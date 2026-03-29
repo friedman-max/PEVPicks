@@ -1,0 +1,74 @@
+{
+  "facets": [
+    {
+      "values": [
+        {
+          "key": {
+            "competitionId": 10547864
+          },
+          "cardinality": 2428,
+          "next": {
+            "values": [
+              {
+                "key": {
+                  "eventTypeId": 7522
+                },
+                "cardinality": 2428
+              }
+            ],
+            "totalResults": 1,
+            "type": "EVENT_TYPE"
+          }
+        },
+        {
+          "key": {
+            "competitionId": 12739957
+          },
+          "cardinality": 44,
+          "next": {
+            "values": [
+              {
+                "key": {
+                  "eventTypeId": 7522
+                },
+                "cardinality": 44
+              }
+            ],
+            "totalResults": 1,
+            "type": "EVENT_TYPE"
+          }
+        }
+      ],
+      "totalResults": 2,
+      "type": "COMPETITION"
+    }
+  ],
+  "results": [],
+  "attachments": {
+    "eventTypes": {
+      "7522": {
+        "name": "Basketball",
+        "key": "EVENT_TYPE:7522",
+        "eventTypeId": 7522
+      }
+    },
+    "competitions": {
+      "12739957": {
+        "key": "COMP:12739957",
+        "name": "NBA Futures",
+        "competitionId": 12739957,
+        "eventId": 34409523,
+        "eventTypeId": 7522,
+        "region": "GBR"
+      },
+      "10547864": {
+        "key": "COMP:10547864",
+        "name": "NBA",
+        "competitionId": 10547864,
+        "eventId": 28049020,
+        "eventTypeId": 7522,
+        "region": "USA"
+      }
+    }
+  }
+}

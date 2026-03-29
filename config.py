@@ -1,0 +1,48 @@
+"""
+App-wide configuration. Edit defaults here or override via .env file.
+"""
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Scraping
+HEADLESS = os.getenv("HEADLESS", "false").lower() == "true"  # headed by default for Cloudflare bypass
+REFRESH_INTERVAL_MINUTES = int(os.getenv("REFRESH_INTERVAL_MINUTES", "15"))
+
+# EV filtering
+MIN_INDIVIDUAL_EV_PCT = float(os.getenv("MIN_INDIVIDUAL_EV_PCT", "0.01"))  # 1%
+
+# Leagues to scrape (can disable any)
+ACTIVE_LEAGUES = {
+    "NBA": os.getenv("LEAGUE_NBA", "true").lower() == "true",
+    "MLB": os.getenv("LEAGUE_MLB", "true").lower() == "true",
+    "NHL": os.getenv("LEAGUE_NHL", "true").lower() == "true",
+    "NCAAB": os.getenv("LEAGUE_NCAAB", "true").lower() == "true",
+}
+
+# FanDuel URLs per league
+FANDUEL_URLS = {
+    "NBA":   "https://sportsbook.fanduel.com/basketball/nba",
+    "MLB":   "https://sportsbook.fanduel.com/baseball/mlb",
+    "NHL":   "https://sportsbook.fanduel.com/hockey/nhl",
+    "NCAAB": "https://sportsbook.fanduel.com/basketball/college-basketball",
+}
+
+# PrizePicks API league IDs
+PRIZEPICKS_LEAGUE_IDS = {
+    "NBA":   7,
+    "MLB":   2,
+    "NHL":   8,
+    "NCAAB": 3,
+}
+
+# Fuzzy match threshold (0-100)
+FUZZY_THRESHOLD = 88
+
+# Single-sided vig assumption
+SINGLE_SIDE_VIG = 0.045
+
+# Server
+HOST = os.getenv("HOST", "127.0.0.1")
+PORT = int(os.getenv("PORT", "8000"))

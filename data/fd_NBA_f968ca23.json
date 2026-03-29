@@ -1,0 +1,37 @@
+{
+  "configs": {
+    "diagnostics": {
+      "browserSDK": {
+        "sampleRate": 0.02
+      }
+    },
+    "sessionReplay": {
+      "sr_interaction_config": {
+        "batch": false,
+        "enabled": true
+      },
+      "sr_privacy_config": {
+        "maskSelector": [
+          "[data-amp-mask]",
+          "#root > div > main > div > div.css-1ck1uaq > div._l._m.css-roynbj > div > section > div.css-1k9nrbz > div > div",
+          "#root > div > main > div > div._s._hj._ar._as._hk._hl._hm._hn._hg._hh._a._fv._cp > div._g._p._s._hs._q > section > div > div:nth-child(3) > div > span",
+          "#root > div > main > div > div._s._hj._ar._as._hk._hl._hm._hn._hg._hh._a._fv._cp > div._g._p._s._hs._q > section > div > div:nth-child(5) > div > span",
+          "#root > div > main > div > div.css-dos1p8 > div:nth-child(2) > div > div._g._fi._az._fj._bd._bc._cv._fk > div:nth-child(2)",
+          "#root > div > main > div > div._s._gq._ar._as._gr._gs._gt._gu._gn._go._a._fv._cp > div._g._p._s._gz._q > section > div > div:nth-child(5) > div",
+          "#root > div > main > div > div._s._gq._ar._as._gr._gs._gt._gu._gn._go._a._fv._cp > div._g._p._s._gz._q > section > div > div:nth-child(3) > div",
+          "#root > div > main > div > div > div > section > div > div:nth-child(5) > div > span",
+          "#root > div > main > div > div > div > section > div > div > div > span",
+          "#root > div > main > div > div > div > div > section > div > div > div"
+        ],
+        "blockSelector": [],
+        "unmaskSelector": [],
+        "defaultMaskLevel": "medium"
+      },
+      "sr_sampling_config": {
+        "sample_rate": 1.0,
+        "capture_enabled": true
+      }
+    },
+    "analyticsSDK": {}
+  }
+}

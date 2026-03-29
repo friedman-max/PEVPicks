@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrizePicks +EV Finder</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <!-- ── Header ── -->
+  <header>
+    <div class="header-left">
+      <span class="logo">PP +EV Finder</span>
+      <span class="badge" id="total-badge">0 bets</span>
+    </div>
+    <div class="header-right">
+      <div class="status-block">
+        <span class="status-dot" id="status-dot"></span>
+        <span id="status-label">Idle</span>
+      </div>
+      <div class="refresh-info">
+        <span id="last-refresh">Never refreshed</span>
+        <span id="next-refresh"></span>
+      </div>
+      <button id="btn-refresh" class="btn btn-primary">Refresh Now</button>
+      <button id="btn-settings" class="btn btn-secondary">Settings</button>
+    </div>
+  </header>
+
+  <!-- ── Tab bar ── -->
+  <div class="tab-bar">
+    <button class="tab active" data-tab="ev">+EV Bets</button>
+    <button class="tab" data-tab="pp">PrizePicks Lines</button>
+  </div>
+
+  <!-- ── Filters bar (EV tab) ── -->
+  <div class="filters-bar" id="ev-filters">
+    <label>League:
+      <select id="filter-league">
+        <option value="">All</option>
+        <option value="NBA">NBA</option>
+        <option value="MLB">MLB</option>
+        <option value="NHL">NHL</option>
+        <option value="NCAAB">NCAAB</option>
+      </select>
+    </label>
+    <label>Prop Type:
+      <input type="text" id="filter-prop" placeholder="e.g. Points" />
+    </label>
+    <label>Min EV%:
+      <input type="number" id="filter-min-ev" value="1" min="0" step="0.5" style="width:70px" />
+    </label>
+    <label>Side:
+      <select id="filter-side">
+        <option value="">Both</option>
+        <option value="over">Over</option>
+        <option value="under">Under</option>
+      </select>
+    </label>
+    <button class="btn btn-secondary" id="btn-clear-filters">Clear</button>
+  </div>
+
+  <!-- ── Filters bar (PP tab) ── -->
+  <div class="filters-bar hidden" id="pp-filters">
+    <label>League:
+      <select id="pp-filter-league">
+        <option value="">All</option>
+        <option value="NBA">NBA</option>
+        <option value="MLB">MLB</option>
+        <option value="NHL">NHL</option>
+        <option value="NCAAB">NCAAB</option>
+      </select>
+    </label>
+    <label>Stat Type:
+      <input type="text" id="pp-filter-stat" placeholder="e.g. Points" />
+    </label>
+    <label>Player:
+      <input type="text" id="pp-filter-player" placeholder="e.g. LeBron" />
+    </label>
+    <button class="btn btn-secondary" id="btn-clear-pp-filters">Clear</button>
+    <button class="btn btn-primary" id="btn-load-pp">Load PrizePicks Lines</button>
+    <span class="badge" id="pp-total-badge">0 lines</span>
+    <span id="pp-status-label" style="color:var(--text-muted);font-size:12px;"></span>
+  </div>
+
+  <!-- ── Main layout (EV tab) ── -->
+  <div class="main-layout" id="ev-view">
+    <!-- Bets table -->
+    <div class="table-section">
+      <div class="table-header-row">
+        <h2>+EV Bets</h2>
+        <div class="table-actions">
+          <span id="selected-count">0 selected</span>
+          <button class="btn btn-accent" id="btn-build-slip" disabled>Build Slip</button>
+          <button class="btn btn-secondary" id="btn-clear-selection">Clear</button>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table id="bets-table">
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="chk-all" title="Select all visible" /></th>
+              <th class="sortable" data-col="player_name">Player</th>
+              <th class="sortable" data-col="league">League</th>
+              <th class="sortable" data-col="prop_type">Prop</th>
+              <th class="sortable" data-col="pp_line">PP Line</th>
+              <th class="sortable" data-col="fd_line">FD Line</th>
+              <th class="sortable" data-col="side">Side</th>
+              <th class="sortable" data-col="true_prob">True Prob</th>
+              <th class="sortable" data-col="edge">Edge</th>
+              <th class="sortable active desc" data-col="individual_ev_pct">Ind. EV%</th>
+              <th>FD Odds</th>
+            </tr>
+          </thead>
+          <tbody id="bets-tbody">
+            <tr id="empty-row">
+              <td colspan="11" class="empty-msg">Click "Refresh Now" to load bets.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Slip builder panel -->
+    <div class="slip-panel" id="slip-panel">
+      <h2>Slip Builder</h2>
+
+      <div class="bankroll-row">
+        <label>Bankroll ($)
+          <input type="number" id="bankroll-input" value="100" min="1" step="10" />
+        </label>
+      </div>
+
+      <div id="slip-legs" class="slip-legs">
+        <p class="empty-msg">Select 2–6 bets from the table.</p>
+      </div>
+
+      <div id="slip-results" class="slip-results hidden">
+        <div class="slip-result-row">
+          <span>Power EV</span>
+          <span id="power-ev" class="ev-value">—</span>
+        </div>
+        <div class="slip-result-row">
+          <span>Flex EV</span>
+          <span id="flex-ev" class="ev-value">—</span>
+        </div>
+        <div class="slip-result-row best-play">
+          <span id="best-play-label">Best Play</span>
+          <span id="best-play-ev" class="ev-value highlight">—</span>
+        </div>
+        <div class="slip-result-row profit-row">
+          <span>Expected Profit</span>
+          <span id="expected-profit" class="ev-value profit">—</span>
+        </div>
+      </div>
+
+      <button class="btn btn-accent btn-full" id="btn-calculate" disabled>Calculate EV</button>
+    </div>
+  </div>
+
+  <!-- ── PrizePicks Lines view ── -->
+  <div class="pp-view hidden" id="pp-view">
+    <div class="table-section">
+      <div class="table-wrapper">
+        <table id="pp-table">
+          <thead>
+            <tr>
+              <th class="sortable-pp" data-col="player_name">Player</th>
+              <th class="sortable-pp" data-col="league">League</th>
+              <th class="sortable-pp" data-col="stat_type">Stat Type</th>
+              <th class="sortable-pp" data-col="line_score">Line</th>
+              <th class="sortable-pp" data-col="start_time">Game Time</th>
+            </tr>
+          </thead>
+          <tbody id="pp-tbody">
+            <tr><td colspan="5" class="empty-msg">Click "Load PrizePicks Lines" to fetch data.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Settings modal ── -->
+  <div class="modal-overlay hidden" id="settings-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Settings</h3>
+        <button class="modal-close" id="btn-close-settings">&times;</button>
+      </div>
+      <div class="modal-body">
+        <label>Auto-refresh interval (minutes)
+          <select id="setting-interval">
+            <option value="5">5</option>
+            <option value="10">10</option>
+            <option value="15" selected>15</option>
+            <option value="30">30</option>
+          </select>
+        </label>
+        <label>Minimum EV% threshold
+          <input type="number" id="setting-min-ev" value="1" min="0" step="0.5" />
+        </label>
+        <fieldset>
+          <legend>Active Leagues</legend>
+          <label><input type="checkbox" class="league-toggle" data-league="NBA" checked /> NBA</label>
+          <label><input type="checkbox" class="league-toggle" data-league="MLB" checked /> MLB</label>
+          <label><input type="checkbox" class="league-toggle" data-league="NHL" checked /> NHL</label>
+          <label><input type="checkbox" class="league-toggle" data-league="NCAAB" checked /> NCAAB</label>
+        </fieldset>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="btn-save-settings">Save</button>
+        <button class="btn btn-secondary" id="btn-cancel-settings">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

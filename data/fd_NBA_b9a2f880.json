@@ -1,0 +1,1617 @@
+{
+  "above-the-fold-ios-xsell-v2": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "above-the-fold-ios-xsell-v3": {
+    "key": "variant",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "experimentKey": "exp-4"
+    },
+    "value": "variant"
+  },
+  "above-the-fold-xsell-android-v3": {
+    "key": "control",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "experimentKey": "exp-1"
+    },
+    "value": "control"
+  },
+  "above-the-fold-xsell-android-v4": {
+    "key": "variant",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "experimentKey": "exp-1"
+    },
+    "value": "variant"
+  },
+  "analytics_logging_to_console": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "testInstrumentation": true
+    }
+  },
+  "atlutd_enable_list_invariant_mitigation": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "atlutd_enable_web_region_selector": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "atlutd_enhanced_product_balance_screen": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "atlutd_use_subscription_for_betslip_with_polling": {
+    "key": "enabled",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "experimentKey": "exp-2"
+    },
+    "value": "enabled"
+  },
+  "badg_casino_clg_loading_fix": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "badg_enable_papi_new_fields": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "badg_enable_quick_bets_new_market_blurbs": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "badg_enable_quick_bets_nfl_any_by_any": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "badg_enable_quick_bets_nfl_player_stats": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "badg_enable_quick_bets_sgp_nfl": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "badg_enable_quick_bets_stats_bar": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "badg_filter_casino_promo_on_sbk_tab": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "badg_horizontal_promos": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "badg_new_reward_cards": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "badg_odds_button_highlight": {
+    "key": "enabled",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "enabled"
+  },
+  "badg_reward_restriction_highlight": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "badg_sbc_stepper": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "badg_use_sib_suggested_web": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "bulldogs_enable_competition_id_rankings": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "casino-explore-test2": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "testInstrumentation": true
+    }
+  },
+  "casino-mds-um": {
+    "key": "treatment",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "experimentKey": "exp-1"
+    },
+    "value": "treatment"
+  },
+  "casino-mds-um-web": {
+    "key": "control",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "experimentKey": "exp-1"
+    },
+    "value": "control"
+  },
+  "checkout-drawer-polling": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "direwatch-passkey-dark-mode": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "testInstrumentation": true
+    }
+  },
+  "double-your-bet": {
+    "key": "control",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "experimentKey": "exp-1"
+    },
+    "value": "control"
+  },
+  "dream_big6_quicklinks": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "dream_disable_ace_deadzone": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "dream_enable_ace_betty_api_v3": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "dream_enable_deeplink_holding_page": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "dream_enable_trending_terms_mvp": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "dream_featured_derby_races": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "dream_no_college_results": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "dream_search_banner": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "dyb-wv-exclusion": {
+    "key": "control",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "experimentKey": "exp-1"
+    },
+    "value": "control"
+  },
+  "eagles_emit_core_events": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "eagles_enable_account_um_logging": {
+    "key": "enabled",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "enabled"
+  },
+  "eagles_enable_corewebview": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "eagles_enable_rg_um": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "eagles_enable_support_and_terms": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "eagles_enable_wallet_balances": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "eagles_log_401_events": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "eagles_my_bets_service_optimization_flow_enabled": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "eagles_new_server_time": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "enable-beacon-api": {
+    "key": "treatment",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "treatment"
+  },
+  "enable_api_state_merger_performance_improvements": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "enable_restricted_to_win_amount": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "enable_rewards_hub": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "enable_sift": {
+    "key": "enabled",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "enabled"
+  },
+  "enable_to_win_amount": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "event-hub-6-box": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "event-preview-card": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "fdtv-stories-entry-point": {
+    "key": "treatment-old",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "experimentKey": "exp-1"
+    },
+    "value": "treatment-old"
+  },
+  "fdtv-stories-in-explore-v2": {
+    "key": "treatment",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "experimentKey": "exp-1"
+    },
+    "value": "treatment"
+  },
+  "flm_enable_pulse": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "flm_pulse_live_now": {
+    "key": "false",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "experimentKey": "exp-1"
+    },
+    "value": "false"
+  },
+  "gard-lsc-nfl": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "gard_autocapture_frustration": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "gard_autocapture_network": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "gard_autocapture_sessions": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "gard_contextual_pulse_home_page_1_86": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "gard_dal_score": {
+    "key": "b",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "payload": {
+      "supportedCompetitions": [
+        "NCAAB",
+        "MLB",
+        "NBA",
+        "NFL"
+      ]
+    },
+    "value": "b"
+  },
+  "gard_enable_amplitude_session_replay": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "gard_enable_core_web_view_data_viz": {
+    "key": "enabled",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "enabled"
+  },
+  "gard_enable_marketcontainer_flashlist": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "gard_enable_persisted_data_viz": {
+    "key": "enabled",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "enabled"
+  },
+  "gard_enable_pulse_flashlist": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "gard_enable_quick_bets_nfl": {
+    "key": "enabled",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "enabled"
+  },
+  "gard_enable_quick_bets_pills": {
+    "key": "enabled",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "enabled"
+  },
+  "gard_enable_quick_bets_stats_banner": {
+    "key": "enabled",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "enabled"
+  },
+  "gard_enable_racing_web": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "gard_enable_selection_box_stats": {
+    "key": "enabled",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "enabled"
+  },
+  "gard_enable_sgp_diff_pricing": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "gard_enable_straights_parlays_diff_pricing": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "gard_enable_streaming_eligibility": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "gard_sgp_diff_pricing_cohorts": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "gard_smp_merge_only": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "gard_straights_parlays_diff_pricing_cohorts": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "geno_enable_rewards_club": {
+    "key": "disabled",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "disabled"
+  },
+  "geocomply_enable": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "goldens_polling_with_use_is_focused": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "goldens_pulse_tab_selected_polling": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "goldens_share_url_shortening": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "goldens_use_sib_suggested": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "herky_cyor": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "herky_cyor_ui_update": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "herky_cyor_ui_with_label": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "herky_enable_adaptive_token": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "herky_enable_boost_builder": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "herky_enable_contextual_tagging_sport_page": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "herky_enable_early_win_token": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "herky_enable_eoy_wrapped_event": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "herky_enable_event_bets_reward_header": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "herky_enable_futures_countdown_timer": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "herky_enable_improved_url_validation": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "herky_enable_login_successful_event": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "herky_enable_my_bets_service_reward_mapping": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "herky_enable_profit_boost_new_sib_contract": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "herky_use_opt_in_response": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "herky_vip_account_links": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "mandalorians-lbrm": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "testInstrumentation": true
+    }
+  },
+  "market-graphs": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "mcn-826-urp-pp-on-x-sell": {
+    "key": "treatment",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "payload": {
+      "shouldEnablePPOnXSell": true
+    },
+    "value": "treatment"
+  },
+  "metadata-web": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "observe-session-sbk": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "testInstrumentation": true
+    }
+  },
+  "omni_enable_my_spend_button": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "omni_enable_my_spend_button_new": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "pandas_event_sorted_squares": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "testInstrumentation": true
+    }
+  },
+  "pasta_pandas_tennis_event_sorting": {
+    "key": "enabled",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "experimentKey": "exp-1"
+    },
+    "value": "enabled"
+  },
+  "production-testing-swj": {
+    "key": "control",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "experimentKey": "exp-1"
+    },
+    "value": "control"
+  },
+  "promo-hub": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "promo-progress": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "testInstrumentation": true
+    }
+  },
+  "promo-progress-beta": {
+    "key": "control",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "experimentKey": "exp-1"
+    },
+    "payload": {
+      "config": {
+        "campaign": "rewards_hub",
+        "type": "insert"
+      },
+      "prismicData": {
+        "product": {
+          "data": {
+            "features": [
+              {
+                "feature_name": "has_promotions"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "value": "control"
+  },
+  "promo-progression-animation": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "testInstrumentation": true
+    }
+  },
+  "qfd-1033-allow-certain-users-to-chose-hp-built-in-profiles": {
+    "key": "control",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "experimentKey": "exp-4"
+    },
+    "payload": false,
+    "value": "control"
+  },
+  "raccoons_enable_refer_a_friend_v2": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "testInstrumentation": true
+    }
+  },
+  "raf-redesign": {
+    "key": "control",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "experimentKey": "exp-1"
+    },
+    "value": "control"
+  },
+  "revert-spread-strike-prices-on-swap": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "rewards-hub": {
+    "key": "control",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "experimentKey": "exp-4"
+    },
+    "value": "control"
+  },
+  "rewards-rive": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "testInstrumentation": true
+    }
+  },
+  "rubies_fix_pulse_flickering_prices": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "rubies_max_payout_check": {
+    "key": "a",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "payload": {
+      "betSlipVariant": {
+        "CLOSED": {
+          "betCount": "1",
+          "enabled": "true",
+          "maxPayout": "1000000"
+        },
+        "STRAIGHTS": {
+          "betCount": "1",
+          "enabled": "true",
+          "maxPayout": "1000000"
+        }
+      }
+    },
+    "value": "a"
+  },
+  "rubies_my_bets_cashout_deprecate_get_eligible_bets": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "sbklbp_disable_mybets_event_links": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "sbklbp_enable_new_features_prompt_my_bets_2_109": {
+    "key": "enabled",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "enabled"
+  },
+  "sbklbp_event_page_basketball_expanded_scoreboard": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "sbklbp_fix_cashout_alert_not_showing": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "sbklbp_force_legacy_scoreboard": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "sbklbp_mlb_home_away_pa_pills": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "sbklbp_nba_enable_next_basket_markets": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "sbklbp_nba_enable_next_basket_templates": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "sbklbp_nba_enable_next_point_pill": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "sbklbp_new_dataviz_american_football_1_93": {
+    "key": "b",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "payload": {
+      "supportedCompetitions": [
+        11432305,
+        12282733,
+        12529073,
+        12276761,
+        12623176,
+        12519209,
+        12496130
+      ]
+    },
+    "value": "b"
+  },
+  "sbklbp_new_dataviz_basketball": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "sbklbp_new_dataviz_configs_2_107": {
+    "key": "a",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "payload": {
+      "datavizConfigs": [
+        {
+          "competitionIds": [
+            11432305,
+            12282733
+          ],
+          "config": {
+            "animations": {
+              "FieldBanner": true,
+              "FieldGoalAttempt": true,
+              "FieldGoalMade": true,
+              "FieldGoalMissed": true,
+              "HighlightFieldGoal": true,
+              "HighlightFumble": true,
+              "HighlightInterception": true,
+              "HighlightOneExtraPoint": true,
+              "HighlightSack": true,
+              "HighlightSafety": true,
+              "HighlightTouchdown": true,
+              "HighlightTurnoverOnDowns": true,
+              "HighlightTwoExtraPoints": true,
+              "Line": true,
+              "MoveLines": true,
+              "RedZone": true,
+              "SemiCircle": true,
+              "SemiCircleCross": true
+            },
+            "features": {
+              "DuplicatedPlay": true,
+              "PlayerHeadshots": false,
+              "PlayerStats": true
+            },
+            "tabs": {
+              "CurrentPlayTab": true,
+              "PlayersTab": true
+            }
+          }
+        },
+        {
+          "competitionIds": [
+            12529073,
+            12276761,
+            12623176,
+            12519209,
+            12499358,
+            12496130
+          ],
+          "config": {
+            "animations": {
+              "FieldBanner": true,
+              "FieldGoalAttempt": false,
+              "FieldGoalMade": false,
+              "FieldGoalMissed": false,
+              "HighlightFieldGoal": true,
+              "HighlightFumble": true,
+              "HighlightInterception": true,
+              "HighlightSack": true,
+              "HighlightSafety": true,
+              "HighlightTouchdown": true,
+              "HighlightTurnoverOnDowns": true,
+              "Line": true,
+              "MoveLines": false,
+              "SemiCircle": true,
+              "SemiCircleCross": true
+            },
+            "features": {
+              "PlayerHeadshots": false,
+              "PlayerStats": false
+            },
+            "tabs": {
+              "CurrentPlayTab": true,
+              "PlayersTab": false
+            }
+          }
+        },
+        {
+          "competitionIds": [
+            10547864,
+            11530660,
+            11384181,
+            11369949,
+            512045
+          ],
+          "config": {
+            "animations": {
+              "Block": true,
+              "DunkMade": true,
+              "DunkMiss": true,
+              "Foul": true,
+              "FreeThrowMade": true,
+              "FreeThrowMiss": true,
+              "Jumpball": true,
+              "LayupMade": true,
+              "LayupMiss": true,
+              "Point": true,
+              "PossessionSwitch": true,
+              "Rebound": true,
+              "Steal": true,
+              "ThreePointMade": true,
+              "ThreePointMiss": true,
+              "TipOff": true,
+              "TwoPointMade": true,
+              "TwoPointMiss": true
+            },
+            "features": {
+              "PlayerCards": true,
+              "PlayerHeadshots": true,
+              "PlayerStats": true
+            },
+            "tabs": {
+              "CurrentPlayTab": true,
+              "PlayersTab": true
+            }
+          }
+        },
+        {
+          "competitionIds": [
+            10861937,
+            12683758,
+            12683760,
+            12274457,
+            531669
+          ],
+          "config": {
+            "animations": {
+              "Block": true,
+              "DunkMade": true,
+              "DunkMiss": true,
+              "Foul": true,
+              "FreeThrowMade": true,
+              "FreeThrowMiss": true,
+              "Jumpball": true,
+              "LayupMade": true,
+              "LayupMiss": true,
+              "Point": true,
+              "PossessionSwitch": true,
+              "Rebound": true,
+              "Steal": true,
+              "ThreePointMade": true,
+              "ThreePointMiss": true,
+              "TipOff": true,
+              "TwoPointMade": true,
+              "TwoPointMiss": true
+            },
+            "features": {
+              "PlayerCards": true,
+              "PlayerHeadshots": true,
+              "PlayerStats": true
+            },
+            "tabs": {
+              "CurrentPlayTab": true,
+              "PlayersTab": true
+            }
+          }
+        }
+      ]
+    },
+    "value": "a"
+  },
+  "sbklbp_new_event_header": {
+    "key": "a",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "payload": {
+      "defaultPill": "undefined",
+      "isNewEventHeader": true,
+      "supportedCompetitions": [
+        "*"
+      ]
+    },
+    "value": "a"
+  },
+  "sbklbp_new_event_page_american_football_2_100": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "sbklbp_new_event_page_baseball_1_92": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "sbklbp_new_event_page_basketball_2_107": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "sbklbp_new_event_page_for_long_tail_sports": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "sbklbp_nfl_quick_bets_split_catch_a_pass": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "sbklbp_pulse_cards_narrative_experiment_2_106": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "sbklbp_pulse_scaling_2_100": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "sbklbp_quick_bets_market_header_for_player_header": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "sbklbp_quick_bets_mlb_2_117": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "sbklbp_react_query_force_refetch": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "sbklbp_react_query_optimizations": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "scoreboard-enabled": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "search-page": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "share_bet_receipt": {
+    "key": "enabled",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "enabled"
+  },
+  "site-wide-jackpots": {
+    "key": "site-wide-jackpots",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "experimentKey": "exp-2"
+    },
+    "payload": {
+      "config": {
+        "campaign": "site_wide_jackpots",
+        "type": "insert"
+      },
+      "prismicData": {
+        "product": {
+          "data": {
+            "features": [
+              {
+                "feature_name": "swj_module"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "value": "site-wide-jackpots"
+  },
+  "spreads-in-6-box": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "tawnies_ab_recommender": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "tawnies_enable_yourway_new_tag_v1": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "tawnies_pulse_get_cards_with_location": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "tc-298-show-quick-picks-module": {
+    "key": "control",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "experimentKey": "exp-1"
+    },
+    "value": "control"
+  },
+  "tc-437-use-formation": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "tc-935-hide-silks": {
+    "key": "treatment",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "treatment"
+  },
+  "team-seed-hardcoded": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "toad_pass_the_leg": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "toad_pass_the_leg_holding": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "toad_rename_special_bets_to_oscars": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "trams_account_rewards_hub_link": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "trams_betslip_redesign": {
+    "key": "enabled",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "experimentKey": "exp-1"
+    },
+    "value": "enabled"
+  },
+  "trams_datetime_performance": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "testInstrumentation": true
+    }
+  },
+  "trams_enable_action_tokens": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "trams_menu_icons_overwrite": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "trams_revised_streaming_eligibility_provisioning": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "testInstrumentation": true
+    }
+  },
+  "trams_rewards_hub_link": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "trams_sweep": {
+    "key": "a",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "payload": {
+      "account": {
+        "amount": "Sweepstakes",
+        "amountSingular": "1 Sweepstake",
+        "heading": "NFL Touchdown Jackpot"
+      },
+      "betslip": {
+        "drawer": {
+          "rowTitle": "Use NFL Touchdown Jackpot",
+          "sectionHeading": "NFL Touchdown Jackpot"
+        },
+        "label": "NFL Touchdown Jackpot"
+      },
+      "iconName": "GenerosityRewards",
+      "pillLabel": "NFL Touchdown Jackpot",
+      "rewardHelpModal": {
+        "rows": {
+          "0": "To enter, toggle 'On' this token when you place an eligible bet.",
+          "1": " If your bet meets the criteria, you'll win your original bet payout plus a share of the Bonus Bets prize!",
+          "2": " For specific offer rules and details, tap Learn more."
+        },
+        "title": "NFL Touchdown Jackpot"
+      },
+      "rewardsCard": {
+        "subtitle": "Jackpot",
+        "title": "NFL Touchdown"
+      },
+      "rewardsSheet": {
+        "label": "NFL Touchdown Jackpot",
+        "title": "NFL Touchdown Jackpot"
+      },
+      "staticPromoCode": "NFLTDJKPT0202ST",
+      "tag": "NFL TOUCHDOWN JACKPOT"
+    },
+    "value": "a"
+  },
+  "uw-4028-experimental-design-ticket-new-watch-live-button": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "testInstrumentation": true
+    }
+  },
+  "uw-4729-experiment-or-fdr-xs-win-probability": {
+    "key": "treatment",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "experimentKey": "exp-1"
+    },
+    "value": "treatment"
+  },
+  "uw-4840": {
+    "key": "control",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "experimentKey": "exp-1"
+    },
+    "value": "control"
+  },
+  "uw-5366-clickable-odds-on-todays-popular-races": {
+    "key": "treatment",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605",
+      "experimentKey": "exp-2"
+    },
+    "value": "treatment"
+  },
+  "wiz_enable_horizontal_upcoming_races": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "wiz_enable_live_racing_tab": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "wiz_enable_popular_parlay_narratives": {
+    "key": "enabled",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "enabled"
+  },
+  "wiz_enable_popular_sgp_narratives": {
+    "key": "enabled",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "enabled"
+  },
+  "wiz_enable_share_active_my_bets": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "wiz_enable_show_alert_on_error_dialog_improvements": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  },
+  "wiz_enable_upcoming_races_1_80": {
+    "key": "enabled",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "enabled"
+  },
+  "wiz_enable_url_encoding_share": {
+    "key": "on",
+    "metadata": {
+      "evaluationId": "1523228144143_1774819212502_2605"
+    },
+    "value": "on"
+  },
+  "wiz_to_win_as_label": {
+    "key": "off",
+    "metadata": {
+      "default": true,
+      "evaluationId": "1523228144143_1774819212502_2605"
+    }
+  }
+}

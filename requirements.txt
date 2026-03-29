@@ -1,0 +1,8 @@
+playwright
+playwright-stealth
+fastapi
+uvicorn[standard]
+apscheduler
+httpx
+rapidfuzz
+python-dotenv
