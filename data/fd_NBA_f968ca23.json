@@ -28,8 +28,8 @@
         "defaultMaskLevel": "medium"
       },
       "sr_sampling_config": {
-        "sample_rate": 1.0,
-        "capture_enabled": true
+        "capture_enabled": true,
+        "sample_rate": 1.0
       }
     },
     "analyticsSDK": {}

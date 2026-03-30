@@ -41,10 +41,12 @@ _state = {
     "bets":          [],        # list[dict] — serialized BetResult
     "bet_map":       {},        # bet_id -> BetResult (for slip calc)
     "pp_lines":      [],        # list[dict] — raw PrizePicks lines
+    "fd_lines":      [],        # list[dict] — raw FanDuel lines
     "last_refresh":  None,      # datetime | None
     "next_refresh":  None,      # datetime | None
     "is_scraping":   False,
     "is_scraping_pp": False,
+    "is_scraping_fd": False,
     "scrape_errors": {},        # league -> error str | None
     "interval_min":  cfg.REFRESH_INTERVAL_MINUTES,
     "min_ev_pct":    cfg.MIN_INDIVIDUAL_EV_PCT,
@@ -305,3 +307,68 @@ def _run_pp_scrape():
     finally:
         with _lock:
             _state["is_scraping_pp"] = False
+
+# ---------------------------------------------------------------------------
+# FanDuel-only endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/api/fanduel")
+def get_fanduel():
+    with _lock:
+        return {
+            "lines": _state["fd_lines"],
+            "total": len(_state["fd_lines"]),
+            "is_scraping": _state["is_scraping_fd"],
+        }
+
+
+@app.post("/api/fanduel/refresh")
+def refresh_fanduel():
+    with _lock:
+        if _state["is_scraping_fd"]:
+            raise HTTPException(status_code=409, detail="FanDuel scrape already in progress.")
+    threading.Thread(target=_run_fd_scrape, daemon=True).start()
+    return {"status": "fanduel refresh started"}
+
+
+def _run_fd_scrape():
+    with _lock:
+        if _state["is_scraping_fd"]:
+            return
+        _state["is_scraping_fd"] = True
+
+    try:
+        with _lock:
+            leagues = dict(_state["active_leagues"])
+
+        logger.info("FanDuel scrape starting...")
+        fd_props = scrape_fanduel(active_leagues=leagues)
+        serialized = []
+        for p in fd_props:
+            if p.over_odds is not None:
+                serialized.append({
+                    "league": p.league,
+                    "player_name": p.player_name,
+                    "stat_type": p.prop_type + " (O)",
+                    "line_score": p.line,
+                    "line_odds": p.over_odds,
+                    "start_time": None,
+                })
+            if p.under_odds is not None:
+                serialized.append({
+                    "league": p.league,
+                    "player_name": p.player_name,
+                    "stat_type": p.prop_type + " (U)",
+                    "line_score": p.line,
+                    "line_odds": p.under_odds,
+                    "start_time": None,
+                })
+        with _lock:
+            _state["fd_lines"] = serialized
+        logger.info("FanDuel scrape complete: %d lines.", len(serialized))
+    except Exception as e:
+        logger.exception("FanDuel scrape error: %s", e)
+    finally:
+        with _lock:
+            _state["is_scraping_fd"] = False
+

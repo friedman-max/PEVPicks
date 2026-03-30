@@ -64,9 +64,9 @@
       "eventTypeName": "Australian Rules",
       "eventTypeId": 61420
     },
-    "998917": {
-      "eventTypeName": "Volleyball",
-      "eventTypeId": 998917
+    "468328": {
+      "eventTypeName": "Handball",
+      "eventTypeId": 468328
     },
     "2593174": {
       "eventTypeName": "Table Tennis",
@@ -125,7 +125,6 @@
     2593174,
     3503,
     61420,
-    998917,
     6,
     5,
     4,
@@ -133,6 +132,7 @@
     8,
     1477,
     6422,
+    468328,
     28608997
   ],
   "QUICK_LINKS": [
@@ -673,9 +673,9 @@
       "name": "Australian Rules",
       "eventTypeId": 61420
     },
-    "998917": {
-      "name": "Volleyball",
-      "eventTypeId": 998917
+    "468328": {
+      "name": "Handball",
+      "eventTypeId": 468328
     },
     "2593174": {
       "name": "Table Tennis",

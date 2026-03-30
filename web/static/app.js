@@ -397,16 +397,24 @@ document.querySelectorAll(".tab").forEach(tab => {
     tab.classList.add("active");
 
     const target = tab.dataset.tab;
+    
+    // Hide all
+    $("ev-view").classList.add("hidden");
+    $("ev-filters").classList.add("hidden");
+    $("pp-view").classList.add("hidden");
+    $("pp-filters").classList.add("hidden");
+    $("fd-view").classList.add("hidden");
+    $("fd-filters").classList.add("hidden");
+
     if (target === "ev") {
       $("ev-view").classList.remove("hidden");
       $("ev-filters").classList.remove("hidden");
-      $("pp-view").classList.add("hidden");
-      $("pp-filters").classList.add("hidden");
-    } else {
-      $("ev-view").classList.add("hidden");
-      $("ev-filters").classList.add("hidden");
+    } else if (target === "pp") {
       $("pp-view").classList.remove("hidden");
       $("pp-filters").classList.remove("hidden");
+    } else if (target === "fd") {
+      $("fd-view").classList.remove("hidden");
+      $("fd-filters").classList.remove("hidden");
     }
   });
 });
@@ -538,6 +546,137 @@ $("btn-load-pp").addEventListener("click", async () => {
   } finally {
     btn.disabled = false;
     btn.textContent = "Load PrizePicks Lines";
+  }
+});
+
+// ── FanDuel Lines ──────────────────────────────────────────────────────
+const fdState = {
+  allLines:      [],
+  filteredLines: [],
+  sortCol:       "player_name",
+  sortDir:       "asc",
+};
+
+const fdTbody       = $("fd-tbody");
+const fdTotalBadge  = $("fd-total-badge");
+const fdStatusLabel = $("fd-status-label");
+
+function applyFDFilters() {
+  const league = $("fd-filter-league").value.toUpperCase();
+  const stat   = $("fd-filter-stat").value.toLowerCase().trim();
+  const player = $("fd-filter-player").value.toLowerCase().trim();
+
+  fdState.filteredLines = fdState.allLines.filter(l => {
+    if (league && l.league !== league) return false;
+    if (stat && !l.stat_type.toLowerCase().includes(stat)) return false;
+    if (player && !l.player_name.toLowerCase().includes(player)) return false;
+    return true;
+  });
+
+  renderFDTable();
+}
+
+["fd-filter-league", "fd-filter-stat", "fd-filter-player"].forEach(id => {
+  $(id).addEventListener("input", applyFDFilters);
+  $(id).addEventListener("change", applyFDFilters);
+});
+
+$("btn-clear-fd-filters").addEventListener("click", () => {
+  $("fd-filter-league").value = "";
+  $("fd-filter-stat").value   = "";
+  $("fd-filter-player").value = "";
+  applyFDFilters();
+});
+
+// Sorting
+document.querySelectorAll("th.sortable-fd").forEach(th => {
+  th.addEventListener("click", () => {
+    const col = th.dataset.col;
+    if (fdState.sortCol === col) {
+      fdState.sortDir = fdState.sortDir === "desc" ? "asc" : "desc";
+    } else {
+      fdState.sortCol = col;
+      fdState.sortDir = col === "line_score" ? "desc" : "asc";
+    }
+    document.querySelectorAll("th.sortable-fd").forEach(t => {
+      t.classList.remove("active", "asc", "desc");
+    });
+    th.classList.add("active", fdState.sortDir);
+    renderFDTable();
+  });
+});
+
+function sortFDLines(lines) {
+  return [...lines].sort((a, b) => {
+    let va = a[fdState.sortCol] ?? "";
+    let vb = b[fdState.sortCol] ?? "";
+    if (typeof va === "string") va = va.toLowerCase();
+    if (typeof vb === "string") vb = vb.toLowerCase();
+    if (va < vb) return fdState.sortDir === "asc" ? -1 : 1;
+    if (va > vb) return fdState.sortDir === "asc" ? 1 : -1;
+    return 0;
+  });
+}
+
+function renderFDTable() {
+  const sorted = sortFDLines(fdState.filteredLines);
+  fdTotalBadge.textContent = `${sorted.length} lines`;
+
+  if (sorted.length === 0) {
+    fdTbody.innerHTML = `<tr><td colspan="6" class="empty-msg">
+      ${fdState.allLines.length === 0 ? 'Click "Load FanDuel Lines" to fetch data.' : "No lines match current filters."}
+    </td></tr>`;
+    return;
+  }
+
+  fdTbody.innerHTML = sorted.map(l => {
+    let gameTime = "—";
+    if (l.start_time) {
+      const d = new Date(l.start_time);
+      gameTime = d.toLocaleDateString([], { month: "numeric", day: "numeric" }) +
+        " " + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    }
+    return `<tr>
+      <td>${l.player_name}</td>
+      <td><span class="league-tag league-${l.league}">${l.league}</span></td>
+      <td>${l.stat_type}</td>
+      <td class="line-value">${l.line_score}</td>
+      <td class="line-value">${fmt.odds(l.line_odds)}</td>
+      <td class="game-time">${gameTime}</td>
+    </tr>`;
+  }).join("");
+}
+
+// Load button
+$("btn-load-fd").addEventListener("click", async () => {
+  const btn = $("btn-load-fd");
+  btn.disabled = true;
+  btn.textContent = "Loading...";
+  fdStatusLabel.textContent = "Fetching FanDuel...";
+
+  try {
+    // Trigger scrape
+    await fetch("/api/fanduel/refresh", { method: "POST" });
+
+    // Poll until done
+    let done = false;
+    while (!done) {
+      await new Promise(r => setTimeout(r, 2000));
+      const resp = await fetch("/api/fanduel");
+      const data = await resp.json();
+      if (!data.is_scraping) {
+        fdState.allLines = data.lines || [];
+        done = true;
+      }
+    }
+
+    fdStatusLabel.textContent = `Loaded at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    applyFDFilters();
+  } catch (e) {
+    fdStatusLabel.textContent = "Error: " + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Load FanDuel Lines";
   }
 });
 

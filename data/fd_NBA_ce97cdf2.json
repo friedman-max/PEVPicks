@@ -157,8 +157,9 @@
     "metadata": {
       "deployed": true,
       "evaluationMode": "remote",
-      "flagType": "release",
-      "flagVersion": 33
+      "experimentKey": "exp-1",
+      "flagType": "experiment",
+      "flagVersion": 35
     },
     "segments": [
       {
@@ -2114,41 +2115,6 @@
     }
   },
   {
-    "key": "raccoons_enable_refer_a_friend_v2",
-    "metadata": {
-      "deployed": true,
-      "evaluationMode": "remote",
-      "experimentKey": "exp-1",
-      "flagType": "experiment",
-      "flagVersion": 16,
-      "testInstrumentation": true
-    },
-    "segments": [
-      {
-        "metadata": {
-          "segmentName": "default"
-        },
-        "variant": "off"
-      }
-    ],
-    "variants": {
-      "disabled": {
-        "key": "disabled",
-        "value": "disabled"
-      },
-      "enabled": {
-        "key": "enabled",
-        "value": "enabled"
-      },
-      "off": {
-        "key": "off",
-        "metadata": {
-          "default": true
-        }
-      }
-    }
-  },
-  {
     "key": "atlutd_enhanced_product_balance_screen",
     "metadata": {
       "deployed": true,
@@ -3551,35 +3517,6 @@
     }
   },
   {
-    "key": "gard_enable_amplitude_session_replay",
-    "metadata": {
-      "deployed": true,
-      "evaluationMode": "remote",
-      "flagType": "release",
-      "flagVersion": 37
-    },
-    "segments": [
-      {
-        "metadata": {
-          "segmentName": "default"
-        },
-        "variant": "off"
-      }
-    ],
-    "variants": {
-      "off": {
-        "key": "off",
-        "metadata": {
-          "default": true
-        }
-      },
-      "on": {
-        "key": "on",
-        "value": "on"
-      }
-    }
-  },
-  {
     "key": "fdtv-stories-entry-point",
     "metadata": {
       "deployed": true,
@@ -4498,7 +4435,7 @@
       "evaluationMode": "remote",
       "experimentKey": "exp-1",
       "flagType": "experiment",
-      "flagVersion": 14,
+      "flagVersion": 16,
       "testInstrumentation": true
     },
     "segments": [

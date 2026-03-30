@@ -23,10 +23,10 @@ ACTIVE_LEAGUES = {
 
 # FanDuel URLs per league
 FANDUEL_URLS = {
-    "NBA":   "https://sportsbook.fanduel.com/basketball/nba",
-    "MLB":   "https://sportsbook.fanduel.com/baseball/mlb",
-    "NHL":   "https://sportsbook.fanduel.com/hockey/nhl",
-    "NCAAB": "https://sportsbook.fanduel.com/basketball/college-basketball",
+    "NBA":   "https://sportsbook.fanduel.com/navigation/nba",
+    "MLB":   "https://sportsbook.fanduel.com/navigation/mlb",
+    "NHL":   "https://sportsbook.fanduel.com/navigation/nhl",
+    "NCAAB": "https://sportsbook.fanduel.com/navigation/ncaab",
 }
 
 # PrizePicks API league IDs

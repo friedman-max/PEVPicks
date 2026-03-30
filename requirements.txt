@@ -1,5 +1,3 @@
-playwright
-playwright-stealth
 fastapi
 uvicorn[standard]
 apscheduler

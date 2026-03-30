@@ -51,3 +51,11 @@ Thumbs.db
 web/__pycache__/
 engine/__pycache__/
 scrapers/__pycache__/
+
+# Local testing & data dumps
+test_*.py
+run_*.sh
+data/*.json
+data/*.png
+data/*.html
+

@@ -3,13 +3,13 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "above-the-fold-ios-xsell-v3": {
     "key": "variant",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "experimentKey": "exp-4"
     },
     "value": "variant"
@@ -17,7 +17,7 @@
   "above-the-fold-xsell-android-v3": {
     "key": "control",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "experimentKey": "exp-1"
     },
     "value": "control"
@@ -25,7 +25,7 @@
   "above-the-fold-xsell-android-v4": {
     "key": "variant",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "experimentKey": "exp-1"
     },
     "value": "variant"
@@ -34,7 +34,7 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "testInstrumentation": true
     }
   },
@@ -42,13 +42,13 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "atlutd_enable_web_region_selector": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
@@ -56,13 +56,13 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "atlutd_use_subscription_for_betslip_with_polling": {
     "key": "enabled",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "experimentKey": "exp-2"
     },
     "value": "enabled"
@@ -71,83 +71,83 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "badg_enable_papi_new_fields": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "badg_enable_quick_bets_new_market_blurbs": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "badg_enable_quick_bets_nfl_any_by_any": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "badg_enable_quick_bets_nfl_player_stats": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "badg_enable_quick_bets_sgp_nfl": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "badg_enable_quick_bets_stats_bar": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "badg_filter_casino_promo_on_sbk_tab": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "badg_horizontal_promos": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "badg_new_reward_cards": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "badg_odds_button_highlight": {
     "key": "enabled",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "enabled"
   },
   "badg_reward_restriction_highlight": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
@@ -155,20 +155,20 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "badg_use_sib_suggested_web": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
   "bulldogs_enable_competition_id_rankings": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
@@ -176,14 +176,14 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "testInstrumentation": true
     }
   },
   "casino-mds-um": {
     "key": "treatment",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "experimentKey": "exp-1"
     },
     "value": "treatment"
@@ -191,7 +191,7 @@
   "casino-mds-um-web": {
     "key": "control",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "experimentKey": "exp-1"
     },
     "value": "control"
@@ -199,7 +199,7 @@
   "checkout-drawer-polling": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
@@ -207,14 +207,14 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "testInstrumentation": true
     }
   },
   "double-your-bet": {
     "key": "control",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "experimentKey": "exp-1"
     },
     "value": "control"
@@ -222,7 +222,7 @@
   "dream_big6_quicklinks": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
@@ -230,13 +230,13 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "dream_enable_ace_betty_api_v3": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
@@ -244,27 +244,27 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "dream_enable_trending_terms_mvp": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "dream_featured_derby_races": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "dream_no_college_results": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
@@ -272,13 +272,13 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "dyb-wv-exclusion": {
     "key": "control",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "experimentKey": "exp-1"
     },
     "value": "control"
@@ -287,13 +287,13 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "eagles_enable_account_um_logging": {
     "key": "enabled",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "enabled"
   },
@@ -301,41 +301,41 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "eagles_enable_rg_um": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "eagles_enable_support_and_terms": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "eagles_enable_wallet_balances": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "eagles_log_401_events": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "eagles_my_bets_service_optimization_flow_enabled": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
@@ -343,41 +343,41 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "enable-beacon-api": {
     "key": "treatment",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "treatment"
   },
   "enable_api_state_merger_performance_improvements": {
-    "key": "off",
+    "key": "on",
     "metadata": {
-      "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
-    }
+      "evaluationId": "1524215900259_1774906391757_3263"
+    },
+    "value": "on"
   },
   "enable_restricted_to_win_amount": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "enable_rewards_hub": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "enable_sift": {
     "key": "enabled",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "enabled"
   },
@@ -385,27 +385,27 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "event-hub-6-box": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
   "event-preview-card": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
   "fdtv-stories-entry-point": {
     "key": "treatment-old",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "experimentKey": "exp-1"
     },
     "value": "treatment-old"
@@ -413,7 +413,7 @@
   "fdtv-stories-in-explore-v2": {
     "key": "treatment",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "experimentKey": "exp-1"
     },
     "value": "treatment"
@@ -422,13 +422,13 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "flm_pulse_live_now": {
     "key": "false",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "experimentKey": "exp-1"
     },
     "value": "false"
@@ -437,41 +437,41 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "gard_autocapture_frustration": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "gard_autocapture_network": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "gard_autocapture_sessions": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "gard_contextual_pulse_home_page_1_86": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "gard_dal_score": {
     "key": "b",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "payload": {
       "supportedCompetitions": [
@@ -483,17 +483,10 @@
     },
     "value": "b"
   },
-  "gard_enable_amplitude_session_replay": {
-    "key": "off",
-    "metadata": {
-      "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
-    }
-  },
   "gard_enable_core_web_view_data_viz": {
     "key": "enabled",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "enabled"
   },
@@ -501,13 +494,13 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "gard_enable_persisted_data_viz": {
     "key": "enabled",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "enabled"
   },
@@ -515,27 +508,27 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "gard_enable_quick_bets_nfl": {
     "key": "enabled",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "enabled"
   },
   "gard_enable_quick_bets_pills": {
     "key": "enabled",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "enabled"
   },
   "gard_enable_quick_bets_stats_banner": {
     "key": "enabled",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "enabled"
   },
@@ -543,13 +536,13 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "gard_enable_selection_box_stats": {
     "key": "enabled",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "enabled"
   },
@@ -557,34 +550,34 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "gard_enable_straights_parlays_diff_pricing": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "gard_enable_streaming_eligibility": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "gard_sgp_diff_pricing_cohorts": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "gard_smp_merge_only": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
@@ -592,20 +585,21 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "geno_enable_rewards_club": {
     "key": "disabled",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263",
+      "experimentKey": "exp-1"
     },
     "value": "disabled"
   },
   "geocomply_enable": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
@@ -613,27 +607,27 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "goldens_pulse_tab_selected_polling": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "goldens_share_url_shortening": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "goldens_use_sib_suggested": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
@@ -641,27 +635,27 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "herky_cyor_ui_update": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "herky_cyor_ui_with_label": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "herky_enable_adaptive_token": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
@@ -669,34 +663,34 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "herky_enable_contextual_tagging_sport_page": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "herky_enable_early_win_token": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "herky_enable_eoy_wrapped_event": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "herky_enable_event_bets_reward_header": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
@@ -704,34 +698,34 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "herky_enable_improved_url_validation": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "herky_enable_login_successful_event": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "herky_enable_my_bets_service_reward_mapping": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "herky_enable_profit_boost_new_sib_contract": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
@@ -739,21 +733,21 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "herky_vip_account_links": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "mandalorians-lbrm": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "testInstrumentation": true
     }
   },
@@ -761,13 +755,13 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "mcn-826-urp-pp-on-x-sell": {
     "key": "treatment",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "payload": {
       "shouldEnablePPOnXSell": true
@@ -777,7 +771,7 @@
   "metadata-web": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
@@ -785,21 +779,21 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "testInstrumentation": true
     }
   },
   "omni_enable_my_spend_button": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
   "omni_enable_my_spend_button_new": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
@@ -807,14 +801,14 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "testInstrumentation": true
     }
   },
   "pasta_pandas_tennis_event_sorting": {
     "key": "enabled",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "experimentKey": "exp-1"
     },
     "value": "enabled"
@@ -822,7 +816,7 @@
   "production-testing-swj": {
     "key": "control",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "experimentKey": "exp-1"
     },
     "value": "control"
@@ -830,7 +824,7 @@
   "promo-hub": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
@@ -838,14 +832,14 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "testInstrumentation": true
     }
   },
   "promo-progress-beta": {
     "key": "control",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "experimentKey": "exp-1"
     },
     "payload": {
@@ -871,31 +865,23 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "testInstrumentation": true
     }
   },
   "qfd-1033-allow-certain-users-to-chose-hp-built-in-profiles": {
     "key": "control",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "experimentKey": "exp-4"
     },
     "payload": false,
     "value": "control"
   },
-  "raccoons_enable_refer_a_friend_v2": {
-    "key": "off",
-    "metadata": {
-      "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605",
-      "testInstrumentation": true
-    }
-  },
   "raf-redesign": {
     "key": "control",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "experimentKey": "exp-1"
     },
     "value": "control"
@@ -903,14 +889,14 @@
   "revert-spread-strike-prices-on-swap": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
   "rewards-hub": {
     "key": "control",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "experimentKey": "exp-4"
     },
     "value": "control"
@@ -919,7 +905,7 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "testInstrumentation": true
     }
   },
@@ -927,13 +913,13 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "rubies_max_payout_check": {
     "key": "a",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "payload": {
       "betSlipVariant": {
@@ -955,20 +941,20 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "sbklbp_disable_mybets_event_links": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "sbklbp_enable_new_features_prompt_my_bets_2_109": {
     "key": "enabled",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "enabled"
   },
@@ -976,13 +962,13 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "sbklbp_fix_cashout_alert_not_showing": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
@@ -990,41 +976,41 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "sbklbp_mlb_home_away_pa_pills": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "sbklbp_nba_enable_next_basket_markets": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "sbklbp_nba_enable_next_basket_templates": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "sbklbp_nba_enable_next_point_pill": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "sbklbp_new_dataviz_american_football_1_93": {
     "key": "b",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "payload": {
       "supportedCompetitions": [
@@ -1043,13 +1029,13 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "sbklbp_new_dataviz_configs_2_107": {
     "key": "a",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "payload": {
       "datavizConfigs": [
@@ -1214,7 +1200,7 @@
   "sbklbp_new_event_header": {
     "key": "a",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "payload": {
       "defaultPill": "undefined",
@@ -1229,27 +1215,27 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "sbklbp_new_event_page_baseball_1_92": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "sbklbp_new_event_page_basketball_2_107": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "sbklbp_new_event_page_for_long_tail_sports": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
@@ -1257,76 +1243,76 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "sbklbp_pulse_cards_narrative_experiment_2_106": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "sbklbp_pulse_scaling_2_100": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "sbklbp_quick_bets_market_header_for_player_header": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "sbklbp_quick_bets_mlb_2_117": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "sbklbp_react_query_force_refetch": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
   "sbklbp_react_query_optimizations": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
   "scoreboard-enabled": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
   "search-page": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
   "share_bet_receipt": {
     "key": "enabled",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "enabled"
   },
   "site-wide-jackpots": {
     "key": "site-wide-jackpots",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "experimentKey": "exp-2"
     },
     "payload": {
@@ -1351,7 +1337,7 @@
   "spreads-in-6-box": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
@@ -1359,13 +1345,13 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "tawnies_enable_yourway_new_tag_v1": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
@@ -1373,13 +1359,13 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "tc-298-show-quick-picks-module": {
     "key": "control",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "experimentKey": "exp-1"
     },
     "value": "control"
@@ -1388,20 +1374,20 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "tc-935-hide-silks": {
     "key": "treatment",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "treatment"
   },
   "team-seed-hardcoded": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
@@ -1409,20 +1395,20 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "toad_pass_the_leg_holding": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "toad_rename_special_bets_to_oscars": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
@@ -1430,13 +1416,13 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "trams_betslip_redesign": {
     "key": "enabled",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "experimentKey": "exp-1"
     },
     "value": "enabled"
@@ -1445,7 +1431,7 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "testInstrumentation": true
     }
   },
@@ -1453,21 +1439,21 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "trams_menu_icons_overwrite": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "trams_revised_streaming_eligibility_provisioning": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "testInstrumentation": true
     }
   },
@@ -1475,13 +1461,13 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "trams_sweep": {
     "key": "a",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "payload": {
       "account": {
@@ -1523,14 +1509,14 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "testInstrumentation": true
     }
   },
   "uw-4729-experiment-or-fdr-xs-win-probability": {
     "key": "treatment",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "experimentKey": "exp-1"
     },
     "value": "treatment"
@@ -1538,7 +1524,7 @@
   "uw-4840": {
     "key": "control",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "experimentKey": "exp-1"
     },
     "value": "control"
@@ -1546,7 +1532,7 @@
   "uw-5366-clickable-odds-on-todays-popular-races": {
     "key": "treatment",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605",
+      "evaluationId": "1524215900259_1774906391757_3263",
       "experimentKey": "exp-2"
     },
     "value": "treatment"
@@ -1555,27 +1541,27 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "wiz_enable_live_racing_tab": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "wiz_enable_popular_parlay_narratives": {
     "key": "enabled",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "enabled"
   },
   "wiz_enable_popular_sgp_narratives": {
     "key": "enabled",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "enabled"
   },
@@ -1583,27 +1569,27 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "wiz_enable_show_alert_on_error_dialog_improvements": {
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   },
   "wiz_enable_upcoming_races_1_80": {
     "key": "enabled",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "enabled"
   },
   "wiz_enable_url_encoding_share": {
     "key": "on",
     "metadata": {
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     },
     "value": "on"
   },
@@ -1611,7 +1597,7 @@
     "key": "off",
     "metadata": {
       "default": true,
-      "evaluationId": "1523228144143_1774819212502_2605"
+      "evaluationId": "1524215900259_1774906391757_3263"
     }
   }
 }

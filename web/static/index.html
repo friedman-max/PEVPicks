@@ -31,6 +31,7 @@
   <div class="tab-bar">
     <button class="tab active" data-tab="ev">+EV Bets</button>
     <button class="tab" data-tab="pp">PrizePicks Lines</button>
+    <button class="tab" data-tab="fd">FanDuel Lines</button>
   </div>
 
   <!-- ── Filters bar (EV tab) ── -->
@@ -81,6 +82,29 @@
     <button class="btn btn-primary" id="btn-load-pp">Load PrizePicks Lines</button>
     <span class="badge" id="pp-total-badge">0 lines</span>
     <span id="pp-status-label" style="color:var(--text-muted);font-size:12px;"></span>
+  </div>
+
+  <!-- ── Filters bar (FD tab) ── -->
+  <div class="filters-bar hidden" id="fd-filters">
+    <label>League:
+      <select id="fd-filter-league">
+        <option value="">All</option>
+        <option value="NBA">NBA</option>
+        <option value="MLB">MLB</option>
+        <option value="NHL">NHL</option>
+        <option value="NCAAB">NCAAB</option>
+      </select>
+    </label>
+    <label>Stat Type:
+      <input type="text" id="fd-filter-stat" placeholder="e.g. Points" />
+    </label>
+    <label>Player:
+      <input type="text" id="fd-filter-player" placeholder="e.g. LeBron" />
+    </label>
+    <button class="btn btn-secondary" id="btn-clear-fd-filters">Clear</button>
+    <button class="btn btn-primary" id="btn-load-fd">Load FanDuel Lines</button>
+    <span class="badge" id="fd-total-badge">0 lines</span>
+    <span id="fd-status-label" style="color:var(--text-muted);font-size:12px;"></span>
   </div>
 
   <!-- ── Main layout (EV tab) ── -->
@@ -175,6 +199,29 @@
           </thead>
           <tbody id="pp-tbody">
             <tr><td colspan="5" class="empty-msg">Click "Load PrizePicks Lines" to fetch data.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── FanDuel Lines view ── -->
+  <div class="pp-view hidden" id="fd-view">
+    <div class="table-section">
+      <div class="table-wrapper">
+        <table id="fd-table">
+          <thead>
+            <tr>
+              <th class="sortable-fd" data-col="player_name">Player</th>
+              <th class="sortable-fd" data-col="league">League</th>
+              <th class="sortable-fd" data-col="stat_type">Stat Type</th>
+              <th class="sortable-fd" data-col="line_score">Line</th>
+              <th class="sortable-fd" data-col="line_odds">Line Odds</th>
+              <th class="sortable-fd" data-col="start_time">Game Time</th>
+            </tr>
+          </thead>
+          <tbody id="fd-tbody">
+            <tr><td colspan="6" class="empty-msg">Click "Load FanDuel Lines" to fetch data.</td></tr>
           </tbody>
         </table>
       </div>

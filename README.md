@@ -16,7 +16,6 @@ A local dashboard that compares PrizePicks lines against FanDuel odds to surface
 - Python 3.10+
 - FastAPI + Uvicorn
 - APScheduler
-- Playwright + playwright-stealth
 - httpx
 - rapidfuzz
 
@@ -29,7 +28,7 @@ A local dashboard that compares PrizePicks lines against FanDuel odds to surface
 ├─ requirements.txt
 ├─ scrapers/
 │  ├─ prizepicks.py       # PrizePicks API scraper
-│  └─ fanduel.py          # FanDuel Playwright scraper
+│  └─ fanduel.py          # FanDuel API scraper
 ├─ engine/                # Matching + EV calculations
 ├─ web/
 │  ├─ app.py              # FastAPI app + scheduler + API routes
@@ -41,14 +40,12 @@ A local dashboard that compares PrizePicks lines against FanDuel odds to surface
 
 1. Create and activate a virtual environment.
 2. Install Python dependencies.
-3. Install Playwright Chromium browser.
-4. Run the app.
+3. Run the app.
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-python -m playwright install chromium
 python main.py
 ```
 
@@ -100,15 +97,7 @@ PrizePicks-only:
 - `GET /api/prizepicks` - Current PrizePicks-only lines.
 - `POST /api/prizepicks/refresh` - Refresh PrizePicks-only lines.
 
-## Troubleshooting
 
-- Browser not installed:
-
-```powershell
-python -m playwright install chromium
-```
-
-- PowerShell execution policy blocks venv activation:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
