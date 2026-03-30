@@ -35,6 +35,7 @@ class PrizePickLine:
     line_score: float
     player_id: str       # PrizePicks internal ID
     start_time: str = "" # ISO timestamp of game start
+    side: str = "both"   # "both", "over", or "under"
 
 
 @dataclass

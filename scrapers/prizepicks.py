@@ -78,14 +78,36 @@ def _fetch_league(client: httpx.Client, league: str, league_id: int) -> list[Pri
             except (ValueError, TypeError):
                 continue
 
-            lines.append(PrizePickLine(
-                league=league,
-                player_name=player_name,
-                stat_type=stat_type,
-                line_score=line_score,
-                player_id=player_id,
-                start_time=start_time or "",
-            ))
+            if line_score % 1 == 0:
+                # Whole number -> split into restrictive Over and Under lines to penalize pushes
+                lines.append(PrizePickLine(
+                    league=league,
+                    player_name=player_name,
+                    stat_type=stat_type,
+                    line_score=line_score + 0.5,
+                    player_id=player_id,
+                    start_time=start_time or "",
+                    side="over",
+                ))
+                lines.append(PrizePickLine(
+                    league=league,
+                    player_name=player_name,
+                    stat_type=stat_type,
+                    line_score=line_score - 0.5,
+                    player_id=player_id,
+                    start_time=start_time or "",
+                    side="under",
+                ))
+            else:
+                lines.append(PrizePickLine(
+                    league=league,
+                    player_name=player_name,
+                    stat_type=stat_type,
+                    line_score=line_score,
+                    player_id=player_id,
+                    start_time=start_time or "",
+                    side="both",
+                ))
 
         # Pagination
         meta = data.get("meta", {})

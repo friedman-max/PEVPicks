@@ -322,6 +322,7 @@ async function fetchStatus() {
     // Detect scraping just finished → fetch fresh bets
     if (state.isScrapingPrev && !data.is_scraping) {
       await fetchBets();
+      await fetchMatched();
     }
     state.isScrapingPrev = data.is_scraping;
 
@@ -401,6 +402,8 @@ document.querySelectorAll(".tab").forEach(tab => {
     // Hide all
     $("ev-view").classList.add("hidden");
     $("ev-filters").classList.add("hidden");
+    $("matched-view").classList.add("hidden");
+    $("matched-filters").classList.add("hidden");
     $("pp-view").classList.add("hidden");
     $("pp-filters").classList.add("hidden");
     $("fd-view").classList.add("hidden");
@@ -409,6 +412,9 @@ document.querySelectorAll(".tab").forEach(tab => {
     if (target === "ev") {
       $("ev-view").classList.remove("hidden");
       $("ev-filters").classList.remove("hidden");
+    } else if (target === "matched") {
+      $("matched-view").classList.remove("hidden");
+      $("matched-filters").classList.remove("hidden");
     } else if (target === "pp") {
       $("pp-view").classList.remove("hidden");
       $("pp-filters").classList.remove("hidden");
@@ -418,6 +424,119 @@ document.querySelectorAll(".tab").forEach(tab => {
     }
   });
 });
+
+// ── Combined Lines ────────────────────────────────────────────────────────
+const matchedState = {
+  allLines:      [],
+  filteredLines: [],
+  sortCol:       "player_name",
+  sortDir:       "asc",
+};
+
+const matchedTbody      = $("matched-tbody");
+const matchedTotalBadge = $("matched-total-badge");
+
+function applyMatchedFilters() {
+  const league = $("matched-filter-league").value.toUpperCase();
+  const prop   = $("matched-filter-prop").value.toLowerCase().trim();
+  const player = $("matched-filter-player").value.toLowerCase().trim();
+
+  matchedState.filteredLines = matchedState.allLines.filter(l => {
+    if (league && l.league !== league) return false;
+    if (prop && !l.stat_type.toLowerCase().includes(prop)) return false;
+    if (player && !l.player_name.toLowerCase().includes(player)) return false;
+    return true;
+  });
+
+  renderMatchedTable();
+}
+
+["matched-filter-league", "matched-filter-prop", "matched-filter-player"].forEach(id => {
+  $(id).addEventListener("input", applyMatchedFilters);
+  $(id).addEventListener("change", applyMatchedFilters);
+});
+
+$("btn-clear-matched-filters").addEventListener("click", () => {
+  $("matched-filter-league").value = "";
+  $("matched-filter-prop").value   = "";
+  $("matched-filter-player").value = "";
+  applyMatchedFilters();
+});
+
+// Sorting
+document.querySelectorAll("th.sortable-matched").forEach(th => {
+  th.addEventListener("click", () => {
+    const col = th.dataset.col;
+    if (matchedState.sortCol === col) {
+      matchedState.sortDir = matchedState.sortDir === "desc" ? "asc" : "desc";
+    } else {
+      matchedState.sortCol = col;
+      matchedState.sortDir = col === "pp_line" || col === "fd_line" ? "desc" : "asc";
+    }
+    document.querySelectorAll("th.sortable-matched").forEach(t => {
+      t.classList.remove("active", "asc", "desc");
+    });
+    th.classList.add("active", matchedState.sortDir);
+    renderMatchedTable();
+  });
+});
+
+function sortMatchedLines(lines) {
+  return [...lines].sort((a, b) => {
+    let va = a[matchedState.sortCol] ?? "";
+    let vb = b[matchedState.sortCol] ?? "";
+    if (typeof va === "string") va = va.toLowerCase();
+    if (typeof vb === "string") vb = vb.toLowerCase();
+    if (va < vb) return matchedState.sortDir === "asc" ? -1 : 1;
+    if (va > vb) return matchedState.sortDir === "asc" ? 1 : -1;
+    return 0;
+  });
+}
+
+function renderMatchedTable() {
+  const sorted = sortMatchedLines(matchedState.filteredLines);
+  matchedTotalBadge.textContent = `${sorted.length} lines`;
+
+  if (sorted.length === 0) {
+    matchedTbody.innerHTML = `<tr><td colspan="8" class="empty-msg">
+      ${matchedState.allLines.length === 0 ? 'Click "Refresh Now" to load bets.' : "No lines match current filters."}
+    </td></tr>`;
+    return;
+  }
+
+  matchedTbody.innerHTML = sorted.map(l => {
+    let gameTime = "—";
+    if (l.start_time) {
+      const d = new Date(l.start_time);
+      gameTime = d.toLocaleDateString([], { month: "numeric", day: "numeric" }) +
+        " " + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    }
+    const lineDiff = l.pp_line !== l.fd_line ? `<span class="line-diff"> ≠${l.fd_line}</span>` : "";
+    const sideClass = l.side === "over" ? "side-over" : "side-under";
+    
+    return `<tr>
+      <td>${l.player_name}</td>
+      <td><span class="league-tag league-${l.league}">${l.league}</span></td>
+      <td>${l.stat_type}</td>
+      <td class="line-value">${l.pp_line}${lineDiff}</td>
+      <td class="line-value">${l.fd_line}</td>
+      <td class="${sideClass}">${l.side.toUpperCase()}</td>
+      <td class="line-value">${fmt.odds(l.odds)}</td>
+      <td class="game-time">${gameTime}</td>
+    </tr>`;
+  }).join("");
+}
+
+async function fetchMatched() {
+  try {
+    const resp = await fetch("/api/matched");
+    const data = await resp.json();
+    matchedState.allLines = data.matches || [];
+    applyMatchedFilters();
+  } catch (e) {
+    console.error("Failed to fetch matched lines:", e);
+  }
+}
 
 // ── PrizePicks Lines ──────────────────────────────────────────────────────
 const ppState = {
@@ -682,4 +801,5 @@ $("btn-load-fd").addEventListener("click", async () => {
 
 // ── Init ───────────────────────────────────────────────────────────────────
 fetchStatus();
+fetchMatched();
 setInterval(fetchStatus, 10_000);

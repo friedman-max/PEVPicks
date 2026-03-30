@@ -40,6 +40,7 @@ _lock = threading.Lock()
 _state = {
     "bets":          [],        # list[dict] — serialized BetResult
     "bet_map":       {},        # bet_id -> BetResult (for slip calc)
+    "matches":       [],        # list[dict] — unfiltered combined lines
     "pp_lines":      [],        # list[dict] — raw PrizePicks lines
     "fd_lines":      [],        # list[dict] — raw FanDuel lines
     "last_refresh":  None,      # datetime | None
@@ -79,6 +80,24 @@ def run_pipeline():
         fd_props = scrape_fanduel(active_leagues=leagues)
         logger.info("Pipeline: matching %d PP lines vs %d FD props...", len(pp_lines), len(fd_props))
         matches = match_props(fd_props, pp_lines)
+        
+        serialized_matches = []
+        for m in matches:
+            if m.pp.line_score != m.fd.line:
+                continue
+            base = {
+                "player_name": m.pp.player_name,
+                "league": m.pp.league,
+                "stat_type": m.pp.stat_type,
+                "pp_line": m.pp.line_score,
+                "fd_line": m.fd.line,
+                "start_time": m.pp.start_time,
+            }
+            pp_side = getattr(m.pp, "side", "both")
+            if pp_side in ("both", "over") and m.fd.over_odds is not None:
+                serialized_matches.append({**base, "side": "over", "odds": m.fd.over_odds})
+            if pp_side in ("both", "under") and m.fd.under_odds is not None:
+                serialized_matches.append({**base, "side": "under", "odds": m.fd.under_odds})
 
         bets: list[BetResult] = []
         with _lock:
@@ -94,6 +113,7 @@ def run_pipeline():
         with _lock:
             _state["bets"]         = [b.to_dict() for b in bets]
             _state["bet_map"]      = {b.bet_id: b for b in bets}
+            _state["matches"]      = serialized_matches
             _state["last_refresh"] = datetime.now()
             _state["next_refresh"] = datetime.now() + timedelta(minutes=_state["interval_min"])
             _state["scrape_errors"] = errors
@@ -163,6 +183,16 @@ def get_bets():
         return {
             "bets":         _state["bets"],
             "total":        len(_state["bets"]),
+            "is_scraping":  _state["is_scraping"],
+        }
+
+
+@app.get("/api/matched")
+def get_matched():
+    with _lock:
+        return {
+            "matches":      _state.get("matches", []),
+            "total":        len(_state.get("matches", [])),
             "is_scraping":  _state["is_scraping"],
         }
 

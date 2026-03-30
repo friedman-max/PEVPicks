@@ -202,8 +202,10 @@ def evaluate_match(match: MatchedProp, min_ev_pct: float = 0.01) -> list[BetResu
         )
         candidates = [result] if result.individual_ev_pct > 0 else []
 
-    # Apply minimum EV filter
+    # Apply minimum EV filter & side constraint
     for r in candidates:
+        if pp.side != "both" and pp.side != r.side:
+            continue
         if r.individual_ev_pct >= min_ev_pct:
             results.append(r)
 
