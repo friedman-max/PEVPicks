@@ -424,9 +424,6 @@ $("btn-settings").addEventListener("click", async () => {
   const resp = await fetch("/api/config");
   const cfg  = await resp.json();
   $("setting-interval").value = cfg.interval_min;
-  document.querySelectorAll(".league-toggle").forEach(chk => {
-    chk.checked = cfg.active_leagues[chk.dataset.league] !== false;
-  });
   $("settings-modal").classList.remove("hidden");
 });
 
@@ -435,21 +432,30 @@ $("btn-settings").addEventListener("click", async () => {
 });
 
 $("btn-save-settings").addEventListener("click", async () => {
-  const leagues = {};
-  document.querySelectorAll(".league-toggle").forEach(chk => {
-    leagues[chk.dataset.league] = chk.checked;
-  });
-
-  await fetch("/api/config", {
-    method:  "POST",
-    headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify({
-      interval_min:   parseInt($("setting-interval").value),
-      min_ev_pct:     -10.0,
-      active_leagues: leagues,
-    }),
-  });
-  $("settings-modal").classList.add("hidden");
+  try {
+    const btn = $("btn-save-settings");
+    btn.disabled = true;
+    btn.textContent = "Saving...";
+    
+    const resp = await fetch("/api/config", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({
+        interval_min:   parseInt($("setting-interval").value),
+        min_ev_pct:     -10.0
+      }),
+    });
+    
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    $("settings-modal").classList.add("hidden");
+    
+  } catch (e) {
+    alert("Error saving settings: " + e.message);
+  } finally {
+    const btn = $("btn-save-settings");
+    btn.disabled = false;
+    btn.textContent = "Save";
+  }
 });
 
 // ── Tab switching ─────────────────────────────────────────────────────────

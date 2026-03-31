@@ -35,7 +35,7 @@ app = FastAPI(title="PrizePicks +EV Finder")
 # In-memory state
 # ---------------------------------------------------------------------------
 
-_lock = threading.Lock()
+_lock = threading.RLock()
 
 _state = {
     "bets":          [],        # list[dict] — serialized BetResult
@@ -49,7 +49,7 @@ _state = {
     "is_scraping_pp": False,
     "is_scraping_fd": False,
     "scrape_errors": {},        # league -> error str | None
-    "interval_min":  cfg.REFRESH_INTERVAL_MINUTES,
+    "interval_min":  1,
     "min_ev_pct":    -10.0,
     "active_leagues": dict(cfg.ACTIVE_LEAGUES),
 }

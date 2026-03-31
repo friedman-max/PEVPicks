@@ -294,19 +294,13 @@
       <div class="modal-body">
         <label>Auto-refresh interval (minutes)
           <select id="setting-interval">
+            <option value="1" selected>1</option>
             <option value="5">5</option>
             <option value="10">10</option>
-            <option value="15" selected>15</option>
+            <option value="15">15</option>
             <option value="30">30</option>
           </select>
         </label>
-        <fieldset>
-          <legend>Active Leagues</legend>
-          <label><input type="checkbox" class="league-toggle" data-league="NBA" checked /> NBA</label>
-          <label><input type="checkbox" class="league-toggle" data-league="MLB" checked /> MLB</label>
-          <label><input type="checkbox" class="league-toggle" data-league="NHL" checked /> NHL</label>
-          <label><input type="checkbox" class="league-toggle" data-league="NCAAB" checked /> NCAAB</label>
-        </fieldset>
       </div>
       <div class="modal-footer">
         <button class="btn btn-primary" id="btn-save-settings">Save</button>
