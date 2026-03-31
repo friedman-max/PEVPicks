@@ -78,6 +78,51 @@ def run_pipeline():
         pp_lines = scrape_prizepicks(active_leagues=leagues)
         logger.info("Pipeline: scraping FanDuel...")
         fd_props = scrape_fanduel(active_leagues=leagues)
+        
+        serialized_pp = [
+            {
+                "league": l.league,
+                "player_name": l.player_name,
+                "stat_type": l.stat_type,
+                "line_score": l.line_score,
+                "start_time": l.start_time,
+            }
+            for l in pp_lines
+        ]
+
+        from engine.devig import devig_multiplicative, devig_single_sided, prob_to_american
+        serialized_fd = []
+        for p in fd_props:
+            true_over, true_under = None, None
+            if p.both_sided and p.over_odds is not None and p.under_odds is not None:
+                true_over, true_under = devig_multiplicative(p.over_odds, p.under_odds)
+            else:
+                if p.over_odds is not None:
+                    true_over = devig_single_sided(p.over_odds)
+                if p.under_odds is not None:
+                    true_under = devig_single_sided(p.under_odds)
+
+            if p.over_odds is not None:
+                serialized_fd.append({
+                    "league": p.league,
+                    "player_name": p.player_name,
+                    "stat_type": p.prop_type + " (O)",
+                    "line_score": p.line,
+                    "line_odds": p.over_odds,
+                    "true_odds": prob_to_american(true_over) if true_over else None,
+                    "start_time": None,
+                })
+            if p.under_odds is not None:
+                serialized_fd.append({
+                    "league": p.league,
+                    "player_name": p.player_name,
+                    "stat_type": p.prop_type + " (U)",
+                    "line_score": p.line,
+                    "line_odds": p.under_odds,
+                    "true_odds": prob_to_american(true_under) if true_under else None,
+                    "start_time": None,
+                })
+
         logger.info("Pipeline: matching %d PP lines vs %d FD props...", len(pp_lines), len(fd_props))
         matches = match_props(fd_props, pp_lines)
         
@@ -126,6 +171,8 @@ def run_pipeline():
             _state["bets"]         = [b.to_dict() for b in bets]
             _state["bet_map"]      = {b.bet_id: b for b in bets}
             _state["matches"]      = serialized_matches
+            _state["pp_lines"]     = serialized_pp
+            _state["fd_lines"]     = serialized_fd
             _state["last_refresh"] = datetime.now()
             _state["next_refresh"] = datetime.now() + timedelta(minutes=_state["interval_min"])
             _state["scrape_errors"] = errors

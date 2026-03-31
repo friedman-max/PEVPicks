@@ -323,6 +323,8 @@ async function fetchStatus() {
     if (state.isScrapingPrev && !data.is_scraping) {
       await fetchBets();
       await fetchMatched();
+      await fetchPP();
+      await fetchFD();
     }
     state.isScrapingPrev = data.is_scraping;
 
@@ -536,6 +538,28 @@ async function fetchMatched() {
     applyMatchedFilters();
   } catch (e) {
     console.error("Failed to fetch matched lines:", e);
+  }
+}
+
+async function fetchPP() {
+  try {
+    const resp = await fetch("/api/prizepicks");
+    const data = await resp.json();
+    ppState.allLines = data.lines || [];
+    applyPPFilters();
+  } catch (e) {
+    console.error("Failed to fetch PrizePicks lines:", e);
+  }
+}
+
+async function fetchFD() {
+  try {
+    const resp = await fetch("/api/fanduel");
+    const data = await resp.json();
+    fdState.allLines = data.lines || [];
+    applyFDFilters();
+  } catch (e) {
+    console.error("Failed to fetch FanDuel lines:", e);
   }
 }
 
