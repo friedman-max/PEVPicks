@@ -164,6 +164,13 @@ def run_pipeline():
             results = evaluate_match(match, min_ev_pct=min_ev)
             bets.extend(results)
 
+        # Deduplicate bets based on bet_id, keeping the one with highest EV
+        unique_bets = {}
+        for b in bets:
+            if b.bet_id not in unique_bets or b.individual_ev_pct > unique_bets[b.bet_id].individual_ev_pct:
+                unique_bets[b.bet_id] = b
+        bets = list(unique_bets.values())
+
         # Sort by individual EV% descending
         bets.sort(key=lambda b: b.individual_ev_pct, reverse=True)
 
