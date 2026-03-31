@@ -40,3 +40,15 @@ def devig_single_sided(american: int) -> float:
     """
     implied = american_to_implied(american)
     return implied / (1.0 + SINGLE_SIDE_VIG)
+
+
+def prob_to_american(prob: float) -> int:
+    """Convert true probability to American odds."""
+    if prob <= 0 or prob >= 1:
+        return 0
+
+    decimal = 1.0 / prob
+    if decimal >= 2.0:
+        return int(round((decimal - 1.0) * 100.0))
+    else:
+        return int(round(-100.0 / (decimal - 1.0)))

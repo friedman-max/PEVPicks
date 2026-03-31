@@ -81,6 +81,8 @@ def run_pipeline():
         logger.info("Pipeline: matching %d PP lines vs %d FD props...", len(pp_lines), len(fd_props))
         matches = match_props(fd_props, pp_lines)
         
+        from engine.devig import devig_multiplicative, devig_single_sided, prob_to_american
+        
         serialized_matches = []
         for m in matches:
             if m.pp.line_score != m.fd.line:
@@ -93,11 +95,21 @@ def run_pipeline():
                 "fd_line": m.fd.line,
                 "start_time": m.pp.start_time,
             }
+            
+            true_over, true_under = None, None
+            if m.fd.both_sided and m.fd.over_odds is not None and m.fd.under_odds is not None:
+                true_over, true_under = devig_multiplicative(m.fd.over_odds, m.fd.under_odds)
+            else:
+                if m.fd.over_odds is not None:
+                    true_over = devig_single_sided(m.fd.over_odds)
+                if m.fd.under_odds is not None:
+                    true_under = devig_single_sided(m.fd.under_odds)
+
             pp_side = getattr(m.pp, "side", "both")
             if pp_side in ("both", "over") and m.fd.over_odds is not None:
-                serialized_matches.append({**base, "side": "over", "odds": m.fd.over_odds})
+                serialized_matches.append({**base, "side": "over", "odds": m.fd.over_odds, "true_odds": prob_to_american(true_over) if true_over else None})
             if pp_side in ("both", "under") and m.fd.under_odds is not None:
-                serialized_matches.append({**base, "side": "under", "odds": m.fd.under_odds})
+                serialized_matches.append({**base, "side": "under", "odds": m.fd.under_odds, "true_odds": prob_to_american(true_under) if true_under else None})
 
         bets: list[BetResult] = []
         with _lock:
@@ -375,8 +387,18 @@ def _run_fd_scrape():
 
         logger.info("FanDuel scrape starting...")
         fd_props = scrape_fanduel(active_leagues=leagues)
+        from engine.devig import devig_multiplicative, devig_single_sided, prob_to_american
         serialized = []
         for p in fd_props:
+            true_over, true_under = None, None
+            if p.both_sided and p.over_odds is not None and p.under_odds is not None:
+                true_over, true_under = devig_multiplicative(p.over_odds, p.under_odds)
+            else:
+                if p.over_odds is not None:
+                    true_over = devig_single_sided(p.over_odds)
+                if p.under_odds is not None:
+                    true_under = devig_single_sided(p.under_odds)
+
             if p.over_odds is not None:
                 serialized.append({
                     "league": p.league,
@@ -384,6 +406,7 @@ def _run_fd_scrape():
                     "stat_type": p.prop_type + " (O)",
                     "line_score": p.line,
                     "line_odds": p.over_odds,
+                    "true_odds": prob_to_american(true_over) if true_over else None,
                     "start_time": None,
                 })
             if p.under_odds is not None:
@@ -393,6 +416,7 @@ def _run_fd_scrape():
                     "stat_type": p.prop_type + " (U)",
                     "line_score": p.line,
                     "line_odds": p.under_odds,
+                    "true_odds": prob_to_american(true_under) if true_under else None,
                     "start_time": None,
                 })
         with _lock:

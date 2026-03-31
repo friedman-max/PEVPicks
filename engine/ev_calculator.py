@@ -14,7 +14,7 @@ from engine.constants import (
     POWER_PAYOUTS,
     FLEX_PAYOUTS,
 )
-from engine.devig import devig_multiplicative, devig_single_sided
+from engine.devig import devig_multiplicative, devig_single_sided, prob_to_american
 from engine.matcher import MatchedProp
 
 
@@ -26,7 +26,7 @@ class BetResult:
     __slots__ = (
         "bet_id", "player_name", "league", "prop_type",
         "pp_line", "fd_line", "side",
-        "true_prob", "edge", "individual_ev_pct",
+        "true_prob", "true_odds", "edge", "individual_ev_pct",
         "over_odds", "under_odds", "both_sided",
         "pp_player_id",
     )
@@ -58,6 +58,7 @@ class BetResult:
         self.under_odds = under_odds
         self.both_sided = both_sided
         self.pp_player_id = pp_player_id
+        self.true_odds = prob_to_american(true_prob)
 
         self.edge = round(true_prob - OPTIMAL_BREAK_EVEN, 6)
         self.individual_ev_pct = round((true_prob * OPTIMAL_IMPLIED_DECIMAL) - 1.0, 6)
@@ -72,6 +73,7 @@ class BetResult:
             "fd_line":           self.fd_line,
             "side":              self.side,
             "true_prob":         round(self.true_prob, 4),
+            "true_odds":         self.true_odds,
             "edge":              round(self.edge, 4),
             "individual_ev_pct": round(self.individual_ev_pct, 4),
             "over_odds":         self.over_odds,

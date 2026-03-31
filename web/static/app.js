@@ -149,7 +149,7 @@ function renderTable() {
       <td>${b.pp_line}</td>
       <td>${b.fd_line}${lineDiff}</td>
       <td class="side-${b.side}">${b.side.toUpperCase()}</td>
-      <td>${fmt.prob(b.true_prob)}</td>
+      <td>${fmt.odds(b.true_odds)}</td>
       <td class="${evClass(b.edge)}">${fmt.pct(b.edge)}</td>
       <td class="${evClass(b.individual_ev_pct)}">${fmt.pct(b.individual_ev_pct)}</td>
       <td style="color:var(--text-muted)">${fdOdds}</td>
@@ -226,7 +226,7 @@ function renderSlipLegs() {
     <div class="slip-leg">
       <div class="slip-leg-name">${b.player_name}</div>
       <div class="slip-leg-detail">${b.prop_type} ${b.side.toUpperCase()} ${b.pp_line} · ${b.league}</div>
-      <div class="slip-leg-prob">True Prob: ${fmt.prob(b.true_prob)} · EV: ${fmt.pct(b.individual_ev_pct)}</div>
+      <div class="slip-leg-prob">True Odds: ${fmt.odds(b.true_odds)} · EV: ${fmt.pct(b.individual_ev_pct)}</div>
     </div>
   `).join("");
 }
@@ -521,6 +521,7 @@ function renderMatchedTable() {
       <td class="line-value">${l.pp_line}${lineDiff}</td>
       <td class="line-value">${l.fd_line}</td>
       <td class="${sideClass}">${l.side.toUpperCase()}</td>
+      <td class="line-value">${fmt.odds(l.true_odds)}</td>
       <td class="line-value">${fmt.odds(l.odds)}</td>
       <td class="game-time">${gameTime}</td>
     </tr>`;
@@ -760,6 +761,7 @@ function renderFDTable() {
       <td><span class="league-tag league-${l.league}">${l.league}</span></td>
       <td>${l.stat_type}</td>
       <td class="line-value">${l.line_score}</td>
+      <td class="line-value">${fmt.odds(l.true_odds)}</td>
       <td class="line-value">${fmt.odds(l.line_odds)}</td>
       <td class="game-time">${gameTime}</td>
     </tr>`;
