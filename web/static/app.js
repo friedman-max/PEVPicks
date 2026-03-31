@@ -120,7 +120,7 @@ function renderTable() {
   const sorted = sortBets(state.filteredBets);
 
   if (sorted.length === 0) {
-    tbody.innerHTML = `<tr id="empty-row"><td colspan="11" class="empty-msg">
+    tbody.innerHTML = `<tr id="empty-row"><td colspan="10" class="empty-msg">
       ${state.allBets.length === 0 ? 'Click "Refresh Now" to load bets.' : "No bets match current filters."}
     </td></tr>`;
     totalBadge.textContent = "0 bets";
@@ -133,7 +133,7 @@ function renderTable() {
     const checked   = state.selected.has(b.bet_id) ? "checked" : "";
     const rowClass  = state.selected.has(b.bet_id) ? "selected" : "";
     const lineDiff  = b.pp_line !== b.fd_line
-      ? `<span class="line-diff"> ≠${b.fd_line}</span>` : "";
+      ? `<span class="line-diff"> (FD: ${b.fd_line})</span>` : "";
 
     const fdOdds = b.side === "over"
       ? fmt.odds(b.over_odds)
@@ -146,8 +146,7 @@ function renderTable() {
       <td>${b.player_name}</td>
       <td>${b.league}</td>
       <td>${b.prop_type}</td>
-      <td>${b.pp_line}</td>
-      <td>${b.fd_line}${lineDiff}</td>
+      <td>${b.pp_line}${lineDiff}</td>
       <td class="side-${b.side}">${b.side.toUpperCase()}</td>
       <td>${fmt.odds(b.true_odds)}</td>
       <td class="${evClass(b.edge)}">${fmt.pct(b.edge)}</td>
@@ -500,7 +499,7 @@ function renderMatchedTable() {
   matchedTotalBadge.textContent = `${sorted.length} lines`;
 
   if (sorted.length === 0) {
-    matchedTbody.innerHTML = `<tr><td colspan="8" class="empty-msg">
+    matchedTbody.innerHTML = `<tr><td colspan="7" class="empty-msg">
       ${matchedState.allLines.length === 0 ? 'Click "Refresh Now" to load bets.' : "No lines match current filters."}
     </td></tr>`;
     return;
@@ -513,7 +512,7 @@ function renderMatchedTable() {
       gameTime = d.toLocaleDateString([], { month: "numeric", day: "numeric" }) +
         " " + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     }
-    const lineDiff = l.pp_line !== l.fd_line ? `<span class="line-diff"> ≠${l.fd_line}</span>` : "";
+    const lineDiff = l.pp_line !== l.fd_line ? `<span class="line-diff"> (FD: ${l.fd_line})</span>` : "";
     const sideClass = l.side === "over" ? "side-over" : "side-under";
     
     return `<tr>
@@ -521,7 +520,6 @@ function renderMatchedTable() {
       <td><span class="league-tag league-${l.league}">${l.league}</span></td>
       <td>${l.stat_type}</td>
       <td class="line-value">${l.pp_line}${lineDiff}</td>
-      <td class="line-value">${l.fd_line}</td>
       <td class="${sideClass}">${l.side.toUpperCase()}</td>
       <td class="line-value">${fmt.odds(l.true_odds)}</td>
       <td class="line-value">${fmt.odds(l.odds)}</td>
