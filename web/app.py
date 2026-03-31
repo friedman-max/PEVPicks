@@ -311,6 +311,50 @@ def build_slip(req: SlipRequest):
     return result
 
 
+@app.post("/api/slip/auto")
+def auto_build_slip(req: SlipRequest):
+    if not req.bet_ids:
+        raise HTTPException(status_code=400, detail="No bet IDs provided.")
+    if len(req.bet_ids) < 2:
+        raise HTTPException(status_code=400, detail="Must provide at least 2 bets.")
+
+    with _lock:
+        bet_map = _state["bet_map"]
+
+    selected = []
+    for bid in req.bet_ids[:6]:
+        if bid in bet_map:
+            selected.append(bet_map[bid])
+            
+    if len(selected) < 2:
+        raise HTTPException(status_code=400, detail="Not enough valid bets found.")
+
+    best_ev = -float('inf')
+    best_k = 0
+    best_result = None
+    best_subset = []
+    
+    for k in range(2, len(selected) + 1):
+        subset = selected[:k]
+        result = calculate_slip(subset, req.bankroll)
+        
+        ev = result.get("best_ev_pct")
+        if ev is None: 
+            continue
+        
+        if ev > best_ev + 0.00001:
+            best_ev = ev
+            best_k = k
+            best_result = result
+            best_subset = [b.bet_id for b in subset]
+
+    if not best_result:
+        raise HTTPException(status_code=400, detail="Could not calculate any valid slip.")
+        
+    best_result["optimal_bet_ids"] = best_subset
+    return best_result
+
+
 class ConfigUpdate(BaseModel):
     interval_min:    Optional[int]   = None
     min_ev_pct:      Optional[float] = None

@@ -30,6 +30,7 @@ const selectedCountEl = $("selected-count");
 const btnRefresh      = $("btn-refresh");
 const btnBuildSlip    = $("btn-build-slip");
 const btnCalculate    = $("btn-calculate");
+const btnAutoBuild    = $("btn-auto-build");
 const btnClearSel     = $("btn-clear-selection");
 const slipLegsEl      = $("slip-legs");
 const slipResultsEl   = $("slip-results");
@@ -271,6 +272,61 @@ btnCalculate.addEventListener("click", async () => {
   } finally {
     btnCalculate.disabled = false;
     btnCalculate.textContent = "Calculate EV";
+  }
+});
+
+btnAutoBuild.addEventListener("click", async () => {
+  const sorted = [...state.filteredBets].sort((a, b) => (b.individual_ev_pct || 0) - (a.individual_ev_pct || 0));
+  
+  const pickedPlayers = new Set();
+  const betIds = [];
+  
+  for (const b of sorted) {
+    if (!pickedPlayers.has(b.player_name)) {
+      pickedPlayers.add(b.player_name);
+      betIds.push(b.bet_id);
+      if (betIds.length === 6) break;
+    }
+  }
+
+  if (betIds.length < 2) {
+    alert("Not enough valid unique players matching the current filters to build a slip.");
+    return;
+  }
+
+  const bankroll = parseFloat(bankrollInput.value) || 100;
+  
+  btnAutoBuild.disabled = true;
+  btnAutoBuild.textContent = "Auto-Building...";
+  
+  try {
+    const resp = await fetch("/api/slip/auto", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ bet_ids: betIds, bankroll }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json();
+      alert("Auto-Slip error: " + (err.detail || resp.statusText));
+      return;
+    }
+    const data = await resp.json();
+    
+    state.selected.clear();
+    for (const bid of data.optimal_bet_ids) {
+      state.selected.add(bid);
+    }
+    
+    updateSelectionUI();
+    renderTable(); 
+    renderSlipLegs();
+    renderSlipResults(data);
+    
+  } catch (e) {
+    alert("Network error: " + e.message);
+  } finally {
+    btnAutoBuild.disabled = false;
+    btnAutoBuild.textContent = "Auto-Build Best Slip";
   }
 });
 
