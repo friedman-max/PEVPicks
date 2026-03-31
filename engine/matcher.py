@@ -93,16 +93,23 @@ def match_props(
 
     Returns a list of MatchedProp (one per PP line that found a match).
     """
-    # Build lookup: (league, prop_type) → list of FanDuelProp
+    # Build lookup: (league, prop_type_lower) → list of FanDuelProp
     fd_index: dict[tuple, list[FanDuelProp]] = {}
     for fd in fd_props:
-        key = (fd.league.upper(), fd.prop_type)
+        key = (fd.league.upper(), fd.prop_type.lower())
         fd_index.setdefault(key, []).append(fd)
+
+    # Alias map: PrizePicks stat names that differ from FanDuel prop names
+    _STAT_ALIASES = {
+        "goalie saves": "saves",
+    }
 
     results: list[MatchedProp] = []
 
     for pp in pp_lines:
-        key = (pp.league.upper(), pp.stat_type)
+        stat_key = pp.stat_type.lower()
+        stat_key = _STAT_ALIASES.get(stat_key, stat_key)
+        key = (pp.league.upper(), stat_key)
         candidates = fd_index.get(key, [])
         if not candidates:
             continue
@@ -118,6 +125,10 @@ def match_props(
             if score > best_score:
                 best_score = score
                 best_fd = fd
+            elif score == best_score and score >= FUZZY_THRESHOLD and best_fd is not None:
+                # Prefer the FD prop whose line matches the PP line
+                if fd.line == pp.line_score and best_fd.line != pp.line_score:
+                    best_fd = fd
 
         if best_fd is not None and best_score >= FUZZY_THRESHOLD:
             results.append(MatchedProp(pp=pp, fd=best_fd, name_score=best_score))

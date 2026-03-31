@@ -100,8 +100,16 @@ PROP_TYPE_MAP = {
     "shots on goal":                 "Shots on Goal",
     "goals":                         "Goals",
     "saves":                         "Saves",
+    "total saves":                   "Saves",
+    "total goals":                   "Goals",
     "points (nhl)":                  "Points",
     "assists (nhl)":                 "Assists",
     "time on ice":                   "Time On Ice",
     "shots":                         "Shots on Goal",
+    # FanDuel market type keys (lowercased with underscores replaced)
+    "player total shots":            "Shots on Goal",
+    "player total saves":            "Saves",
+    "player total goals":            "Goals",
+    "player total assists":          "Assists",
+    "player total points":           "Points",
 }
