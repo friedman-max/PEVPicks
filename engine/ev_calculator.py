@@ -120,8 +120,7 @@ def _evaluate_same_line(match: MatchedProp) -> list[BetResult]:
             both_sided=fd.both_sided,
             pp_player_id=pp.player_id,
         )
-        if result.individual_ev_pct > 0:
-            results.append(result)
+        results.append(result)
 
     return results
 
@@ -177,7 +176,7 @@ def evaluate_match(match: MatchedProp, min_ev_pct: float = 0.01) -> list[BetResu
             both_sided=fd.both_sided,
             pp_player_id=pp.player_id,
         )
-        candidates = [result] if result.individual_ev_pct > 0 else []
+        candidates = [result]
 
     else:
         # PP harder line for UNDER → value exclusively on PP UNDER
@@ -202,7 +201,7 @@ def evaluate_match(match: MatchedProp, min_ev_pct: float = 0.01) -> list[BetResu
             both_sided=fd.both_sided,
             pp_player_id=pp.player_id,
         )
-        candidates = [result] if result.individual_ev_pct > 0 else []
+        candidates = [result]
 
     # Apply minimum EV filter & side constraint
     for r in candidates:

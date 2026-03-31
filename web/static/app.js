@@ -58,21 +58,25 @@ function evClass(ev_pct) {
 function applyFilters() {
   const league  = $("filter-league").value.toUpperCase();
   const prop    = $("filter-prop").value.toLowerCase().trim();
-  const minEv   = parseFloat($("filter-min-ev").value) / 100 || 0;
   const side    = $("filter-side").value.toLowerCase();
+  const maxOddsStr = $("filter-max-odds").value.trim();
+  const maxOdds = maxOddsStr ? parseInt(maxOddsStr, 10) : null;
+  const minEvStr = $("filter-min-ev").value.trim();
+  const minEv = minEvStr ? parseFloat(minEvStr) / 100 : 0;
 
   state.filteredBets = state.allBets.filter(b => {
     if (league && b.league !== league)                           return false;
     if (prop   && !b.prop_type.toLowerCase().includes(prop))    return false;
-    if (b.individual_ev_pct < minEv)                            return false;
     if (side   && b.side !== side)                              return false;
+    if (maxOdds !== null && b.true_odds > maxOdds)              return false;
+    if (minEv !== null && b.individual_ev_pct < minEv)          return false;
     return true;
   });
 
   renderTable();
 }
 
-["filter-league", "filter-prop", "filter-min-ev", "filter-side"].forEach(id => {
+["filter-league", "filter-prop", "filter-max-odds", "filter-min-ev", "filter-side"].forEach(id => {
   $(id).addEventListener("input", applyFilters);
   $(id).addEventListener("change", applyFilters);
 });
@@ -80,7 +84,8 @@ function applyFilters() {
 $("btn-clear-filters").addEventListener("click", () => {
   $("filter-league").value = "";
   $("filter-prop").value   = "";
-  $("filter-min-ev").value = "1";
+  $("filter-max-odds").value = "";
+  $("filter-min-ev").value   = "0";
   $("filter-side").value   = "";
   applyFilters();
 });
@@ -363,7 +368,6 @@ $("btn-settings").addEventListener("click", async () => {
   const resp = await fetch("/api/config");
   const cfg  = await resp.json();
   $("setting-interval").value = cfg.interval_min;
-  $("setting-min-ev").value   = (cfg.min_ev_pct * 100).toFixed(1);
   document.querySelectorAll(".league-toggle").forEach(chk => {
     chk.checked = cfg.active_leagues[chk.dataset.league] !== false;
   });
@@ -385,7 +389,7 @@ $("btn-save-settings").addEventListener("click", async () => {
     headers: { "Content-Type": "application/json" },
     body:    JSON.stringify({
       interval_min:   parseInt($("setting-interval").value),
-      min_ev_pct:     parseFloat($("setting-min-ev").value) / 100,
+      min_ev_pct:     -10.0,
       active_leagues: leagues,
     }),
   });

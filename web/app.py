@@ -50,7 +50,7 @@ _state = {
     "is_scraping_fd": False,
     "scrape_errors": {},        # league -> error str | None
     "interval_min":  cfg.REFRESH_INTERVAL_MINUTES,
-    "min_ev_pct":    cfg.MIN_INDIVIDUAL_EV_PCT,
+    "min_ev_pct":    -10.0,
     "active_leagues": dict(cfg.ACTIVE_LEAGUES),
 }
 
