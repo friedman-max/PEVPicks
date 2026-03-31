@@ -93,6 +93,11 @@ PROP_TYPE_MAP = {
     "hitter fantasy score":          "Hitter Fantasy Score",
     "pitching outs":                 "Pitching Outs",
     "batting runs":                  "Runs",
+    "home runs":                     "Home Runs",
+    "stolen bases":                  "Stolen Bases",
+    "singles":                       "Singles",
+    "doubles":                       "Doubles",
+    "triples":                       "Triples",
 
     # ── Hockey (NHL) ──
     # PrizePicks: Shots on Goal, Goals, Saves, Points, Assists, Time On Ice,

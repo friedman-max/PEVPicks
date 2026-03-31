@@ -1,7 +1,7 @@
 """
 App-wide configuration. Edit defaults here or override via .env file.
 """
-import os
+import osndu
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -41,8 +41,8 @@ PRIZEPICKS_LEAGUE_IDS = {
 FUZZY_THRESHOLD = 88
 
 # Single-sided vig assumption
-SINGLE_SIDE_VIG = 0.045
-
+SINGLE_SIDE_VIG = 0.070
+ndu
 # Server
 HOST = os.getenv("HOST", "127.0.0.1")
 PORT = int(os.getenv("PORT", "8000"))

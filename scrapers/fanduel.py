@@ -369,7 +369,13 @@ LEAGUE_TABS = {
         "player-props",
     ],
     "MLB": [
-        "pitcher-props", "batter-props",
+        "pitcher-props", "batter-props", "player-props", 
+        "home-runs", "strikeouts", "hits", "runs", "rbis", 
+        "total-bases", "stolen-bases", "outs-recorded", 
+        "earned-runs-allowed", "earned-runs", "walks-allowed", 
+        "walks-issued", "walks", "pitcher-strikeouts", 
+        "hits-+-runs-+-rbis", "hits-runs-rbis", "to-record-a-hit",
+        "hits-allowed", "singles", "doubles", "triples"
     ],
 }
 
