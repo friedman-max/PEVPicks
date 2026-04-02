@@ -33,9 +33,9 @@ FLEX_PAYOUTS = {
     6: {4: 0.4,  5: 2.0,  6: 25.0},
 }
 
-# The most efficient single-leg implied decimal odds (5-Flex / 6-Flex break-even = 54.34%)
-OPTIMAL_BREAK_EVEN = 0.5434
-OPTIMAL_IMPLIED_DECIMAL = 1.0 / OPTIMAL_BREAK_EVEN  # ≈ 1.8402
+# The most efficient single-leg implied decimal odds (Power 6 / 1.849 multiplier)
+OPTIMAL_IMPLIED_DECIMAL = 1.849
+OPTIMAL_BREAK_EVEN = 1.0 / OPTIMAL_IMPLIED_DECIMAL  # ≈ 0.54083
 
 # Prop type normalization: FanDuel label → PrizePicks stat_type label
 # Keys are lowercase FanDuel strings; values are PrizePicks stat_type strings
