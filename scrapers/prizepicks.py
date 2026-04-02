@@ -14,13 +14,14 @@ from engine.matcher import PrizePickLine
 
 logger = logging.getLogger(__name__)
 
-PP_BASE = "https://api.prizepicks.com/projections"
+PP_BASE = "https://partner-api.prizepicks.com/projections"
 PP_HEADERS = {
     "Accept":          "application/json",
     "Referer":         "https://app.prizepicks.com/",
     "Origin":          "https://app.prizepicks.com",
+    "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     "x-device-id":     str(uuid.uuid4()),
-    "x-device-info":   "anonymousId=,name=,os=windows,osVersion=Windows NT 10.0; Win64; x64,platform=web,appVersion=,gameMode=pickem,stateCode=",
+    "x-device-info":   "{\"anonymousId\":\"\",\"os\":\"windows\",\"osVersion\":\"10\",\"platform\":\"web\",\"gameMode\":\"pickem\"}",
 }
 
 
@@ -33,7 +34,7 @@ def _fetch_league(session: requests.Session, league: str, league_id: int) -> lis
         try:
             resp = session.get(
                 PP_BASE,
-                params={"league_id": league_id, "per_page": 250, "page": page},
+                params={"league_id": league_id, "per_page": 250, "page": page, "single_stat": "true"},
                 headers=PP_HEADERS,
                 timeout=20,
             )
@@ -117,6 +118,7 @@ def _fetch_league(session: requests.Session, league: str, league_id: int) -> lis
         if page >= total_pages or not projections:
             break
         page += 1
+        time.sleep(3)  # pagination delay
 
     logger.info("PrizePicks [%s]: %d lines fetched", league, len(lines))
     return lines
@@ -127,15 +129,16 @@ def scrape_prizepicks(active_leagues: dict | None = None) -> list[PrizePickLine]
     leagues = active_leagues if active_leagues is not None else ACTIVE_LEAGUES
     all_lines: list[PrizePickLine] = []
 
-    with requests.Session(impersonate="chrome") as session:
+    with requests.Session(impersonate="chrome124") as session:
         for league, active in leagues.items():
             if not active:
                 continue
             league_id = PRIZEPICKS_LEAGUE_IDS.get(league)
             if league_id is None:
                 continue
+            logger.info("Scraping PrizePicks league: %s (ID: %d)", league, league_id)
             lines = _fetch_league(session, league, league_id)
             all_lines.extend(lines)
-            time.sleep(1.5)  # rate-limit buffer between leagues
+            time.sleep(10)  # inter-league delay
 
     return all_lines

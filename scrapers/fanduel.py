@@ -10,6 +10,7 @@ import asyncio
 import httpx
 import logging
 import urllib.parse
+import re
 from typing import Optional
 
 from config import ACTIVE_LEAGUES
@@ -67,11 +68,12 @@ def _normalize_prop_type(raw: str) -> Optional[str]:
     if raw_norm.endswith(" - rbis") or raw_norm == "rbis": return "RBIs"
 
     # ── NHL player props (market types like PLAYER_TOTAL_SHOTS, PLAYER_TOTAL_SAVES) ──
-    if "shots on goal" in raw_norm or "total shots" in raw_norm or "player total shots" in raw_norm: return "Shots on Goal"
-    if "total saves" in raw_norm or "player total saves" in raw_norm: return "Saves"
-    if "total goals" in raw_norm or "player total goals" in raw_norm: return "Goals"
-    if "total assists" in raw_norm or "player total assists" in raw_norm: return "Assists"
+    if "shots on goal" in raw_norm or "total shots" in raw_norm or "player total shots" in raw_norm or "shots" in raw_norm: return "Shots on Goal"
+    if "total saves" in raw_norm or "player total saves" in raw_norm or "saves" in raw_norm: return "Saves"
+    if "total goals" in raw_norm or "player total goals" in raw_norm or "goal" in raw_norm: return "Goals"
+    if "total assists" in raw_norm or "player total assists" in raw_norm or "assist" in raw_norm: return "Assists"
     if "time on ice" in raw_norm: return "Time On Ice"
+    if "points" in raw_norm and league == "NHL": return "Points"
 
     return None
 
@@ -97,24 +99,21 @@ _GAME_LEVEL_TYPES = {
     "MATCH_RESULT", "BOTH_TEAMS_TO_SCORE", "DRAW_NO_BET",
 }
 
-# ── Multi-runner "To Record X+" markets (MLB batter props) ──
-# Maps (market_name_pattern, threshold) → (pp_stat_type, line)
-# These are single-sided markets where each runner is a player.
-import re
-
+# ── Multi-runner "To Record X+" markets (MLB, NBA, NHL props) ──
 _MULTI_RUNNER_RE = re.compile(
-    r"^(?:to (?:record|hit)|player to record)\s+"
+    r"^(?:to record|player to record|player|to hit)\s+"
     r"(?:a |an )?(\d+\+\s*)?(.+)$",
     re.IGNORECASE,
 )
 
 # Market name fragment → PrizePicks stat type
 _MULTI_RUNNER_MAP = {
+    # -- MLB Batter milestones --
     "hit":                "Hits",
     "hits":               "Hits",
     "single":             "Singles",
-    "double":             "Doubles",
-    "triple":             "Triples",
+    "doubles":            "Doubles",
+    "triples":            "Triples",
     "home run":           "Home Runs",
     "home runs":          "Home Runs",
     "rbi":                "RBIs",
@@ -127,36 +126,52 @@ _MULTI_RUNNER_MAP = {
     "hits + runs + rbis": "Hits+Runs+RBIs",
     "walks":              "Walks",
     "strikeouts":         "Hitter Strikeouts",
+    
+    # -- NBA milestones --
+    "points":             "Points",
+    "rebounds":           "Rebounds",
+    "assists":            "Assists",
+    "made threes":        "3-PT Made",
+    "three point field goals": "3-PT Made",
+    "threes":             "3-PT Made",
+    "steals":             "Steals",
+    "blocks":             "Blocked Shots",
+    "blocked shots":      "Blocked Shots",
+    
+    # -- NHL milestones --
+    "shots on goal":      "Shots on Goal",
+    "shots":              "Shots on Goal",
+    "saves":              "Saves",
+    "goals":              "Goals",
+    "points-assists":     "Pts+Asts",
+    "points":             "Points",
 }
-
 
 def _parse_multi_runner_market(mkt_name: str) -> Optional[tuple[str, float]]:
     """
-    Parse a multi-runner batter-prop market name.
-    Returns (pp_stat_type, line) or None if not a recognized market.
-
-    Examples:
-      "To Record A Hit"           → ("Hits",        0.5)
-      "To Record 2+ Hits"         → ("Hits",        1.5)
-      "To Record 3+ Total Bases"  → ("Total Bases", 2.5)
-      "Player To Record 1+ Hits + Runs + RBIs" → ("Hits+Runs+RBIs", 0.5)
+    Parse a multi-runner milestone market name.
     """
     m = _MULTI_RUNNER_RE.match(mkt_name.strip())
     if not m:
-        return None
+        # Fallback: "[Stat] X+" or "X+ [Stat]"
+        m2 = re.match(r"^(.+?)\s+(\d+\+)$", mkt_name.strip(), re.IGNORECASE)
+        if m2:
+             stat_part = m2.group(1).strip()
+             threshold_str = m2.group(2).rstrip("+")
+        else:
+             return None
+    else:
+        threshold_str = (m.group(1) or "").strip().rstrip("+").strip()
+        stat_part = m.group(2).strip().lower()
 
-    threshold_str = (m.group(1) or "").strip().rstrip("+").strip()
     threshold = int(threshold_str) if threshold_str else 1
+    stat_raw = stat_part.lower()
+    stat_norm = stat_raw.rstrip("s")
 
-    stat_part = m.group(2).strip().rstrip("s").lower()  # don't strip plural yet
-    stat_raw = m.group(2).strip().lower()
-
-    # Try the raw stat first, then without trailing 's'
-    pp_stat = _MULTI_RUNNER_MAP.get(stat_raw)
+    # Try mapping
+    pp_stat = _MULTI_RUNNER_MAP.get(stat_raw) or _MULTI_RUNNER_MAP.get(stat_norm)
     if not pp_stat:
-        pp_stat = _MULTI_RUNNER_MAP.get(stat_part)
-    if not pp_stat:
-        # Try partial matching for compound stats
+        # Partial match
         for key, val in _MULTI_RUNNER_MAP.items():
             if key in stat_raw:
                 pp_stat = val
@@ -167,12 +182,8 @@ def _parse_multi_runner_market(mkt_name: str) -> Optional[tuple[str, float]]:
     line = threshold - 0.5
     return (pp_stat, line)
 
-
 def _extract_props_from_json(data: dict, league: str) -> list[FanDuelProp]:
-    """
-    Parse FanDuel API JSON response.
-    Extracts marketName, runnerName, handicap, and americanDisplayOdds for Player Props.
-    """
+    """Parse FanDuel API JSON response."""
     props: list[FanDuelProp] = []
 
     try:
@@ -180,7 +191,6 @@ def _extract_props_from_json(data: dict, league: str) -> list[FanDuelProp]:
         markets_raw = attachments.get("markets", {})
         events_raw  = attachments.get("events",  {})
 
-        # Build event-id → player name mapping from events
         player_by_event: dict[str, str] = {}
         for ev_id, ev in events_raw.items():
             name = ev.get("name", "") or ev.get("teamName", "")
@@ -190,10 +200,9 @@ def _extract_props_from_json(data: dict, league: str) -> list[FanDuelProp]:
             mkt_name     = mkt.get("marketName", "") or mkt.get("marketType", "")
             market_type  = mkt.get("marketType", "")
 
-            # Skip game-level markets (not player props)
             if market_type in _GAME_LEVEL_TYPES:
                 continue
-            # Skip period/inning/quarter markets
+                
             mkt_lower = mkt_name.lower()
             if any(x in mkt_lower for x in [
                 "1st period", "2nd period", "3rd period",
@@ -208,26 +217,40 @@ def _extract_props_from_json(data: dict, league: str) -> list[FanDuelProp]:
             ]):
                 continue
 
-            # ── Multi-runner batter-prop markets (MLB) ──
-            # e.g. "To Record A Hit" with 18 player runners at handicap=0
+            # ── Multi-runner / Milestone markets ──
             multi = _parse_multi_runner_market(mkt_name)
-            if multi:
-                pp_stat, line = multi
+            is_alt = " - alt" in mkt_name.lower() or "alternative" in mkt_name.lower() 
+            
+            if multi or is_alt:
                 runners = mkt.get("runners", [])
                 for runner in runners:
-                    player_name = runner.get("runnerName", "").strip()
-                    if not player_name:
-                        continue
-                    # Skip compound names like "Alvarez/Houston Astros"
-                    if "/" in player_name:
-                        continue
+                    runner_raw = runner.get("runnerName", "").strip()
+                    if not runner_raw: continue
+                    if "/" in runner_raw: continue
+
+                    if multi:
+                        pp_stat, line = multi
+                        player_name = runner_raw
+                    else:
+                        m_th = re.search(r"(\d+)\+", runner_raw)
+                        if not m_th: continue
+                        threshold = int(m_th.group(1))
+                        line = threshold - 0.5
+                        
+                        pp_stat = _normalize_prop_type(mkt_name)
+                        if not pp_stat: continue
+                        
+                        player_name = runner_raw.split(" - ")[0].strip()
+                        if player_name.lower() in ["over", "under"]:
+                             player_name = mkt_name.split(" - ")[0].strip()
+
                     win_odds = runner.get("winRunnerOdds", {})
                     american = (
                         _parse_american(win_odds.get("americanDisplayOdds", {}).get("americanOdds"))
                         or _parse_american(runner.get("currentPrice"))
                     )
-                    if american is None:
-                        continue
+                    if american is None: continue
+                    
                     props.append(FanDuelProp(
                         league=league,
                         player_name=player_name,
@@ -237,14 +260,13 @@ def _extract_props_from_json(data: dict, league: str) -> list[FanDuelProp]:
                         under_odds=None,
                         both_sided=False,
                     ))
-                continue  # Don't also parse as over/under
+                continue
 
             normalized = _normalize_prop_type(mkt_name) or _normalize_prop_type(market_type)
             if not normalized:
                 continue
 
             runners = mkt.get("runners", [])
-            # Group runners by handicap (line) to find over/under pairs
             by_line: dict[float, dict] = {}
 
             for runner in runners:
@@ -267,11 +289,9 @@ def _extract_props_from_json(data: dict, league: str) -> list[FanDuelProp]:
                 is_over  = "over"  in runner_name or "+" in runner_name
                 is_under = "under" in runner_name
 
-                # Extract player name from market name (e.g. "Bam Adebayo - Points")
                 if " - " in mkt_name:
                     player_name = mkt_name.split(" - ")[0].strip()
                 else:
-                    # Try extracting from runner name first (e.g. "Pavel Zacha - Over")
                     runner_raw = runner.get("runnerName", "")
                     clean_runner = runner_raw
                     for suffix in [" - Over", " - Under", " Over", " Under"]:
@@ -280,8 +300,6 @@ def _extract_props_from_json(data: dict, league: str) -> list[FanDuelProp]:
                             break
                     clean_runner = clean_runner.split("(")[0].strip()
 
-                    # Try extracting player from market name by stripping prop suffix
-                    # e.g. "Pavel Zacha Shots on Goal" → "Pavel Zacha"
                     market_player = ""
                     _PROP_SUFFIXES = [
                         "shots on goal", "total saves", "total goals",
@@ -300,7 +318,6 @@ def _extract_props_from_json(data: dict, league: str) -> list[FanDuelProp]:
                         or clean_runner
                     )
 
-                    # Fallback to event name
                     event_id = str(mkt.get("eventId", ""))
                     if event_id and event_id in player_by_event:
                         if not player_name or player_name.lower() in ["over", "under", ""]:
@@ -319,7 +336,6 @@ def _extract_props_from_json(data: dict, league: str) -> list[FanDuelProp]:
                 elif is_under:
                     entry["under_odds"] = american
                 else:
-                    # Fallback: treat as over if it's the first runner
                     if entry["over_odds"] is None:
                         entry["over_odds"] = american
 
@@ -358,7 +374,7 @@ LEAGUE_TABS = {
     "NBA": [
         "player-points", "player-rebounds", "player-assists",
         "player-threes", "player-props", "player-combos",
-        "player-defense",
+        "player-defense", "alternative-handicaps",
     ],
     "NCAAB": [
         "player-points", "player-rebounds", "player-assists",
@@ -366,7 +382,7 @@ LEAGUE_TABS = {
     ],
     "NHL": [
         "shots", "goalies", "goals", "points-assists",
-        "player-props",
+        "player-props", "alternative-handicaps",
     ],
     "MLB": [
         "pitcher-props", "batter-props", "player-props", 
@@ -375,7 +391,8 @@ LEAGUE_TABS = {
         "earned-runs-allowed", "earned-runs", "walks-allowed", 
         "walks-issued", "walks", "pitcher-strikeouts", 
         "hits-+-runs-+-rbis", "hits-runs-rbis", "to-record-a-hit",
-        "hits-allowed", "singles", "doubles", "triples"
+        "hits-allowed", "singles", "doubles", "triples",
+        "alternative-run-lines",
     ],
 }
 
@@ -420,7 +437,7 @@ async def _scrape_league(client: httpx.AsyncClient, league: str) -> list[FanDuel
         if isinstance(res, list):
             all_props.extend(res)
              
-    # Deduplicate by (player_name, prop_type, line, side)
+    # Deduplicate by (player_name, prop_type, line)
     seen = set()
     unique: list[FanDuelProp] = []
     for p in all_props:

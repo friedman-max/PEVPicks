@@ -1,36 +1,40 @@
-import asyncio
+import requests
 import json
-from curl_cffi import requests
+import uuid
 
-async def find_nhl_subcats():
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Accept": "application/json"
-    }
-    url = "https://sportsbook.draftkings.com/sites/US-NJ-SB/api/v5/eventgroups/42133?format=json"
-    print(f"Fetching: {url}")
-    try:
-        r = requests.get(url, headers=headers, impersonate="chrome")
-        print("Status:", r.status_code)
-        if r.status_code == 200:
-            data = r.json()
-            categories = data.get("eventGroup", {}).get("offerCategories", [])
-            print(f"Found {len(categories)} categories.")
-            for cat in categories:
-                cat_name = cat.get("name")
-                cat_id = cat.get("offerCategoryId")
-                print(f"Checking category: {cat_name} ({cat_id})")
-                
-                # Fetch detailed subcategories for this category
-                cat_url = f"https://sportsbook.draftkings.com/sites/US-NJ-SB/api/v5/eventgroups/42133/categories/{cat_id}?format=json"
-                r_cat = requests.get(cat_url, headers=headers, impersonate="chrome")
-                if r_cat.status_code == 200:
-                    cat_data = r_cat.json()
-                    subcats = cat_data.get("eventGroup", {}).get("offerCategories", [])[0].get("offerSubcategoryDescriptors", [])
-                    for sc in subcats:
-                        print(f"  - Subcategory: {sc.get('name')} (ID: {sc.get('subcategoryId')})")
-    except Exception as e:
-        print("Error:", e)
+PP_BASE = "https://partner-api.prizepicks.com/projections"
+PP_HEADERS = {
+    "Accept":          "application/json",
+    "Referer":         "https://app.prizepicks.com/",
+    "Origin":          "https://app.prizepicks.com",
+    "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "x-device-id":     str(uuid.uuid4()),
+    "x-device-info":   "{\"anonymousId\":\"\",\"os\":\"windows\",\"osVersion\":\"10\",\"platform\":\"web\",\"gameMode\":\"pickem\"}",
+}
+
+def discover_leagues():
+    print("Fetching PrizePicks leagues...")
+    # Fetch a small page for projection to see the meta / included for leagues
+    resp = requests.get(PP_BASE, params={"per_page": 1}, headers=PP_HEADERS)
+    if resp.status_code != 200:
+        print(f"Error: {resp.status_code}")
+        return
+
+    data = resp.json()
+    included = data.get("included", [])
+    
+    leagues = []
+    for item in included:
+        if item.get("type") == "league":
+            leagues.append({
+                "id": item.get("id"),
+                "name": item.get("attributes", {}).get("name"),
+                "display_name": item.get("attributes", {}).get("display_name"),
+            })
+    
+    print("\nAvailable Leagues on PrizePicks:")
+    for l in leagues:
+        print(f"  [{l['id']}] {l['name']} ({l['display_name']})")
 
 if __name__ == "__main__":
-    asyncio.run(find_nhl_subcats())
+    discover_leagues()
