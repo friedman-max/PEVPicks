@@ -19,9 +19,9 @@ PP_HEADERS = {
     "Accept":          "application/json",
     "Referer":         "https://app.prizepicks.com/",
     "Origin":          "https://app.prizepicks.com",
-    "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "User-Agent":      "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
     "x-device-id":     str(uuid.uuid4()),
-    "x-device-info":   "{\"anonymousId\":\"\",\"os\":\"windows\",\"osVersion\":\"10\",\"platform\":\"web\",\"gameMode\":\"pickem\"}",
+    "x-device-info":   "{\"anonymousId\":\"\",\"os\":\"ios\",\"osVersion\":\"16.0\",\"platform\":\"web\",\"gameMode\":\"pickem\"}",
 }
 
 
@@ -136,7 +136,6 @@ def scrape_prizepicks(active_leagues: dict | None = None) -> list[PrizePickLine]
             league_id = PRIZEPICKS_LEAGUE_IDS.get(league)
             if league_id is None:
                 continue
-            logger.info("Scraping PrizePicks league: %s (ID: %d)", league, league_id)
             lines = _fetch_league(session, league, league_id)
             all_lines.extend(lines)
             time.sleep(10.0)  # Significant inter-league delay to avoid 429s
