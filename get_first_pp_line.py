@@ -13,11 +13,9 @@ from config import ACTIVE_LEAGUES
 logging.basicConfig(level=logging.INFO)
 
 def get_first_line():
-    print("Waiting 30 seconds to bypass rate-limit...")
-    time.sleep(30)
-    print("Fetching PrizePicks lines (MLB)...")
-    # Only fetch MLB for speed during test
-    leagues = {"MLB": True}
+    print("Fetching PrizePicks lines (NHL)...")
+    # Only fetch NHL for speed during test
+    leagues = {"NHL": True}
     lines = scrape_prizepicks(active_leagues=leagues)
     
     if lines:

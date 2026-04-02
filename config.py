@@ -13,11 +13,12 @@ REFRESH_INTERVAL_MINUTES = int(os.getenv("REFRESH_INTERVAL_MINUTES", "15"))
 # EV filtering
 MIN_INDIVIDUAL_EV_PCT = float(os.getenv("MIN_INDIVIDUAL_EV_PCT", "0.01"))  # 1%
 
-# Leagues to scrape (can disable any)
+# Leagues to scrape (set specific sports to false to exclude)
+SCRAPE_ALL_LEAGUES = os.getenv("SCRAPE_ALL_LEAGUES", "false").lower() == "true"
 ACTIVE_LEAGUES = {
-    "NBA": os.getenv("LEAGUE_NBA", "true").lower() == "true",
-    "MLB": os.getenv("LEAGUE_MLB", "true").lower() == "true",
-    "NHL": os.getenv("LEAGUE_NHL", "true").lower() == "true",
+    "NBA":   os.getenv("LEAGUE_NBA", "true").lower()   == "true",
+    "MLB":   os.getenv("LEAGUE_MLB", "true").lower()   == "true",
+    "NHL":   os.getenv("LEAGUE_NHL", "true").lower()   == "true",
     "NCAAB": os.getenv("LEAGUE_NCAAB", "true").lower() == "true",
 }
 

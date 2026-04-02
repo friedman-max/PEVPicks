@@ -1,20 +1,25 @@
 import logging
 import json
+import uuid
 from curl_cffi import requests
+
+PP_HEADERS = {
+    "Accept":          "application/json",
+    "Referer":         "https://app.prizepicks.com/",
+    "Origin":          "https://app.prizepicks.com",
+    "User-Agent":      "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
+    "x-device-id":     str(uuid.uuid4()),
+    "x-device-info":   "{\"anonymousId\":\"\",\"os\":\"ios\",\"osVersion\":\"16.0\",\"platform\":\"web\",\"gameMode\":\"pickem\"}",
+}
 
 def test_leagues():
     logging.basicConfig(level=logging.INFO)
-    headers = {
-        "Accept": "application/json",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Referer": "https://app.prizepicks.com/",
-    }
     
-    url = "https://api.prizepicks.com/leagues?state_code=&game_mode=pickem"
+    url = "https://partner-api.prizepicks.com/leagues?state_code=&game_mode=pickem"
     
     with requests.Session(impersonate="chrome124") as session:
         try:
-            resp = session.get(url, headers=headers)
+            resp = session.get(url, headers=PP_HEADERS)
             print(f"Status: {resp.status_code}")
             if resp.status_code == 200:
                 data = resp.json()

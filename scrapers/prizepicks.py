@@ -9,7 +9,7 @@ from typing import Optional
 
 from curl_cffi import requests
 
-from config import PRIZEPICKS_LEAGUE_IDS, ACTIVE_LEAGUES
+from config import PRIZEPICKS_LEAGUE_IDS, ACTIVE_LEAGUES, SCRAPE_ALL_LEAGUES
 from engine.matcher import PrizePickLine
 
 logger = logging.getLogger(__name__)
@@ -20,9 +20,28 @@ PP_HEADERS = {
     "Referer":         "https://app.prizepicks.com/",
     "Origin":          "https://app.prizepicks.com",
     "User-Agent":      "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
-    "x-device-id":     str(uuid.uuid4()),
-    "x-device-info":   "{\"anonymousId\":\"\",\"os\":\"ios\",\"osVersion\":\"16.0\",\"platform\":\"web\",\"gameMode\":\"pickem\"}",
+    "x-device-id":     "73d6f789-53b1-4b13-97cc-f91cc6d11111",
 }
+
+def _request_with_retry(session: requests.Session, method: str, url: str, **kwargs) -> requests.Response:
+    """Make an HTTP request with retries for status 429/403."""
+    max_retries = 3
+    base_delay = 10
+    for attempt in range(max_retries):
+        try:
+            resp = session.request(method, url, **kwargs)
+            if resp.status_code in [429, 403]:
+                delay = base_delay * (3 ** attempt)
+                logger.warning("PrizePicks %d Error - retrying in %d seconds...", resp.status_code, delay)
+                time.sleep(delay)
+                continue
+            resp.raise_for_status()
+            return resp
+        except Exception as e:
+            if attempt == max_retries - 1:
+                raise e
+            time.sleep(base_delay)
+    raise Exception("Max retries reached")
 
 
 def _fetch_league(session: requests.Session, league: str, league_id: int) -> list[PrizePickLine]:
@@ -32,13 +51,14 @@ def _fetch_league(session: requests.Session, league: str, league_id: int) -> lis
 
     while True:
         try:
-            resp = session.get(
+            resp = _request_with_retry(
+                session, 
+                "GET",
                 PP_BASE,
-                params={"league_id": league_id, "per_page": 250, "page": page, "single_stat": "true"},
+                params={"league_id": league_id, "per_page": 250, "page": page},
                 headers=PP_HEADERS,
                 timeout=20,
             )
-            resp.raise_for_status()
         except Exception as e:
             logger.error("PrizePicks HTTP error for %s page %d: %s", league, page, e)
             break
@@ -125,19 +145,23 @@ def _fetch_league(session: requests.Session, league: str, league_id: int) -> lis
 
 
 def scrape_prizepicks(active_leagues: dict | None = None) -> list[PrizePickLine]:
-    """Scrape all active leagues from PrizePicks API."""
-    leagues = active_leagues if active_leagues is not None else ACTIVE_LEAGUES
+    """Scrape specific active leagues from PrizePicks API."""
     all_lines: list[PrizePickLine] = []
-
-    with requests.Session(impersonate="chrome124") as session:
-        for league, active in leagues.items():
-            if not active:
+    
+    # Use the 4 core leagues by default
+    target_leagues = active_leagues if active_leagues is not None else ACTIVE_LEAGUES
+    
+    with requests.Session(impersonate="safari17_2_ios") as session:
+        for league_name, is_active in target_leagues.items():
+            if not is_active:
                 continue
-            league_id = PRIZEPICKS_LEAGUE_IDS.get(league)
-            if league_id is None:
+            
+            league_id = PRIZEPICKS_LEAGUE_IDS.get(league_name)
+            if not league_id:
                 continue
-            lines = _fetch_league(session, league, league_id)
+                
+            lines = _fetch_league(session, league_name, league_id)
             all_lines.extend(lines)
-            time.sleep(10.0)  # Significant inter-league delay to avoid 429s
+            time.sleep(5.0)
 
     return all_lines
