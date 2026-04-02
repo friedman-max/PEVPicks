@@ -33,6 +33,7 @@
     <button class="tab" data-tab="matched">Combined Lines</button>
     <button class="tab" data-tab="pp">PrizePicks Lines</button>
     <button class="tab" data-tab="fd">FanDuel Lines</button>
+    <button class="tab" data-tab="dk">DraftKings Lines</button>
   </div>
 
   <!-- ── Filters bar (EV tab) ── -->
@@ -131,6 +132,28 @@
     <span class="badge" id="fd-total-badge">0 lines</span>
     <span id="fd-status-label" style="color:var(--text-muted);font-size:12px;"></span>
   </div>
+  
+  <!-- ── Filters bar (DK tab) ── -->
+  <div class="filters-bar hidden" id="dk-filters">
+    <label>League:
+      <select id="dk-filter-league">
+        <option value="">All</option>
+        <option value="NBA">NBA</option>
+        <option value="MLB">MLB</option>
+        <option value="NHL">NHL</option>
+      </select>
+    </label>
+    <label>Stat Type:
+      <input type="text" id="dk-filter-stat" placeholder="e.g. Points" />
+    </label>
+    <label>Player:
+      <input type="text" id="dk-filter-player" placeholder="e.g. LeBron" />
+    </label>
+    <button class="btn btn-secondary" id="btn-clear-dk-filters">Clear</button>
+    <button class="btn btn-primary" id="btn-load-dk">Load DraftKings Lines</button>
+    <span class="badge" id="dk-total-badge">0 lines</span>
+    <span id="dk-status-label" style="color:var(--text-muted);font-size:12px;"></span>
+  </div>
 
   <!-- ── Main layout (EV tab) ── -->
   <div class="main-layout" id="ev-view">
@@ -209,7 +232,7 @@
   </div>
 
   <!-- ── Matched Lines view ── -->
-  <div class="main-layout hidden" id="matched-view">
+  <div class="pp-view hidden" id="matched-view">
     <div class="table-section" style="flex: 1; max-width: 100%;">
       <div class="table-header-row">
         <h2>Combined Lines</h2>
@@ -224,13 +247,15 @@
               <th class="sortable-matched" data-col="pp_line">Line</th>
               <th class="sortable-matched" data-col="side">Side</th>
               <th class="sortable-matched" data-col="true_odds">True Odds</th>
-              <th class="sortable-matched" data-col="odds">FD Odds</th>
+              <th class="sortable-matched" data-col="best_odds">Best Odds</th>
+              <th class="sortable-matched" data-col="fd_odds">FD Odds</th>
+              <th class="sortable-matched" data-col="dk_odds">DK Odds</th>
               <th class="sortable-matched" data-col="start_time">Game Time</th>
             </tr>
           </thead>
           <tbody id="matched-tbody">
             <tr id="matched-empty-row">
-              <td colspan="7" class="empty-msg">Waiting for data...</td>
+              <td colspan="10" class="empty-msg">Waiting for data...</td>
             </tr>
           </tbody>
         </table>
@@ -278,6 +303,29 @@
           </thead>
           <tbody id="fd-tbody">
             <tr><td colspan="6" class="empty-msg">Click "Load FanDuel Lines" to fetch data.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── DraftKings Lines view ── -->
+  <div class="pp-view hidden" id="dk-view">
+    <div class="table-section">
+      <div class="table-wrapper">
+        <table id="dk-table">
+          <thead>
+            <tr>
+              <th class="sortable-dk" data-col="player_name">Player</th>
+              <th class="sortable-dk" data-col="league">League</th>
+              <th class="sortable-dk" data-col="stat_type">Stat Type</th>
+              <th class="sortable-dk" data-col="line_score">Line</th>
+              <th class="sortable-dk" data-col="true_odds">True Odds</th>
+              <th class="sortable-dk" data-col="line_odds">Line Odds</th>
+            </tr>
+          </thead>
+          <tbody id="dk-tbody">
+            <tr><td colspan="6" class="empty-msg">Click "Load DraftKings Lines" to fetch data.</td></tr>
           </tbody>
         </table>
       </div>

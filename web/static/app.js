@@ -386,6 +386,7 @@ async function fetchStatus() {
       await fetchMatched();
       await fetchPP();
       await fetchFD();
+      await fetchDK();
     }
     state.isScrapingPrev = data.is_scraping;
 
@@ -476,6 +477,8 @@ document.querySelectorAll(".tab").forEach(tab => {
     $("pp-filters").classList.add("hidden");
     $("fd-view").classList.add("hidden");
     $("fd-filters").classList.add("hidden");
+    $("dk-view").classList.add("hidden");
+    $("dk-filters").classList.add("hidden");
 
     if (target === "ev") {
       $("ev-view").classList.remove("hidden");
@@ -489,6 +492,9 @@ document.querySelectorAll(".tab").forEach(tab => {
     } else if (target === "fd") {
       $("fd-view").classList.remove("hidden");
       $("fd-filters").classList.remove("hidden");
+    } else if (target === "dk") {
+      $("dk-view").classList.remove("hidden");
+      $("dk-filters").classList.remove("hidden");
     }
   });
 });
@@ -566,7 +572,7 @@ function renderMatchedTable() {
   matchedTotalBadge.textContent = `${sorted.length} lines`;
 
   if (sorted.length === 0) {
-    matchedTbody.innerHTML = `<tr><td colspan="7" class="empty-msg">
+    matchedTbody.innerHTML = `<tr><td colspan="10" class="empty-msg">
       ${matchedState.allLines.length === 0 ? 'Click "Refresh Now" to load bets.' : "No lines match current filters."}
     </td></tr>`;
     return;
@@ -589,7 +595,9 @@ function renderMatchedTable() {
       <td class="line-value">${l.pp_line}${lineDiff}</td>
       <td class="${sideClass}">${l.side.toUpperCase()}</td>
       <td class="line-value">${fmt.trueOdds(l.true_odds)}</td>
-      <td class="line-value">${fmt.odds(l.odds)}</td>
+      <td class="line-value">${fmt.odds(l.best_odds)}</td>
+      <td class="line-value">${fmt.odds(l.fd_odds)}</td>
+      <td class="line-value">${fmt.odds(l.dk_odds)}</td>
       <td class="game-time">${gameTime}</td>
     </tr>`;
   }).join("");
@@ -625,6 +633,17 @@ async function fetchFD() {
     applyFDFilters();
   } catch (e) {
     console.error("Failed to fetch FanDuel lines:", e);
+  }
+}
+
+async function fetchDK() {
+  try {
+    const resp = await fetch("/api/draftkings");
+    const data = await resp.json();
+    dkState.allLines = data.lines || [];
+    applyDKFilters();
+  } catch (e) {
+    console.error("Failed to fetch DraftKings lines:", e);
   }
 }
 
@@ -890,10 +909,136 @@ $("btn-load-fd").addEventListener("click", async () => {
   }
 });
 
+// ── DraftKings Lines ──────────────────────────────────────────────────────
+const dkState = {
+  allLines:      [],
+  filteredLines: [],
+  sortCol:       "player_name",
+  sortDir:       "asc",
+};
+
+const dkTbody       = $("dk-tbody");
+const dkTotalBadge  = $("dk-total-badge");
+const dkStatusLabel = $("dk-status-label");
+
+function applyDKFilters() {
+  const league = $("dk-filter-league").value.toUpperCase();
+  const stat   = $("dk-filter-stat").value.toLowerCase().trim();
+  const player = $("dk-filter-player").value.toLowerCase().trim();
+
+  dkState.filteredLines = dkState.allLines.filter(l => {
+    if (league && l.league !== league) return false;
+    if (stat && !l.stat_type.toLowerCase().includes(stat)) return false;
+    if (player && !l.player_name.toLowerCase().includes(player)) return false;
+    return true;
+  });
+
+  renderDKTable();
+}
+
+["dk-filter-league", "dk-filter-stat", "dk-filter-player"].forEach(id => {
+  $(id).addEventListener("input", applyDKFilters);
+  $(id).addEventListener("change", applyDKFilters);
+});
+
+$("btn-clear-dk-filters").addEventListener("click", () => {
+  $("dk-filter-league").value = "";
+  $("dk-filter-stat").value   = "";
+  $("dk-filter-player").value = "";
+  applyDKFilters();
+});
+
+// Sorting
+document.querySelectorAll("th.sortable-dk").forEach(th => {
+  th.addEventListener("click", () => {
+    const col = th.dataset.col;
+    if (dkState.sortCol === col) {
+      dkState.sortDir = dkState.sortDir === "desc" ? "asc" : "desc";
+    } else {
+      dkState.sortCol = col;
+      dkState.sortDir = col === "line_score" ? "desc" : "asc";
+    }
+    document.querySelectorAll("th.sortable-dk").forEach(t => {
+      t.classList.remove("active", "asc", "desc");
+    });
+    th.classList.add("active", dkState.sortDir);
+    renderDKTable();
+  });
+});
+
+function sortDKLines(lines) {
+  return [...lines].sort((a, b) => {
+    let va = a[dkState.sortCol] ?? "";
+    let vb = b[dkState.sortCol] ?? "";
+    if (typeof va === "string") va = va.toLowerCase();
+    if (typeof vb === "string") vb = vb.toLowerCase();
+    if (va < vb) return dkState.sortDir === "asc" ? -1 : 1;
+    if (va > vb) return dkState.sortDir === "asc" ? 1 : -1;
+    return 0;
+  });
+}
+
+function renderDKTable() {
+  const sorted = sortDKLines(dkState.filteredLines);
+  dkTotalBadge.textContent = `${sorted.length} lines`;
+
+  if (sorted.length === 0) {
+    dkTbody.innerHTML = `<tr><td colspan="6" class="empty-msg">
+      ${dkState.allLines.length === 0 ? 'Click "Load DraftKings Lines" to fetch data.' : "No lines match current filters."}
+    </td></tr>`;
+    return;
+  }
+
+  dkTbody.innerHTML = sorted.map(l => {
+    return `<tr>
+      <td>${l.player_name}</td>
+      <td><span class="league-tag league-${l.league}">${l.league}</span></td>
+      <td>${l.stat_type}</td>
+      <td class="line-value">${l.line_score}</td>
+      <td class="line-value">${fmt.trueOdds(l.true_odds)}</td>
+      <td class="line-value">${fmt.odds(l.line_odds)}</td>
+    </tr>`;
+  }).join("");
+}
+
+// Load button
+$("btn-load-dk").addEventListener("click", async () => {
+  const btn = $("btn-load-dk");
+  btn.disabled = true;
+  btn.textContent = "Loading...";
+  dkStatusLabel.textContent = "Fetching DraftKings...";
+
+  try {
+    // Trigger scrape
+    await fetch("/api/draftkings/refresh", { method: "POST" });
+
+    // Poll until done
+    let done = false;
+    while (!done) {
+      await new Promise(r => setTimeout(r, 2000));
+      const resp = await fetch("/api/draftkings");
+      const data = await resp.json();
+      if (!data.is_scraping) {
+        dkState.allLines = data.lines || [];
+        done = true;
+      }
+    }
+
+    dkStatusLabel.textContent = `Loaded at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    applyDKFilters();
+  } catch (e) {
+    dkStatusLabel.textContent = "Error: " + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Load DraftKings Lines";
+  }
+});
+
 // ── Init ───────────────────────────────────────────────────────────────────
 fetchStatus();
 fetchBets();
 fetchMatched();
 fetchPP();
 fetchFD();
+fetchDK();
 setInterval(fetchStatus, 10_000);

@@ -25,6 +25,7 @@ from engine.ev_calculator import BetResult, calculate_slip, evaluate_match
 from engine.matcher import match_props
 from scrapers.fanduel import scrape_fanduel
 from scrapers.prizepicks import scrape_prizepicks
+from scrapers.draftkings import scrape_draftkings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -43,11 +44,13 @@ _state = {
     "matches":       [],        # list[dict] — unfiltered combined lines
     "pp_lines":      [],        # list[dict] — raw PrizePicks lines
     "fd_lines":      [],        # list[dict] — raw FanDuel lines
+    "dk_lines":      [],        # list[dict] — raw DraftKings lines
     "last_refresh":  None,      # datetime | None
     "next_refresh":  None,      # datetime | None
     "is_scraping":   False,
     "is_scraping_pp": False,
     "is_scraping_fd": False,
+    "is_scraping_dk": False,
     "scrape_errors": {},        # league -> error str | None
     "interval_min":  1,
     "min_ev_pct":    -10.0,
@@ -78,6 +81,8 @@ def run_pipeline():
         pp_lines = scrape_prizepicks(active_leagues=leagues)
         logger.info("Pipeline: scraping FanDuel...")
         fd_props = scrape_fanduel(active_leagues=leagues)
+        logger.info("Pipeline: scraping DraftKings...")
+        dk_props = scrape_draftkings(active_leagues=leagues)
         
         serialized_pp = [
             {
@@ -123,38 +128,119 @@ def run_pipeline():
                     "start_time": None,
                 })
 
-        logger.info("Pipeline: matching %d PP lines vs %d FD props...", len(pp_lines), len(fd_props))
-        matches = match_props(fd_props, pp_lines)
+        serialized_dk = []
+        for p in dk_props:
+            true_over, true_under = None, None
+            if p.both_sided and p.over_odds is not None and p.under_odds is not None:
+                true_over, true_under = devig_multiplicative(p.over_odds, p.under_odds)
+            else:
+                if p.over_odds is not None:
+                    true_over = devig_single_sided(p.over_odds)
+                if p.under_odds is not None:
+                    true_under = devig_single_sided(p.under_odds)
+
+            if p.over_odds is not None:
+                serialized_dk.append({
+                    "league": p.league,
+                    "player_name": p.player_name,
+                    "stat_type": p.prop_type + " (O)",
+                    "line_score": p.line,
+                    "line_odds": p.over_odds,
+                    "true_odds": prob_to_american(true_over) if true_over else None,
+                    "start_time": None,
+                })
+            if p.under_odds is not None:
+                serialized_dk.append({
+                    "league": p.league,
+                    "player_name": p.player_name,
+                    "stat_type": p.prop_type + " (U)",
+                    "line_score": p.line,
+                    "line_odds": p.under_odds,
+                    "true_odds": prob_to_american(true_under) if true_under else None,
+                    "start_time": None,
+                })
+
+        logger.info("Pipeline: matching %d PP lines vs %d FD and %d DK props...", len(pp_lines), len(fd_props), len(dk_props))
+        matches = match_props(fd_props, dk_props, pp_lines)
         
         from engine.devig import devig_multiplicative, devig_single_sided, prob_to_american
         
         serialized_matches = []
         for m in matches:
-            if m.pp.line_score != m.fd.line:
+            # We already filter for both books in the matcher, but we check line equality here
+            # Both books must match the PP line for it to be a clean 'Combined Line' comparison
+            if m.pp.line_score != m.fd.line or m.pp.line_score != m.dk.line:
                 continue
+                
             base = {
                 "player_name": m.pp.player_name,
                 "league": m.pp.league,
                 "stat_type": m.pp.stat_type,
                 "pp_line": m.pp.line_score,
                 "fd_line": m.fd.line,
+                "dk_line": m.dk.line,
                 "start_time": m.pp.start_time,
             }
             
-            true_over, true_under = None, None
-            if m.fd.both_sided and m.fd.over_odds is not None and m.fd.under_odds is not None:
-                true_over, true_under = devig_multiplicative(m.fd.over_odds, m.fd.under_odds)
-            else:
-                if m.fd.over_odds is not None:
-                    true_over = devig_single_sided(m.fd.over_odds)
-                if m.fd.under_odds is not None:
-                    true_under = devig_single_sided(m.fd.under_odds)
-
             pp_side = getattr(m.pp, "side", "both")
-            if pp_side in ("both", "over") and m.fd.over_odds is not None:
-                serialized_matches.append({**base, "side": "over", "odds": m.fd.over_odds, "true_odds": prob_to_american(true_over) if true_over else None})
-            if pp_side in ("both", "under") and m.fd.under_odds is not None:
-                serialized_matches.append({**base, "side": "under", "odds": m.fd.under_odds, "true_odds": prob_to_american(true_under) if true_under else None})
+            
+            # Helper to calculate conservative true odds based on two books
+            def get_combined_true_odds(fd_o, dk_o, fd_u, dk_u, side):
+                if side == "over":
+                    o1, o2 = fd_o, dk_o
+                    u1, u2 = fd_u, dk_u
+                else:
+                    o1, o2 = fd_u, dk_u
+                    u1, u2 = fd_o, dk_o
+
+                if o1 is None or o2 is None: return None, None
+                
+                # Best odds is the one that pays out MORE (higher American number)
+                best_odds = max(o1, o2)
+                
+                # True odds based on the book that provided the best_odds (conservative approach)
+                # If we have both sides for that book, use multiplicative devig
+                target_book = "fd" if o1 >= o2 else "dk"
+                
+                if target_book == "fd":
+                    if m.fd.both_sided and fd_o is not None and fd_u is not None:
+                        t_o, t_u = devig_multiplicative(fd_o, fd_u)
+                    else:
+                        t_o, t_u = devig_single_sided(fd_o), devig_single_sided(fd_u) if fd_u else None
+                else:
+                    if m.dk.both_sided and dk_o is not None and dk_u is not None:
+                        t_o, t_u = devig_multiplicative(dk_o, dk_u)
+                    else:
+                        t_o, t_u = devig_single_sided(dk_o), devig_single_sided(dk_u) if dk_u else None
+                
+                final_true_prob = t_o if side == "over" else t_u
+                return best_odds, prob_to_american(final_true_prob) if final_true_prob else None
+
+            # Process Over side
+            if pp_side in ("both", "over") and m.fd.over_odds is not None and m.dk.over_odds is not None:
+                best, true = get_combined_true_odds(m.fd.over_odds, m.dk.over_odds, m.fd.under_odds, m.dk.under_odds, "over")
+                if best is not None:
+                    serialized_matches.append({
+                        **base, 
+                        "side": "over", 
+                        "best_odds": best,
+                        "fd_odds": m.fd.over_odds,
+                        "dk_odds": m.dk.over_odds,
+                        "true_odds": true
+                    })
+
+            # Process Under side
+            if pp_side in ("both", "under") and m.fd.under_odds is not None and m.dk.under_odds is not None:
+                best, true = get_combined_true_odds(m.fd.over_odds, m.dk.over_odds, m.fd.under_odds, m.dk.under_odds, "under")
+                if best is not None:
+                    serialized_matches.append({
+                        **base, 
+                        "side": "under", 
+                        "best_odds": best,
+                        "fd_odds": m.fd.under_odds,
+                        "dk_odds": m.dk.under_odds,
+                        "true_odds": true
+                    })
 
         bets: list[BetResult] = []
         with _lock:
@@ -182,6 +268,7 @@ def run_pipeline():
             _state["matches"]      = serialized_matches
             _state["pp_lines"]     = serialized_pp
             _state["fd_lines"]     = serialized_fd
+            _state["dk_lines"]     = serialized_dk
             _state["last_refresh"] = datetime.now()
             _state["next_refresh"] = datetime.now() + timedelta(minutes=_state["interval_min"])
             _state["scrape_errors"] = errors
@@ -527,4 +614,81 @@ def _run_fd_scrape():
     finally:
         with _lock:
             _state["is_scraping_fd"] = False
+
+
+# ---------------------------------------------------------------------------
+# DraftKings-only endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/api/draftkings")
+def get_draftkings():
+    with _lock:
+        return {
+            "lines": _state["dk_lines"],
+            "total": len(_state["dk_lines"]),
+            "is_scraping": _state["is_scraping_dk"],
+        }
+
+
+@app.post("/api/draftkings/refresh")
+def refresh_draftkings():
+    with _lock:
+        if _state["is_scraping_dk"]:
+            raise HTTPException(status_code=409, detail="DraftKings scrape already in progress.")
+    threading.Thread(target=_run_dk_scrape, daemon=True).start()
+    return {"status": "draftkings refresh started"}
+
+
+def _run_dk_scrape():
+    with _lock:
+        if _state["is_scraping_dk"]:
+            return
+        _state["is_scraping_dk"] = True
+
+    try:
+        with _lock:
+            leagues = dict(_state["active_leagues"])
+
+        logger.info("DraftKings scrape starting...")
+        dk_props = scrape_draftkings(active_leagues=leagues)
+        from engine.devig import devig_multiplicative, devig_single_sided, prob_to_american
+        serialized = []
+        for p in dk_props:
+            true_over, true_under = None, None
+            if p.both_sided and p.over_odds is not None and p.under_odds is not None:
+                true_over, true_under = devig_multiplicative(p.over_odds, p.under_odds)
+            else:
+                if p.over_odds is not None:
+                    true_over = devig_single_sided(p.over_odds)
+                if p.under_odds is not None:
+                    true_under = devig_single_sided(p.under_odds)
+
+            if p.over_odds is not None:
+                serialized.append({
+                    "league": p.league,
+                    "player_name": p.player_name,
+                    "stat_type": p.prop_type + " (O)",
+                    "line_score": p.line,
+                    "line_odds": p.over_odds,
+                    "true_odds": prob_to_american(true_over) if true_over else None,
+                    "start_time": None,
+                })
+            if p.under_odds is not None:
+                serialized.append({
+                    "league": p.league,
+                    "player_name": p.player_name,
+                    "stat_type": p.prop_type + " (U)",
+                    "line_score": p.line,
+                    "line_odds": p.under_odds,
+                    "true_odds": prob_to_american(true_under) if true_under else None,
+                    "start_time": None,
+                })
+        with _lock:
+            _state["dk_lines"] = serialized
+        logger.info("DraftKings scrape complete: %d lines.", len(serialized))
+    except Exception as e:
+        logger.exception("DraftKings scrape error: %s", e)
+    finally:
+        with _lock:
+            _state["is_scraping_dk"] = False
 
