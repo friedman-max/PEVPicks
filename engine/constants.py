@@ -83,6 +83,7 @@ PROP_TYPE_MAP = {
     #   Earned Runs Allowed, Hits Allowed, Hitter Fantasy Score, Pitching Outs
     "strikeouts":                    "Pitcher Strikeouts",
     "pitcher strikeouts":            "Pitcher Strikeouts",
+    "strikeouts thrown":             "Pitcher Strikeouts",
     "hits":                          "Hits",
     "runs":                          "Runs",
     "rbis":                          "RBIs",
@@ -92,12 +93,18 @@ PROP_TYPE_MAP = {
     "hits allowed":                  "Hits Allowed",
     "hitter fantasy score":          "Hitter Fantasy Score",
     "pitching outs":                 "Pitching Outs",
+    "outs recorded":                 "Pitching Outs",
     "batting runs":                  "Runs",
     "home runs":                     "Home Runs",
     "stolen bases":                  "Stolen Bases",
     "singles":                       "Singles",
     "doubles":                       "Doubles",
     "triples":                       "Triples",
+    "extra base hits":               "Extra Base Hits",
+    "hits + runs + rbis":            "Hits+Runs+RBIs",
+    "hits+runs+rbis":                "Hits+Runs+RBIs",
+    "runs + rbis":                   "Runs+RBIs",
+    "runs+rbis":                     "Runs+RBIs",
 
     # ── Hockey (NHL) ──
     # PrizePicks: Shots on Goal, Goals, Saves, Points, Assists, Time On Ice,
