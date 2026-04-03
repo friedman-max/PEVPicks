@@ -1,4 +1,4 @@
-# PrizePicks +EV Finder
+# CoreProp
 
 A local dashboard that compares PrizePicks lines against FanDuel odds to surface positive expected value (+EV) props.
 

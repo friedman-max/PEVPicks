@@ -30,7 +30,7 @@ from scrapers.draftkings import scrape_draftkings
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="PrizePicks +EV Finder")
+app = FastAPI(title="CoreProp")
 
 # ---------------------------------------------------------------------------
 # In-memory state

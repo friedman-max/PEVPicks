@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PrizePicks +EV Finder</title>
+  <title>CoreProp</title>
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
   <!-- ── Header ── -->
   <header>
     <div class="header-left">
-      <span class="logo">PP +EV Finder</span>
+      <span class="logo">CoreProp</span>
       <span class="badge" id="total-badge">0 bets</span>
     </div>
     <div class="header-right">
@@ -160,7 +160,6 @@
     <!-- Bets table -->
     <div class="table-section">
       <div class="table-header-row">
-        <h2>+EV Bets</h2>
         <div class="table-actions">
           <span id="selected-count">0 selected</span>
           <button class="btn btn-accent" id="btn-build-slip" disabled>Build Slip</button>
@@ -234,9 +233,6 @@
   <!-- ── Matched Lines view ── -->
   <div class="pp-view hidden" id="matched-view">
     <div class="table-section" style="flex: 1; max-width: 100%;">
-      <div class="table-header-row">
-        <h2>Combined Lines</h2>
-      </div>
       <div class="table-wrapper">
         <table id="matched-table">
           <thead>
