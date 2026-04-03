@@ -25,6 +25,7 @@ class FanDuelProp:
     over_odds: Optional[int]    # American; None if not available
     under_odds: Optional[int]   # American; None if not available
     both_sided: bool
+    start_time: str = ""
 
 
 @dataclass

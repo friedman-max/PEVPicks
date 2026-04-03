@@ -15,13 +15,6 @@ from engine.matcher import PrizePickLine
 logger = logging.getLogger(__name__)
 
 PP_BASE = "https://partner-api.prizepicks.com/projections"
-PP_HEADERS = {
-    "Accept":          "application/json",
-    "Referer":         "https://app.prizepicks.com/",
-    "Origin":          "https://app.prizepicks.com",
-    "User-Agent":      "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
-    "x-device-id":     "73d6f789-53b1-4b13-97cc-f91cc6d11111",
-}
 
 def _request_with_retry(session: requests.Session, method: str, url: str, **kwargs) -> requests.Response:
     """Make an HTTP request with retries for status 429/403."""
@@ -44,7 +37,7 @@ def _request_with_retry(session: requests.Session, method: str, url: str, **kwar
     raise Exception("Max retries reached")
 
 
-def _fetch_league(session: requests.Session, league: str, league_id: int) -> list[PrizePickLine]:
+def _fetch_league(session: requests.Session, league: str, league_id: int, headers: dict) -> list[PrizePickLine]:
     """Fetch all projections for a single league."""
     lines: list[PrizePickLine] = []
     page = 1
@@ -56,7 +49,7 @@ def _fetch_league(session: requests.Session, league: str, league_id: int) -> lis
                 "GET",
                 PP_BASE,
                 params={"league_id": league_id, "per_page": 250, "page": page},
-                headers=PP_HEADERS,
+                headers=headers,
                 timeout=20,
             )
         except Exception as e:
@@ -151,6 +144,13 @@ def scrape_prizepicks(active_leagues: dict | None = None) -> list[PrizePickLine]
     # Use the 4 core leagues by default
     target_leagues = active_leagues if active_leagues is not None else ACTIVE_LEAGUES
     
+    device_id = str(uuid.uuid4())
+    headers = {
+        "Accept": "application/json",
+        "Referer": "https://app.prizepicks.com/",
+        "x-device-id": device_id
+    }
+    
     with requests.Session(impersonate="safari17_2_ios") as session:
         for league_name, is_active in target_leagues.items():
             if not is_active:
@@ -160,8 +160,13 @@ def scrape_prizepicks(active_leagues: dict | None = None) -> list[PrizePickLine]
             if not league_id:
                 continue
                 
-            lines = _fetch_league(session, league_name, league_id)
+            lines = _fetch_league(session, league_name, league_id, headers)
             all_lines.extend(lines)
-            time.sleep(5.0)
+            
+            # CRITICAL: partner-api.prizepicks.com enforces a strict WAF rate limit 
+            # of exactly 2 requests per 60 seconds per IP. 
+            # We must sleep for 40 seconds between leagues to ensure older requests 
+            # drop out of the rolling bucket, avoiding a hard 429 block on the 3rd request (e.g., NHL).
+            time.sleep(40.0)
 
     return all_lines

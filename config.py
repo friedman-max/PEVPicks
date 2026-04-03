@@ -35,7 +35,7 @@ PRIZEPICKS_LEAGUE_IDS = {
     "NBA":   7,
     "MLB":   2,
     "NHL":   8,
-    "NCAAB": 3,
+    "NCAAB": 189,
 }
 
 # Fuzzy match threshold (0-100)

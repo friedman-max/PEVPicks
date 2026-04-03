@@ -192,13 +192,18 @@ def _extract_props_from_json(data: dict, league: str) -> list[FanDuelProp]:
         events_raw  = attachments.get("events",  {})
 
         player_by_event: dict[str, str] = {}
+        time_by_event: dict[str, str] = {}
         for ev_id, ev in events_raw.items():
             name = ev.get("name", "") or ev.get("teamName", "")
             player_by_event[str(ev_id)] = name
+            time_by_event[str(ev_id)] = ev.get("openDate", "")
 
         for mkt_id, mkt in markets_raw.items():
             mkt_name     = mkt.get("marketName", "") or mkt.get("marketType", "")
             market_type  = mkt.get("marketType", "")
+            
+            event_id = str(mkt.get("eventId", ""))
+            start_time = time_by_event.get(event_id, "")
 
             if market_type in _GAME_LEVEL_TYPES:
                 continue
@@ -259,6 +264,7 @@ def _extract_props_from_json(data: dict, league: str) -> list[FanDuelProp]:
                         over_odds=american,
                         under_odds=None,
                         both_sided=False,
+                        start_time=start_time,
                     ))
                 continue
 
@@ -354,6 +360,7 @@ def _extract_props_from_json(data: dict, league: str) -> list[FanDuelProp]:
                     over_odds=over_odds,
                     under_odds=under_odds,
                     both_sided=both_sided,
+                    start_time=start_time,
                 ))
     except Exception as e:
         logger.debug("JSON parse error: %s", e)

@@ -115,7 +115,7 @@ def run_pipeline():
                     "line_score": p.line,
                     "line_odds": p.over_odds,
                     "true_odds": prob_to_american(true_over) if true_over else None,
-                    "start_time": None,
+                    "start_time": getattr(p, "start_time", None),
                 })
             if p.under_odds is not None:
                 serialized_fd.append({
@@ -125,7 +125,7 @@ def run_pipeline():
                     "line_score": p.line,
                     "line_odds": p.under_odds,
                     "true_odds": prob_to_american(true_under) if true_under else None,
-                    "start_time": None,
+                    "start_time": getattr(p, "start_time", None),
                 })
 
         serialized_dk = []
@@ -147,7 +147,7 @@ def run_pipeline():
                     "line_score": p.line,
                     "line_odds": p.over_odds,
                     "true_odds": prob_to_american(true_over) if true_over else None,
-                    "start_time": None,
+                    "start_time": getattr(p, "start_time", None),
                 })
             if p.under_odds is not None:
                 serialized_dk.append({
@@ -157,7 +157,7 @@ def run_pipeline():
                     "line_score": p.line,
                     "line_odds": p.under_odds,
                     "true_odds": prob_to_american(true_under) if true_under else None,
-                    "start_time": None,
+                    "start_time": getattr(p, "start_time", None),
                 })
 
         logger.info("Pipeline: matching %d PP lines vs %d FD and %d DK props...", len(pp_lines), len(fd_props), len(dk_props))
@@ -639,7 +639,7 @@ def _run_fd_scrape():
                     "line_score": p.line,
                     "line_odds": p.over_odds,
                     "true_odds": prob_to_american(true_over) if true_over else None,
-                    "start_time": None,
+                    "start_time": getattr(p, "start_time", None),
                 })
             if p.under_odds is not None:
                 serialized.append({
@@ -649,7 +649,7 @@ def _run_fd_scrape():
                     "line_score": p.line,
                     "line_odds": p.under_odds,
                     "true_odds": prob_to_american(true_under) if true_under else None,
-                    "start_time": None,
+                    "start_time": getattr(p, "start_time", None),
                 })
         with _lock:
             _state["fd_lines"] = serialized
@@ -716,7 +716,7 @@ def _run_dk_scrape():
                     "line_score": p.line,
                     "line_odds": p.over_odds,
                     "true_odds": prob_to_american(true_over) if true_over else None,
-                    "start_time": None,
+                    "start_time": getattr(p, "start_time", None),
                 })
             if p.under_odds is not None:
                 serialized.append({
@@ -726,7 +726,7 @@ def _run_dk_scrape():
                     "line_score": p.line,
                     "line_odds": p.under_odds,
                     "true_odds": prob_to_american(true_under) if true_under else None,
-                    "start_time": None,
+                    "start_time": getattr(p, "start_time", None),
                 })
         with _lock:
             _state["dk_lines"] = serialized
