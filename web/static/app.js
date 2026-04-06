@@ -621,6 +621,12 @@ document.querySelectorAll(".tab").forEach(tab => {
     } else if (target === "pin") {
       $("pin-view").classList.remove("hidden");
       $("pin-filters").classList.remove("hidden");
+      // Always re-fetch/render when switching to pin tab
+      if (pinState.allLines.length > 0) {
+        renderPinTable();
+      } else {
+        fetchPin();
+      }
     } else if (target === "backtest") {
       $("backtest-view").classList.remove("hidden");
       $("backtest-filters").classList.remove("hidden");
