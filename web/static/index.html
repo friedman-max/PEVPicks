@@ -14,7 +14,6 @@
   <header>
     <div class="header-left">
       <span class="logo">CoreProp</span>
-      <span class="badge" id="total-badge">0 bets</span>
     </div>
     <div class="header-right">
       <div class="status-block">
@@ -69,6 +68,8 @@
       </select>
     </label>
     <button class="btn btn-secondary" id="btn-clear-filters">Clear</button>
+    <span class="badge" id="total-badge">0 bets</span>
+    <div id="ev-pagination" class="pagination-controls"></div>
   </div>
 
   <!-- ── Filters bar (Matched tab) ── -->
@@ -90,6 +91,7 @@
     </label>
     <button class="btn btn-secondary" id="btn-clear-matched-filters">Clear</button>
     <span class="badge" id="matched-total-badge">0 lines</span>
+    <div id="matched-pagination" class="pagination-controls"></div>
   </div>
 
   <!-- ── Filters bar (PP tab) ── -->
@@ -112,6 +114,7 @@
     <button class="btn btn-secondary" id="btn-clear-pp-filters">Clear</button>
     <button class="btn btn-primary" id="btn-load-pp">Load PrizePicks Lines</button>
     <span class="badge" id="pp-total-badge">0 lines</span>
+    <div id="pp-pagination" class="pagination-controls"></div>
     <span id="pp-status-label" style="color:var(--text-muted);font-size:12px;"></span>
   </div>
 
@@ -135,6 +138,7 @@
     <button class="btn btn-secondary" id="btn-clear-fd-filters">Clear</button>
     <button class="btn btn-primary" id="btn-load-fd">Load FanDuel Lines</button>
     <span class="badge" id="fd-total-badge">0 lines</span>
+    <div id="fd-pagination" class="pagination-controls"></div>
     <span id="fd-status-label" style="color:var(--text-muted);font-size:12px;"></span>
   </div>
   
@@ -158,6 +162,7 @@
     <button class="btn btn-secondary" id="btn-clear-dk-filters">Clear</button>
     <button class="btn btn-primary" id="btn-load-dk">Load DraftKings Lines</button>
     <span class="badge" id="dk-total-badge">0 lines</span>
+    <div id="dk-pagination" class="pagination-controls"></div>
     <span id="dk-status-label" style="color:var(--text-muted);font-size:12px;"></span>
   </div>
 
@@ -332,7 +337,6 @@
             <tr><td colspan="6" class="empty-msg">Click "Load DraftKings Lines" to fetch data.</td></tr>
           </tbody>
         </table>
-      </div>
     </div>
   </div>
 
@@ -356,6 +360,7 @@
     <button class="btn btn-secondary" id="btn-clear-pin-filters">Clear</button>
     <button class="btn btn-primary" id="btn-load-pin">Load Pinnacle Lines</button>
     <span class="badge" id="pin-total-badge">0 lines</span>
+    <div id="pin-pagination" class="pagination-controls"></div>
     <span id="pin-status-label" style="color:var(--text-muted);font-size:12px;"></span>
   </div>
 
@@ -441,7 +446,6 @@
           </thead>
           <tbody id="bt-tbody"></tbody>
         </table>
-      </div>
     </div>
   </div>
 
@@ -463,6 +467,7 @@
         <option value="NCAAB">NCAAB</option>
       </select>
     </label>
+    <div id="bt-pagination" class="pagination-controls"></div>
   </div>
 
   <!-- ── Settings modal ── -->

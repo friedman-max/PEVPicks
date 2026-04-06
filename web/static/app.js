@@ -16,6 +16,8 @@ const state = {
   sortDir:       "desc",
   lastBetCount:  -1,          // detect when new bets arrive
   isScrapingPrev: false,
+  page:          1,
+  pageSize:      100,
 };
 
 // ── DOM refs ───────────────────────────────────────────────────────────────
@@ -57,6 +59,47 @@ function evClass(ev_pct) {
   return "ev-low";
 }
 
+// ── Pagination Helper ──────────────────────────────────────────────────────
+function renderPagination(containerId, stateObj, totalItems, renderCallback) {
+  const container = $(containerId);
+  if (!container) return;
+  const totalPages = Math.ceil(totalItems / stateObj.pageSize) || 1;
+  if (stateObj.page > totalPages) stateObj.page = totalPages;
+  if (stateObj.page < 1) stateObj.page = 1;
+
+  if (totalItems === 0) {
+    container.innerHTML = "";
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="pagination">
+      <button class="btn btn-secondary btn-sm" ${stateObj.page === 1 ? "disabled" : ""} id="${containerId}-prev">&lt;</button>
+      <span>P. ${stateObj.page} / ${totalPages}</span>
+      <button class="btn btn-secondary btn-sm" ${stateObj.page === totalPages ? "disabled" : ""} id="${containerId}-next">&gt;</button>
+    </div>
+  `;
+
+  const btnPrev = document.getElementById(`${containerId}-prev`);
+  const btnNext = document.getElementById(`${containerId}-next`);
+  if (btnPrev) {
+    btnPrev.addEventListener("click", () => {
+      if (stateObj.page > 1) {
+        stateObj.page--;
+        renderCallback();
+      }
+    });
+  }
+  if (btnNext) {
+    btnNext.addEventListener("click", () => {
+      if (stateObj.page < totalPages) {
+        stateObj.page++;
+        renderCallback();
+      }
+    });
+  }
+}
+
 // ── Filters ────────────────────────────────────────────────────────────────
 function applyFilters() {
   const league  = $("filter-league").value.toUpperCase();
@@ -76,6 +119,7 @@ function applyFilters() {
     return true;
   });
 
+  state.page = 1;
   renderTable();
 }
 
@@ -107,6 +151,7 @@ document.querySelectorAll("th.sortable").forEach(th => {
       t.classList.remove("active", "asc", "desc");
     });
     th.classList.add("active", state.sortDir);
+    state.page = 1;
     renderTable();
   });
 });
@@ -127,7 +172,16 @@ function sortBets(bets) {
 function renderTable() {
   const sorted = sortBets(state.filteredBets);
 
-  if (sorted.length === 0) {
+  const totalItems = sorted.length;
+  const totalPages = Math.ceil(totalItems / state.pageSize) || 1;
+  if (state.page > totalPages) state.page = totalPages;
+  if (state.page < 1) state.page = 1;
+  const startIdx = (state.page - 1) * state.pageSize;
+  const paginated = sorted.slice(startIdx, startIdx + state.pageSize);
+
+  renderPagination("ev-pagination", state, totalItems, renderTable);
+
+  if (totalItems === 0) {
     tbody.innerHTML = `<tr id="empty-row"><td colspan="10" class="empty-msg">
       ${state.allBets.length === 0 ? 'Click "Refresh Now" to load bets.' : "No bets match current filters."}
     </td></tr>`;
@@ -135,9 +189,9 @@ function renderTable() {
     return;
   }
 
-  totalBadge.textContent = `${sorted.length} bet${sorted.length !== 1 ? "s" : ""}`;
+  totalBadge.textContent = `${totalItems} bet${totalItems !== 1 ? "s" : ""}`;
 
-  tbody.innerHTML = sorted.map(b => {
+  tbody.innerHTML = paginated.map(b => {
     const checked   = state.selected.has(b.bet_id) ? "checked" : "";
     const rowClass  = state.selected.has(b.bet_id) ? "selected" : "";
     const lineDiff = (b.fd_line != null && b.pp_line !== b.fd_line)
@@ -209,8 +263,11 @@ function updateSelectionUI() {
 
 $("chk-all").addEventListener("change", e => {
   const checked = e.target.checked;
-  const visible = sortBets(state.filteredBets);
-  const toToggle = checked ? visible.slice(0, 6) : visible;
+  const totalItems = state.filteredBets.length;
+  const startIdx = (state.page - 1) * state.pageSize;
+  const paginated = sortBets(state.filteredBets).slice(startIdx, startIdx + state.pageSize);
+  
+  const toToggle = checked ? paginated.slice(0, 6) : paginated;
   toToggle.forEach(b => {
     if (checked) state.selected.add(b.bet_id);
     else         state.selected.delete(b.bet_id);
@@ -569,6 +626,8 @@ const matchedState = {
   filteredLines: [],
   sortCol:       "player_name",
   sortDir:       "asc",
+  page:          1,
+  pageSize:      100,
 };
 
 const matchedTbody      = $("matched-tbody");
@@ -586,6 +645,7 @@ function applyMatchedFilters() {
     return true;
   });
 
+  matchedState.page = 1;
   renderMatchedTable();
 }
 
@@ -615,6 +675,7 @@ document.querySelectorAll("th.sortable-matched").forEach(th => {
       t.classList.remove("active", "asc", "desc");
     });
     th.classList.add("active", matchedState.sortDir);
+    matchedState.page = 1;
     renderMatchedTable();
   });
 });
@@ -633,16 +694,26 @@ function sortMatchedLines(lines) {
 
 function renderMatchedTable() {
   const sorted = sortMatchedLines(matchedState.filteredLines);
-  matchedTotalBadge.textContent = `${sorted.length} lines`;
+  
+  const totalItems = sorted.length;
+  const totalPages = Math.ceil(totalItems / matchedState.pageSize) || 1;
+  if (matchedState.page > totalPages) matchedState.page = totalPages;
+  if (matchedState.page < 1) matchedState.page = 1;
+  const startIdx = (matchedState.page - 1) * matchedState.pageSize;
+  const paginated = sorted.slice(startIdx, startIdx + matchedState.pageSize);
 
-  if (sorted.length === 0) {
+  renderPagination("matched-pagination", matchedState, totalItems, renderMatchedTable);
+
+  matchedTotalBadge.textContent = `${totalItems} lines`;
+
+  if (totalItems === 0) {
     matchedTbody.innerHTML = `<tr><td colspan="11" class="empty-msg">
       ${matchedState.allLines.length === 0 ? 'Click "Refresh Now" to load bets.' : "No lines match current filters."}
     </td></tr>`;
     return;
   }
 
-  matchedTbody.innerHTML = sorted.map(l => {
+  matchedTbody.innerHTML = paginated.map(l => {
     let gameTime = "—";
     if (l.start_time) {
       const d = new Date(l.start_time);
@@ -729,6 +800,8 @@ const ppState = {
   filteredLines: [],
   sortCol:       "player_name",
   sortDir:       "asc",
+  page:          1,
+  pageSize:      100,
 };
 
 const ppTbody       = $("pp-tbody");
@@ -747,6 +820,7 @@ function applyPPFilters() {
     return true;
   });
 
+  ppState.page = 1;
   renderPPTable();
 }
 
@@ -776,6 +850,7 @@ document.querySelectorAll("th.sortable-pp").forEach(th => {
       t.classList.remove("active", "asc", "desc");
     });
     th.classList.add("active", ppState.sortDir);
+    ppState.page = 1;
     renderPPTable();
   });
 });
@@ -794,16 +869,26 @@ function sortPPLines(lines) {
 
 function renderPPTable() {
   const sorted = sortPPLines(ppState.filteredLines);
-  ppTotalBadge.textContent = `${sorted.length} lines`;
+  
+  const totalItems = sorted.length;
+  const totalPages = Math.ceil(totalItems / ppState.pageSize) || 1;
+  if (ppState.page > totalPages) ppState.page = totalPages;
+  if (ppState.page < 1) ppState.page = 1;
+  const startIdx = (ppState.page - 1) * ppState.pageSize;
+  const paginated = sorted.slice(startIdx, startIdx + ppState.pageSize);
 
-  if (sorted.length === 0) {
+  renderPagination("pp-pagination", ppState, totalItems, renderPPTable);
+
+  ppTotalBadge.textContent = `${totalItems} lines`;
+
+  if (totalItems === 0) {
     ppTbody.innerHTML = `<tr><td colspan="5" class="empty-msg">
       ${ppState.allLines.length === 0 ? 'Click "Load PrizePicks Lines" to fetch data.' : "No lines match current filters."}
     </td></tr>`;
     return;
   }
 
-  ppTbody.innerHTML = sorted.map(l => {
+  ppTbody.innerHTML = paginated.map(l => {
     let gameTime = "—";
     if (l.start_time) {
       const d = new Date(l.start_time);
@@ -859,6 +944,8 @@ const fdState = {
   filteredLines: [],
   sortCol:       "player_name",
   sortDir:       "asc",
+  page:          1,
+  pageSize:      100,
 };
 
 const fdTbody       = $("fd-tbody");
@@ -877,6 +964,7 @@ function applyFDFilters() {
     return true;
   });
 
+  fdState.page = 1;
   renderFDTable();
 }
 
@@ -906,6 +994,7 @@ document.querySelectorAll("th.sortable-fd").forEach(th => {
       t.classList.remove("active", "asc", "desc");
     });
     th.classList.add("active", fdState.sortDir);
+    fdState.page = 1;
     renderFDTable();
   });
 });
@@ -924,16 +1013,26 @@ function sortFDLines(lines) {
 
 function renderFDTable() {
   const sorted = sortFDLines(fdState.filteredLines);
-  fdTotalBadge.textContent = `${sorted.length} lines`;
+  
+  const totalItems = sorted.length;
+  const totalPages = Math.ceil(totalItems / fdState.pageSize) || 1;
+  if (fdState.page > totalPages) fdState.page = totalPages;
+  if (fdState.page < 1) fdState.page = 1;
+  const startIdx = (fdState.page - 1) * fdState.pageSize;
+  const paginated = sorted.slice(startIdx, startIdx + fdState.pageSize);
 
-  if (sorted.length === 0) {
+  renderPagination("fd-pagination", fdState, totalItems, renderFDTable);
+
+  fdTotalBadge.textContent = `${totalItems} lines`;
+
+  if (totalItems === 0) {
     fdTbody.innerHTML = `<tr><td colspan="6" class="empty-msg">
       ${fdState.allLines.length === 0 ? 'Click "Load FanDuel Lines" to fetch data.' : "No lines match current filters."}
     </td></tr>`;
     return;
   }
 
-  fdTbody.innerHTML = sorted.map(l => {
+  fdTbody.innerHTML = paginated.map(l => {
     let gameTime = "—";
     if (l.start_time) {
       const d = new Date(l.start_time);
@@ -991,6 +1090,8 @@ const dkState = {
   filteredLines: [],
   sortCol:       "player_name",
   sortDir:       "asc",
+  page:          1,
+  pageSize:      100,
 };
 
 const dkTbody       = $("dk-tbody");
@@ -1009,6 +1110,7 @@ function applyDKFilters() {
     return true;
   });
 
+  dkState.page = 1;
   renderDKTable();
 }
 
@@ -1038,6 +1140,7 @@ document.querySelectorAll("th.sortable-dk").forEach(th => {
       t.classList.remove("active", "asc", "desc");
     });
     th.classList.add("active", dkState.sortDir);
+    dkState.page = 1;
     renderDKTable();
   });
 });
@@ -1056,16 +1159,26 @@ function sortDKLines(lines) {
 
 function renderDKTable() {
   const sorted = sortDKLines(dkState.filteredLines);
-  dkTotalBadge.textContent = `${sorted.length} lines`;
+  
+  const totalItems = sorted.length;
+  const totalPages = Math.ceil(totalItems / dkState.pageSize) || 1;
+  if (dkState.page > totalPages) dkState.page = totalPages;
+  if (dkState.page < 1) dkState.page = 1;
+  const startIdx = (dkState.page - 1) * dkState.pageSize;
+  const paginated = sorted.slice(startIdx, startIdx + dkState.pageSize);
 
-  if (sorted.length === 0) {
+  renderPagination("dk-pagination", dkState, totalItems, renderDKTable);
+
+  dkTotalBadge.textContent = `${totalItems} lines`;
+
+  if (totalItems === 0) {
     dkTbody.innerHTML = `<tr><td colspan="6" class="empty-msg">
       ${dkState.allLines.length === 0 ? 'Click "Load DraftKings Lines" to fetch data.' : "No lines match current filters."}
     </td></tr>`;
     return;
   }
 
-  dkTbody.innerHTML = sorted.map(l => {
+  dkTbody.innerHTML = paginated.map(l => {
     return `<tr>
       <td>${l.player_name}</td>
       <td><span class="league-tag league-${l.league}">${l.league}</span></td>
@@ -1116,6 +1229,8 @@ const pinState = {
   filteredLines: [],
   sortCol:       "player_name",
   sortDir:       "asc",
+  page:          1,
+  pageSize:      100,
 };
 
 const pinTbody       = $("pin-tbody");
@@ -1134,6 +1249,7 @@ function applyPinFilters() {
     return true;
   });
 
+  pinState.page = 1;
   renderPinTable();
 }
 
@@ -1163,6 +1279,7 @@ document.querySelectorAll("th.sortable-pin").forEach(th => {
       t.classList.remove("active", "asc", "desc");
     });
     th.classList.add("active", pinState.sortDir);
+    pinState.page = 1;
     renderPinTable();
   });
 });
@@ -1181,16 +1298,26 @@ function sortPinLines(lines) {
 
 function renderPinTable() {
   const sorted = sortPinLines(pinState.filteredLines);
-  pinTotalBadge.textContent = `${sorted.length} lines`;
+  
+  const totalItems = sorted.length;
+  const totalPages = Math.ceil(totalItems / pinState.pageSize) || 1;
+  if (pinState.page > totalPages) pinState.page = totalPages;
+  if (pinState.page < 1) pinState.page = 1;
+  const startIdx = (pinState.page - 1) * pinState.pageSize;
+  const paginated = sorted.slice(startIdx, startIdx + pinState.pageSize);
 
-  if (sorted.length === 0) {
+  renderPagination("pin-pagination", pinState, totalItems, renderPinTable);
+
+  pinTotalBadge.textContent = `${totalItems} lines`;
+
+  if (totalItems === 0) {
     pinTbody.innerHTML = `<tr><td colspan="6" class="empty-msg">
       ${pinState.allLines.length === 0 ? 'Click "Load Pinnacle Lines" to fetch data.' : "No lines match current filters."}
     </td></tr>`;
     return;
   }
 
-  pinTbody.innerHTML = sorted.map(l => {
+  pinTbody.innerHTML = paginated.map(l => {
     return `<tr>
       <td>${l.player_name}</td>
       <td><span class="league-tag league-${l.league}">${l.league}</span></td>
@@ -1238,6 +1365,10 @@ $("btn-load-pin").addEventListener("click", async () => {
 // ── Backtest Dashboard ────────────────────────────────────────────────────
 
 let btSlips = [];   // raw slip objects from API
+const btState = {
+  page: 1,
+  pageSize: 100
+};
 
 async function fetchBacktest() {
   try {
@@ -1285,13 +1416,23 @@ function renderBacktest() {
 
   // Table
   const tbody = $("bt-tbody");
-  if (allLegs.length === 0) {
+  
+  const totalItems = allLegs.length;
+  const totalPages = Math.ceil(totalItems / btState.pageSize) || 1;
+  if (btState.page > totalPages) btState.page = totalPages;
+  if (btState.page < 1) btState.page = 1;
+  const startIdx = (btState.page - 1) * btState.pageSize;
+  const paginated = allLegs.slice(startIdx, startIdx + btState.pageSize);
+
+  renderPagination("bt-pagination", btState, totalItems, renderBacktest);
+
+  if (totalItems === 0) {
     tbody.innerHTML = `<tr><td colspan="16" class="empty-msg">No backtest data yet. Slips will appear here as they are logged.</td></tr>`;
     return;
   }
 
   let prevSlipId = null;
-  tbody.innerHTML = allLegs.map(l => {
+  tbody.innerHTML = paginated.map(l => {
     const isFirst = l.slip_id !== prevSlipId;
     prevSlipId = l.slip_id;
     const evPct = l.proj_slip_ev_pct != null ? (parseFloat(l.proj_slip_ev_pct) * 100).toFixed(1) + "%" : "";
@@ -1323,8 +1464,14 @@ function renderBacktest() {
 }
 
 // Filter events
-$("bt-filter-result").addEventListener("change", renderBacktest);
-$("bt-filter-league").addEventListener("change", renderBacktest);
+$("bt-filter-result").addEventListener("change", () => {
+  btState.page = 1;
+  renderBacktest();
+});
+$("bt-filter-league").addEventListener("change", () => {
+  btState.page = 1;
+  renderBacktest();
+});
 
 // Download CSV
 $("btn-bt-download").addEventListener("click", () => {

@@ -283,3 +283,21 @@ th.sortable-pp.active.asc::after { content: ' ↑'; }
   cursor: pointer; flex-shrink: 0; line-height: 1; padding: 4px;
 }
 .slip-banner-close:hover { color: var(--text); }
+.pagination-controls {
+  margin-left: auto;
+}
+.pagination-controls .pagination {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pagination-controls span {
+  font-size: 12px;
+  color: var(--text-muted);
+  min-width: 80px;
+  text-align: center;
+}
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 11px;
+}
