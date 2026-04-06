@@ -193,9 +193,18 @@ function renderTable() {
 
   tbody.innerHTML = paginated.map(b => {
     const checked   = state.selected.has(b.bet_id) ? "checked" : "";
-    const rowClass  = state.selected.has(b.bet_id) ? "selected" : "";
+    const isLive    = b.in_backtest === true;
+    const rowClass  = [
+      state.selected.has(b.bet_id) ? "selected" : "",
+      isLive ? "in-backtest" : "",
+    ].filter(Boolean).join(" ");
+
     const lineDiff = (b.fd_line != null && b.pp_line !== b.fd_line)
       ? `<span class="line-diff"> (FD: ${b.fd_line})</span>` : "";
+
+    const liveBadge = isLive
+      ? ` <span class="live-badge">LIVE</span>`
+      : "";
 
     // Build book odds display with source tags
     const bookOddsEntries = [
@@ -209,7 +218,7 @@ function renderTable() {
 
     return `<tr class="${rowClass}" data-id="${b.bet_id}">
       <td><input type="checkbox" class="row-chk" data-id="${b.bet_id}" ${checked} /></td>
-      <td>${b.player_name}</td>
+      <td>${b.player_name}${liveBadge}</td>
       <td>${b.league}</td>
       <td>${b.prop_type}</td>
       <td>${b.pp_line}${lineDiff}</td>

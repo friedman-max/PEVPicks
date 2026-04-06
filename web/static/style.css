@@ -249,6 +249,41 @@ th.sortable-pp.active.asc::after { content: ' ↑'; }
   padding: 14px 20px; border-top: 1px solid var(--border);
 }
 
+/* ── Backtest view ── */
+.backtest-view {
+  height: calc(100vh - 102px); overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.bt-summary {
+  display: flex; gap: 12px; padding: 16px 20px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+}
+.bt-card {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 18px; min-width: 120px;
+  text-align: center;
+}
+.bt-card-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.bt-card-value { font-size: 22px; font-weight: 700; margin-top: 4px; color: var(--text); }
+.bt-card-value.positive { color: var(--green); }
+.bt-card-value.negative { color: var(--red); }
+
+.bt-actions {
+  display: flex; gap: 10px; padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.backtest-view .table-section { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.backtest-view .table-wrapper { flex: 1; overflow-y: auto; }
+
+/* Slip group separator */
+#bt-tbody tr.slip-first td { border-top: 2px solid var(--accent); }
+
+/* Result badges */
+.result-hit     { color: var(--green); font-weight: 700; }
+.result-miss    { color: var(--red);   font-weight: 700; }
+.result-pending { color: var(--yellow); font-weight: 500; }
+
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -283,6 +318,7 @@ th.sortable-pp.active.asc::after { content: ' ↑'; }
   cursor: pointer; flex-shrink: 0; line-height: 1; padding: 4px;
 }
 .slip-banner-close:hover { color: var(--text); }
+<<<<<<< HEAD
 .pagination-controls {
   margin-left: auto;
 }
@@ -300,4 +336,29 @@ th.sortable-pp.active.asc::after { content: ' ↑'; }
 .btn-sm {
   padding: 4px 8px;
   font-size: 11px;
+=======
+
+/* ── Already-in-backtest row highlighting ───────────────────────────────── */
+tr.in-backtest {
+  background: rgba(239, 68, 68, 0.10) !important;  /* subtle red tint */
+}
+tr.in-backtest:hover {
+  background: rgba(239, 68, 68, 0.18) !important;
+}
+tr.in-backtest.selected {
+  background: rgba(239, 68, 68, 0.22) !important;
+}
+.live-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #fff;
+  background: #ef4444;
+  border-radius: 3px;
+  vertical-align: middle;
+  line-height: 1.5;
+>>>>>>> 9b94ec6bc86cc282a44b6b1721f60fe4a89f38e3
 }

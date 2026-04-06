@@ -414,6 +414,9 @@ def run_pipeline():
         # Sort by individual EV% descending
         bets.sort(key=lambda b: b.individual_ev_pct, reverse=True)
 
+        # Snapshot used_bets keys so we can flag already-logged legs in the UI
+        used_keys = _backtest.used_bet_keys()
+
         serialized_bets = []
         for b in bets:
             d = b.to_dict()
@@ -422,6 +425,13 @@ def run_pipeline():
             d["dk_odds_book"] = extras.get("dk_odds")
             d["pin_odds_book"] = extras.get("pin_odds")
             d["start_time"]   = extras.get("start_time", "")
+            # Flag bets already logged in today's backtest slips
+            bet_key = (
+                b.player_name.lower(),
+                b.prop_type.lower(),
+                b.side,
+            )
+            d["in_backtest"] = bet_key in used_keys
             serialized_bets.append(d)
 
         with _lock:
