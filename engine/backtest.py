@@ -18,8 +18,9 @@ from engine.ev_calculator import power_slip_ev, flex_slip_ev
 
 logger = logging.getLogger(__name__)
 
-DATA_DIR = pathlib.Path(__file__).parent.parent / "data"
-CSV_PATH  = DATA_DIR / "backtest.csv"
+DATA_DIR      = pathlib.Path(__file__).parent.parent / "data"
+CSV_PATH      = DATA_DIR / "backtest.csv"
+_TEST_CSV_PATH = DATA_DIR / ".backtest_test.csv"  # scratch path used only by unit tests
 
 CSV_COLUMNS = [
     "slip_id", "timestamp", "slip_type", "n_legs", "proj_slip_ev_pct",
@@ -56,9 +57,16 @@ class BacktestLogger:
       - Log to CSV; mark used bets so they won't appear in future slips today
     """
 
-    def __init__(self):
+    def __init__(self, csv_path: Optional[pathlib.Path] = None):
+        """
+        Args:
+            csv_path: Override the CSV output path. Leave as None (default) for
+                      production use. Pass a temp path in tests to avoid polluting
+                      the real data/backtest.csv.
+        """
         self.used_bets: set[tuple] = set()  # (player_name_lower, prop_type_lower, side)
         self.last_reset_date: Optional[date] = None
+        self._csv_path = csv_path or CSV_PATH
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         self._init_csv()
 
@@ -68,10 +76,10 @@ class BacktestLogger:
 
     def _init_csv(self) -> None:
         """Create CSV with headers if it doesn't already exist."""
-        if not CSV_PATH.exists():
-            with open(CSV_PATH, "w", newline="", encoding="utf-8") as f:
+        if not self._csv_path.exists():
+            with open(self._csv_path, "w", newline="", encoding="utf-8") as f:
                 csv.DictWriter(f, fieldnames=CSV_COLUMNS).writeheader()
-            logger.info("Created backtest CSV at %s", CSV_PATH)
+            logger.info("Created backtest CSV at %s", self._csv_path)
 
     def _midnight_reset(self) -> None:
         """Automatically reset the used-bets pool when the calendar date changes."""
@@ -271,7 +279,7 @@ class BacktestLogger:
             })
 
         try:
-            with open(CSV_PATH, "a", newline="", encoding="utf-8") as f:
+            with open(self._csv_path, "a", newline="", encoding="utf-8") as f:
                 csv.DictWriter(f, fieldnames=CSV_COLUMNS).writerows(rows)
             logger.info(
                 "Backtest: logged slip %s  (%d-leg %s  EV=%.2f%%  neg_legs=%d)",
