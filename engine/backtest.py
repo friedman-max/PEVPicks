@@ -171,14 +171,16 @@ class BacktestLogger:
         Given the current list of bet dicts, find and log the slip combination
         that maximises total slip EV.
 
-        Selection rules:
-          - Hard floor: legs with individual_ev_pct < MIN_LEG_EV_PCT (-1%) are ignored
-          - Always require at least MIN_POSITIVE_LEGS (3) positive-EV legs
-          - Allow up to MAX_NEGATIVE_LEGS (2) slightly-negative legs ONLY when
-            adding them produces a net higher slip EV than the all-positive baseline
-          - Evaluates every valid combination; picks the global maximum, not a greedy
-            first-positive result
-          - Returns None (skips silently) if no combination yields slip EV > 0
+        Selection rules (two-phase, positive-EV-first):
+          - Hard floor: legs with individual_ev_pct < MIN_LEG_EV_PCT (-1%) are
+            never included
+          - **Phase 1 (positive-only)**: Build the best slip using ONLY legs
+            with individual_ev_pct >= 0.  Cascade 6→5→4→3 legs.  If any
+            positive-only combo yields slip EV > 0, use it and stop.
+          - **Phase 2 (allow negatives as last resort)**: Only reached when
+            Phase 1 finds nothing viable.  Allows up to MAX_NEGATIVE_LEGS
+            slightly-negative legs.  Must still beat EV > 0.
+          - Returns None (skips silently) if no combination yields slip EV > 0.
 
         Each bet dict must include: player_name, prop_type, side, true_prob,
         individual_ev_pct, pp_line, league, start_time.
@@ -205,7 +207,6 @@ class BacktestLogger:
             [b for b in valid if _ev(b) >= 0.0],
             key=self._score, reverse=True,
         )
-        # Sorted desc by score so index 0 is the "least negative" (best negative)
         negative_pool = sorted(
             [b for b in valid if _ev(b) < 0.0],
             key=self._score, reverse=True,
@@ -218,59 +219,87 @@ class BacktestLogger:
             )
             return None
 
-        # ── 3. Search all valid (n_pos, n_neg) combinations ─────────────────
-        #  Rules:
-        #    • n_pos  ∈ [MIN_POSITIVE_LEGS, 6]
-        #    • n_neg  ∈ [0, MAX_NEGATIVE_LEGS]
-        #    • total  k = n_pos + n_neg  ∈ [3, 6]
-        #    • n_neg ≤ len(negative_pool)
-        #
-        #  For each combination we evaluate the best of Power / Flex EV and
-        #  track the global maximum across all combinations.
+        # ── Helper: evaluate a candidate slip and return (ev, type) or None ──
+        def _evaluate_slip(legs: list[dict]):
+            """Return (ev, slip_type) for the best of Power/Flex, or None."""
+            k = len(legs)
+            true_probs = [float(b.get("true_prob") or 0.0) for b in legs]
+            avg_prob   = sum(true_probs) / k
 
+            power_be = BREAK_EVEN.get((str(k), "power"))
+            flex_be  = BREAK_EVEN.get((str(k), "flex"))
+
+            cand_ev:   Optional[float] = None
+            cand_type: Optional[str]   = None
+
+            if power_be is not None and avg_prob >= power_be:
+                pev = power_slip_ev(true_probs)
+                if pev is not None and pev > 0:
+                    if cand_ev is None or pev > cand_ev:
+                        cand_ev, cand_type = pev, "Power"
+
+            if flex_be is not None and avg_prob >= flex_be:
+                fev = flex_slip_ev(true_probs)
+                if fev is not None and fev > 0:
+                    if cand_ev is None or fev > cand_ev:
+                        cand_ev, cand_type = fev, "Flex"
+
+            if cand_ev is not None:
+                return (cand_ev, cand_type)
+            return None
+
+        # ── 3. PHASE 1: All-positive slips only ────────────────────────────
+        #  Cascade 6→5→4→3.  We PREFER more legs because higher payout
+        #  multipliers (40x for 6-leg, 20x for 5-leg, etc.) beat a smaller
+        #  slip with slightly better EV%.  Take the FIRST (largest) viable
+        #  slip — do not compare across sizes.
         best_ev:        Optional[float] = None
         best_type:      Optional[str]   = None
         best_legs:      Optional[list]  = None
 
-        max_n_neg = min(MAX_NEGATIVE_LEGS, len(negative_pool))
+        max_pos = min(6, len(positive_pool))
+        for n_pos in range(max_pos, MIN_POSITIVE_LEGS - 1, -1):
+            legs = positive_pool[:n_pos]
+            result = _evaluate_slip(legs)
+            if result is not None:
+                best_ev, best_type = result
+                best_legs = legs
+                logger.info(
+                    "Backtest: Phase 1 (positive-only) found %d-leg %s slip  EV=%.2f%%",
+                    n_pos, best_type, best_ev * 100,
+                )
+                break  # take the largest viable size
 
-        for n_neg in range(0, max_n_neg + 1):
-            neg_legs  = negative_pool[:n_neg]
-            max_n_pos = min(6 - n_neg, len(positive_pool))
+        if best_ev is None:
+            # ── 4. PHASE 2: Allow negative legs as last resort ───────────────
+            #  Only reached when no all-positive slip is viable.
+            logger.debug(
+                "Backtest: Phase 1 found nothing — trying Phase 2 with negative legs"
+            )
+            max_n_neg = min(MAX_NEGATIVE_LEGS, len(negative_pool))
 
-            for n_pos in range(MIN_POSITIVE_LEGS, max_n_pos + 1):
-                k = n_pos + n_neg
-                if k < 3 or k > 6:
-                    continue
+            # Still prefer larger slips: cascade total legs 6→5→4→3
+            for target_k in range(6, MIN_POSITIVE_LEGS - 1, -1):
+                if best_ev is not None:
+                    break
+                for n_neg in range(1, min(max_n_neg, target_k - MIN_POSITIVE_LEGS + 1) + 1):
+                    n_pos = target_k - n_neg
+                    if n_pos < MIN_POSITIVE_LEGS or n_pos > len(positive_pool):
+                        continue
+                    legs = positive_pool[:n_pos] + negative_pool[:n_neg]
+                    result = _evaluate_slip(legs)
+                    if result is not None:
+                        best_ev, best_type = result
+                        best_legs = legs
+                        n_neg_in = sum(1 for b in best_legs if _ev(b) < 0)
+                        logger.info(
+                            "Backtest: Phase 2 found %d-leg %s slip  EV=%.2f%%  "
+                            "(includes %d negative-EV leg(s) — no positive-only was viable)",
+                            target_k, best_type, best_ev * 100, n_neg_in,
+                        )
+                        break  # take the largest viable size
 
-                legs       = positive_pool[:n_pos] + neg_legs
-                true_probs = [float(b.get("true_prob") or 0.0) for b in legs]
-                avg_prob   = sum(true_probs) / k
-
-                power_be = BREAK_EVEN.get((str(k), "power"))
-                flex_be  = BREAK_EVEN.get((str(k), "flex"))
-
-                candidate_ev:   Optional[float] = None
-                candidate_type: Optional[str]   = None
-
-                if power_be is not None and avg_prob >= power_be:
-                    pev = power_slip_ev(true_probs)
-                    if pev is not None and pev > 0:
-                        if candidate_ev is None or pev > candidate_ev:
-                            candidate_ev, candidate_type = pev, "Power"
-
-                if flex_be is not None and avg_prob >= flex_be:
-                    fev = flex_slip_ev(true_probs)
-                    if fev is not None and fev > 0:
-                        if candidate_ev is None or fev > candidate_ev:
-                            candidate_ev, candidate_type = fev, "Flex"
-
-                if candidate_ev is not None and (best_ev is None or candidate_ev > best_ev):
-                    best_ev    = candidate_ev
-                    best_type  = candidate_type
-                    best_legs  = legs
-
-        # ── 4. Nothing viable found — skip silently ──────────────────────────
+        # ── 5. Nothing viable found — skip silently ──────────────────────────
         if best_ev is None or best_legs is None:
             logger.debug(
                 "Backtest: no positive-EV slip found from %d available bets — skipping",
