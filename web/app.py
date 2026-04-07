@@ -131,17 +131,27 @@ def run_pipeline():
             pin_props = prev_pin_raw
             errors["pinnacle"] = "Empty response — using cached data"
 
-        serialized_pp = [
-            {
-                "league": l.league,
-                "player_name": l.player_name,
-                "stat_type": l.stat_type,
-                "line_score": l.line_score,
-                "side": l.side,
-                "start_time": l.start_time,
-            }
-            for l in pp_lines
-        ]
+        serialized_pp = []
+        for l in pp_lines:
+            if l.side == "both":
+                common = {
+                    "league": l.league,
+                    "player_name": l.player_name,
+                    "stat_type": l.stat_type,
+                    "line_score": l.line_score,
+                    "start_time": l.start_time,
+                }
+                serialized_pp.append({**common, "side": "over"})
+                serialized_pp.append({**common, "side": "under"})
+            else:
+                serialized_pp.append({
+                    "league": l.league,
+                    "player_name": l.player_name,
+                    "stat_type": l.stat_type,
+                    "line_score": l.line_score,
+                    "side": l.side,
+                    "start_time": l.start_time,
+                })
 
         from engine.devig import devig_multiplicative, devig_single_sided, prob_to_american
         serialized_fd = []
@@ -751,17 +761,27 @@ def _run_pp_scrape():
         if len(pp_lines) == 0 and len(prev_pp_raw) >= _MIN_LINES_FOR_FALLBACK:
             logger.warning("PrizePicks returned 0 lines, reusing %d cached lines", len(prev_pp_raw))
             pp_lines = prev_pp_raw
-        serialized = [
-            {
-                "league": l.league,
-                "player_name": l.player_name,
-                "stat_type": l.stat_type,
-                "line_score": l.line_score,
-                "side": l.side,
-                "start_time": l.start_time,
-            }
-            for l in pp_lines
-        ]
+        serialized = []
+        for l in pp_lines:
+            if l.side == "both":
+                common = {
+                    "league": l.league,
+                    "player_name": l.player_name,
+                    "stat_type": l.stat_type,
+                    "line_score": l.line_score,
+                    "start_time": l.start_time,
+                }
+                serialized.append({**common, "side": "over"})
+                serialized.append({**common, "side": "under"})
+            else:
+                serialized.append({
+                    "league": l.league,
+                    "player_name": l.player_name,
+                    "stat_type": l.stat_type,
+                    "line_score": l.line_score,
+                    "side": l.side,
+                    "start_time": l.start_time,
+                })
         with _lock:
             _state["pp_lines"] = serialized
             _state["_prev_pp_raw"] = pp_lines
