@@ -54,6 +54,8 @@ class ESPNResultsChecker:
         self._session.headers["User-Agent"] = "Mozilla/5.0"
         # (league, date_str) → {player_name_lower: stats_dict}
         self._cache: dict[tuple, dict] = {}
+        # (league_lower, player_name_lower) → stats_dict (closest to target time)
+        self._gamelog_cache: dict[tuple, dict] = {}
 
     # ------------------------------------------------------------------
     # Public API
@@ -115,14 +117,17 @@ class ESPNResultsChecker:
                 continue
 
             player_stats = self._get_player_stats(league, date_str, player_name)
-            if player_stats is None:
-                logger.debug(
-                    "ResultsChecker: no ESPN stats for %s (%s %s)",
-                    player_name, league, date_str,
-                )
-                continue
+            
+            actual = None
+            if player_stats is not None:
+                actual = self._compute_stat(player_stats, prop_type, league)
+                
+            if actual is None:
+                logger.debug("ResultsChecker: trying gamelog fallback for %s (%s)", player_name, prop_type)
+                gl_stats = self._fetch_gamelog_stats(league, player_name, gs)
+                if gl_stats is not None:
+                    actual = self._compute_stat(gl_stats, prop_type, league)
 
-            actual = self._compute_stat(player_stats, prop_type, league)
             if actual is None:
                 logger.debug(
                     "ResultsChecker: cannot compute '%s' for %s", prop_type, player_name
@@ -267,10 +272,18 @@ class ESPNResultsChecker:
         if prop_type == "Pts+Asts":
             p, a = _num("pts"), _num("ast")
             return None if None in (p, a) else p + a
+        if prop_type == "Rebs+Asts":
+            r, a = _num("reb"), _num("ast")
+            return None if None in (r, a) else r + a
         if prop_type == "Steals":
             return _num("stl")
         if prop_type == "Blocked Shots":
             return _num("blk")
+        if prop_type == "Blks+Stls":
+            b, s = _num("blk"), _num("stl")
+            return None if None in (b, s) else b + s
+        if prop_type == "Turnovers":
+            return _num("to")
 
         # ── MLB ─────────────────────────────────────────────────
         if prop_type == "Pitcher Strikeouts":
@@ -300,6 +313,19 @@ class ESPNResultsChecker:
         if prop_type == "Runs+RBIs":
             r, rbi = _num("r"), _num("rbi")
             return None if None in (r, rbi) else r + rbi
+        if prop_type == "Singles":
+            h, d2, d3, hr = _num("h"), _num("2b"), _num("3b"), _num("hr")
+            return None if None in (h, d2, d3, hr) else h - (d2 or 0) - (d3 or 0) - hr
+        if prop_type == "Doubles":
+            return _num("2b")
+        if prop_type == "Triples":
+            return _num("3b")
+        if prop_type == "Walks" or prop_type == "Walks Allowed":
+            return _num("bb")
+        if prop_type == "Earned Runs Allowed":
+            return _num("er")
+        if prop_type == "Hits Allowed":
+            return _num("h")
         if prop_type == "Pitching Outs":
             # ESPN stores IP like "6.1" — convert to outs
             ip = stats.get("ip")
@@ -319,12 +345,111 @@ class ESPNResultsChecker:
         if prop_type == "Points" and league == "NHL":
             g, a = _num("g"), _num("a")
             return None if None in (g, a) else g + a
-        if prop_type == "Shots on Goal":
+        if prop_type.lower() == "shots on goal":
             return _num("sog") or _num("shots") or _num("s")
         if prop_type == "Saves":
             return _num("sv") or _num("saves")
 
         return None
+
+    def _fetch_gamelog_stats(self, league: str, player_name: str, target_date: datetime) -> Optional[dict]:
+        """Search ESPN and fetch player gamelog to ensure accurate verification when boxscore misses."""
+        cache_key = (league.lower(), player_name.lower())
+        if cache_key in self._gamelog_cache:
+            return self._gamelog_cache[cache_key]
+            
+        search_url = "https://site.api.espn.com/apis/search/v2"
+        try:
+            r = self._session.get(search_url, params={"query": player_name, "limit": 3}, timeout=15)
+            r.raise_for_status()
+            data = r.json()
+        except Exception as exc:
+            logger.debug("ResultsChecker: search API failed for %s: %s", player_name, exc)
+            self._gamelog_cache[cache_key] = None
+            return None
+            
+        uid = None
+        for res in data.get("results", []):
+            if res.get("type") == "player":
+                for c in res.get("contents", []):
+                    uid = c.get("uid")
+                    break
+            if uid:
+                break
+                
+        if not uid or "a:" not in uid:
+            self._gamelog_cache[cache_key] = None
+            return None
+            
+        athlete_id = uid.split("a:")[-1]
+        
+        league_path = {
+            "NBA": "basketball/nba",
+            "NCAAB": "basketball/mens-college-basketball",
+            "MLB": "baseball/mlb",
+            "NHL": "hockey/nhl"
+        }.get(league.upper())
+        
+        if not league_path:
+            self._gamelog_cache[cache_key] = None
+            return None
+            
+        gl_url = f"https://site.web.api.espn.com/apis/common/v3/sports/{league_path}/athletes/{athlete_id}/gamelog"
+        try:
+            r2 = self._session.get(gl_url, timeout=15)
+            r2.raise_for_status()
+            gl = r2.json()
+        except Exception as exc:
+            logger.debug("ResultsChecker: gamelog fetch failed for %s: %s", player_name, exc)
+            self._gamelog_cache[cache_key] = None
+            return None
+            
+        global_labels = gl.get("labels", [])
+        events_meta = gl.get("events", {})
+        all_game_stats = {}
+        
+        for st in gl.get("seasonTypes", []):
+            for cat in st.get("categories", []):
+                labels = cat.get("labels") or global_labels
+                labels_lower = [str(L).lower() for L in labels]
+                for ev in cat.get("events", []):
+                    event_id = ev.get("eventId")
+                    if not event_id:
+                        continue
+                    stats_arr = ev.get("stats", [])
+                    stat_dict = dict(zip(labels_lower, stats_arr))
+                    
+                    if "k" in stat_dict and "so" not in stat_dict:
+                        stat_dict["so"] = stat_dict["k"]
+                    if "s" in stat_dict and "sog" not in stat_dict:
+                        stat_dict["sog"] = stat_dict["s"]
+                    if "sv" in stat_dict and "saves" not in stat_dict:
+                        stat_dict["saves"] = stat_dict["sv"]
+                        
+                    if event_id not in all_game_stats:
+                        all_game_stats[event_id] = {}
+                    all_game_stats[event_id].update(stat_dict)
+                    
+        best_stats = None
+        best_diff = timedelta(days=999)
+        for eid, s_dict in all_game_stats.items():
+            meta = events_meta.get(eid, {})
+            gd_str = meta.get("gameDate")
+            if not gd_str: continue
+            try:
+                ev_dt = datetime.fromisoformat(gd_str.replace("Z", "+00:00"))
+                if ev_dt.tzinfo is None:
+                    ev_dt = ev_dt.replace(tzinfo=timezone.utc)
+                diff = abs(ev_dt - target_date)
+                if diff <= timedelta(hours=36):
+                    if diff < best_diff:
+                        best_diff = diff
+                        best_stats = s_dict
+            except Exception:
+                pass
+                
+        self._gamelog_cache[cache_key] = best_stats
+        return best_stats
 
     @staticmethod
     def _write_csv(csv_path: pathlib.Path, rows: list[dict]) -> None:

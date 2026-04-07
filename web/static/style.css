@@ -347,7 +347,7 @@ tr.in-backtest:hover {
 tr.in-backtest.selected {
   background: rgba(239, 68, 68, 0.22) !important;
 }
-.live-badge {
+.logged-badge {
   display: inline-block;
   margin-left: 6px;
   padding: 1px 5px;

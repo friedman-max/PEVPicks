@@ -29,20 +29,8 @@ CSV_COLUMNS = [
     "result", "stat_actual",
 ]
 
-# Minutes before game start to treat as "HIGH" urgency
-URGENCY_MINUTES = 60
-
-# Extra score added when urgency is HIGH (same units as ind_ev_pct)
-URGENCY_BONUS = 0.02
-
 # Hard floor: legs with individual EV below this are never included
 MIN_LEG_EV_PCT = -0.01   # -1%
-
-# Maximum number of slightly-negative legs allowed in any one slip
-MAX_NEGATIVE_LEGS = 2
-
-# Minimum number of positive-EV legs required in every slip
-MIN_POSITIVE_LEGS = 3
 
 
 class BacktestLogger:
@@ -51,9 +39,9 @@ class BacktestLogger:
 
     Selection logic:
       - Filter out already-used (player, prop, side) combos
-      - Score each bet: score = ind_ev_pct + URGENCY_BONUS if game within 60 min
-      - Try slip sizes 6 → 5 → 4 → 3, pick first size where best_ev > 0
-        and average true_prob meets the break-even threshold
+      - Hard floor: individual_ev_pct >= -1% (-0.01)
+      - Sort greedily by individual EV descending
+      - Pick top 6 legs to form a 6-Leg Power Slip
       - Log to CSV; mark used bets so they won't appear in future slips today
     """
 
@@ -131,36 +119,9 @@ class BacktestLogger:
         self.used_bets = set()
         self.last_reset_date = date.today()
 
-    # ------------------------------------------------------------------
-    # Scoring helpers
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _is_urgent(game_start: Optional[str]) -> bool:
-        """Return True if the game starts within URGENCY_MINUTES from now."""
-        if not game_start:
-            return False
-        try:
-            gs = datetime.fromisoformat(game_start.replace("Z", "+00:00"))
-            if gs.tzinfo is None:
-                now = datetime.utcnow()
-                gs = gs.replace(tzinfo=None)
-            else:
-                now = datetime.now(tz=timezone.utc)
-            minutes_to_start = (gs - now).total_seconds() / 60
-            return 0 < minutes_to_start <= URGENCY_MINUTES
-        except Exception:
-            return False
-
     def used_bet_keys(self) -> set[tuple]:
         """Return the current set of (player_lower, prop_lower, side) tuples used today."""
         return set(self.used_bets)
-
-    @classmethod
-    def _score(cls, bet: dict) -> float:
-        ev = float(bet.get("individual_ev_pct") or 0.0)
-        bonus = URGENCY_BONUS if cls._is_urgent(bet.get("start_time")) else 0.0
-        return ev + bonus
 
     # ------------------------------------------------------------------
     # Main entry point
@@ -169,21 +130,14 @@ class BacktestLogger:
     def try_log_slip(self, bets: list[dict]) -> Optional[dict]:
         """
         Given the current list of bet dicts, find and log the slip combination
-        that maximises total slip EV.
+        that maximises total slip EV using a greedy approach for 6-leg power slips.
 
-        Selection rules (two-phase, positive-EV-first):
-          - Hard floor: legs with individual_ev_pct < MIN_LEG_EV_PCT (-1%) are
-            never included
-          - **Phase 1 (positive-only)**: Build the best slip using ONLY legs
-            with individual_ev_pct >= 0.  Cascade 6→5→4→3 legs.  If any
-            positive-only combo yields slip EV > 0, use it and stop.
-          - **Phase 2 (allow negatives as last resort)**: Only reached when
-            Phase 1 finds nothing viable.  Allows up to MAX_NEGATIVE_LEGS
-            slightly-negative legs.  Must still beat EV > 0.
-          - Returns None (skips silently) if no combination yields slip EV > 0.
-
-        Each bet dict must include: player_name, prop_type, side, true_prob,
-        individual_ev_pct, pp_line, league, start_time.
+        Selection rules:
+          - Filter out already-used (player, prop, side) combos
+          - Filter out legs with individual_ev_pct < MIN_LEG_EV_PCT (-1%)
+          - Sort descending strictly by EV (ignoring urgency)
+          - Pick the top 6 legs
+          - Return if EV <= 0
         """
         self._midnight_reset()
 
@@ -197,133 +151,46 @@ class BacktestLogger:
             ) not in self.used_bets
         ]
 
-        # ── 2. Apply hard floor and split into positive / negative pools ─────
+        # ── 2. Apply hard floor and sort ─────────────────────────────────────
         def _ev(b: dict) -> float:
             return float(b.get("individual_ev_pct") or 0.0)
 
         valid = [b for b in available if _ev(b) >= MIN_LEG_EV_PCT]
+        pool = sorted(valid, key=_ev, reverse=True)
 
-        positive_pool = sorted(
-            [b for b in valid if _ev(b) >= 0.0],
-            key=self._score, reverse=True,
-        )
-        negative_pool = sorted(
-            [b for b in valid if _ev(b) < 0.0],
-            key=self._score, reverse=True,
-        )
-
-        if len(positive_pool) < MIN_POSITIVE_LEGS:
+        # We strictly want 6-leg power slips
+        if len(pool) < 6:
             logger.debug(
-                "Backtest: only %d positive-EV bets available (need %d) — skipping",
-                len(positive_pool), MIN_POSITIVE_LEGS,
+                "Backtest: only %d valid bets available (need 6) — skipping", len(pool)
             )
             return None
 
-        # ── Helper: evaluate a candidate slip and return (ev, type) or None ──
-        def _evaluate_slip(legs: list[dict]):
-            """Return (ev, slip_type) for the best of Power/Flex, or None."""
-            k = len(legs)
-            true_probs = [float(b.get("true_prob") or 0.0) for b in legs]
-            avg_prob   = sum(true_probs) / k
+        # ── 3. Evaluate the 6 best legs ──────────────────────────────────────
+        best_legs = pool[:6]
+        true_probs = [float(b.get("true_prob") or 0.0) for b in best_legs]
+        k = 6
+        avg_prob = sum(true_probs) / k
 
-            power_be = BREAK_EVEN.get((str(k), "power"))
-            flex_be  = BREAK_EVEN.get((str(k), "flex"))
-
-            cand_ev:   Optional[float] = None
-            cand_type: Optional[str]   = None
-
-            if power_be is not None and avg_prob >= power_be:
-                pev = power_slip_ev(true_probs)
-                if pev is not None and pev > 0:
-                    if cand_ev is None or pev > cand_ev:
-                        cand_ev, cand_type = pev, "Power"
-
-            if flex_be is not None and avg_prob >= flex_be:
-                fev = flex_slip_ev(true_probs)
-                if fev is not None and fev > 0:
-                    if cand_ev is None or fev > cand_ev:
-                        cand_ev, cand_type = fev, "Flex"
-
-            if cand_ev is not None:
-                return (cand_ev, cand_type)
+        power_be = BREAK_EVEN.get((str(k), "power"))
+        if power_be is None or avg_prob < power_be:
+            logger.debug("Backtest: Top 6 legs do not meet break-even threshold.")
             return None
 
-        # ── 3. PHASE 1: All-positive slips only ────────────────────────────
-        #  Cascade 6→5→4→3.  We PREFER more legs because higher payout
-        #  multipliers (40x for 6-leg, 20x for 5-leg, etc.) beat a smaller
-        #  slip with slightly better EV%.  Take the FIRST (largest) viable
-        #  slip — do not compare across sizes.
-        best_ev:        Optional[float] = None
-        best_type:      Optional[str]   = None
-        best_legs:      Optional[list]  = None
-
-        max_pos = min(6, len(positive_pool))
-        for n_pos in range(max_pos, MIN_POSITIVE_LEGS - 1, -1):
-            legs = positive_pool[:n_pos]
-            result = _evaluate_slip(legs)
-            if result is not None:
-                best_ev, best_type = result
-                best_legs = legs
-                logger.info(
-                    "Backtest: Phase 1 (positive-only) found %d-leg %s slip  EV=%.2f%%",
-                    n_pos, best_type, best_ev * 100,
-                )
-                break  # take the largest viable size
-
-        if best_ev is None:
-            # ── 4. PHASE 2: Allow negative legs as last resort ───────────────
-            #  Only reached when no all-positive slip is viable.
+        best_ev = power_slip_ev(true_probs)
+        if best_ev is None or best_ev <= 0:
             logger.debug(
-                "Backtest: Phase 1 found nothing — trying Phase 2 with negative legs"
-            )
-            max_n_neg = min(MAX_NEGATIVE_LEGS, len(negative_pool))
-
-            # Still prefer larger slips: cascade total legs 6→5→4→3
-            for target_k in range(6, MIN_POSITIVE_LEGS - 1, -1):
-                if best_ev is not None:
-                    break
-                for n_neg in range(1, min(max_n_neg, target_k - MIN_POSITIVE_LEGS + 1) + 1):
-                    n_pos = target_k - n_neg
-                    if n_pos < MIN_POSITIVE_LEGS or n_pos > len(positive_pool):
-                        continue
-                    legs = positive_pool[:n_pos] + negative_pool[:n_neg]
-                    result = _evaluate_slip(legs)
-                    if result is not None:
-                        best_ev, best_type = result
-                        best_legs = legs
-                        n_neg_in = sum(1 for b in best_legs if _ev(b) < 0)
-                        logger.info(
-                            "Backtest: Phase 2 found %d-leg %s slip  EV=%.2f%%  "
-                            "(includes %d negative-EV leg(s) — no positive-only was viable)",
-                            target_k, best_type, best_ev * 100, n_neg_in,
-                        )
-                        break  # take the largest viable size
-
-        # ── 5. Nothing viable found — skip silently ──────────────────────────
-        if best_ev is None or best_legs is None:
-            logger.debug(
-                "Backtest: no positive-EV slip found from %d available bets — skipping",
-                len(valid),
+                "Backtest: Top 6 legs do not form a +EV power slip. Projected EV: %s", best_ev
             )
             return None
 
-        # ── 5. Log the winning slip to CSV ───────────────────────────────────
-        k         = len(best_legs)
-        slip_id   = str(uuid.uuid4())[:8].upper()
+        best_type = "Power"
+        slip_id = str(uuid.uuid4())[:8].upper()
         timestamp = datetime.now().isoformat(timespec="seconds")
-        proj_ev   = round(best_ev, 4)
+        proj_ev = round(best_ev, 4)
 
-        n_neg_used = sum(1 for b in best_legs if _ev(b) < 0)
-        if n_neg_used:
-            logger.debug(
-                "Backtest: slip %s uses %d negative-EV leg(s) — net gain over "
-                "all-positive baseline justified",
-                slip_id, n_neg_used,
-            )
-
+        # ── 4. Log the slip to CSV ───────────────────────────────────────────
         rows = []
         for i, bet in enumerate(best_legs, start=1):
-            urgency = "HIGH" if self._is_urgent(bet.get("start_time")) else "NORMAL"
             rows.append({
                 "slip_id":          slip_id,
                 "timestamp":        timestamp,
@@ -338,7 +205,7 @@ class BacktestLogger:
                 "side":             bet.get("side", ""),
                 "true_prob":        round(float(bet.get("true_prob") or 0), 4),
                 "ind_ev_pct":       round(_ev(bet), 4),
-                "urgency":          urgency,
+                "urgency":          "NORMAL",  # urgency is now ignored entirely
                 "game_start":       bet.get("start_time", ""),
                 "result":           "pending",
                 "stat_actual":      "",
@@ -348,14 +215,14 @@ class BacktestLogger:
             with open(self._csv_path, "a", newline="", encoding="utf-8") as f:
                 csv.DictWriter(f, fieldnames=CSV_COLUMNS).writerows(rows)
             logger.info(
-                "Backtest: logged slip %s  (%d-leg %s  EV=%.2f%%  neg_legs=%d)",
-                slip_id, k, best_type, best_ev * 100, n_neg_used,
+                "Backtest: logged slip %s  (6-leg Power EV=%.2f%%)",
+                slip_id, best_ev * 100
             )
         except Exception as exc:
             logger.error("Backtest: CSV write failed: %s", exc)
             return None
 
-        # ── 6. Mark legs as used ─────────────────────────────────────────────
+        # ── 5. Mark legs as used ─────────────────────────────────────────────
         for bet in best_legs:
             self.used_bets.add((
                 bet.get("player_name", "").lower(),
@@ -363,7 +230,7 @@ class BacktestLogger:
                 bet.get("side", ""),
             ))
 
-        # ── 7. Return slip summary for the frontend notification ─────────────
+        # ── 6. Return slip summary for the frontend notification ─────────────
         return {
             "slip_id":          slip_id,
             "timestamp":        timestamp,
@@ -385,3 +252,4 @@ class BacktestLogger:
                 for r in rows
             ],
         }
+

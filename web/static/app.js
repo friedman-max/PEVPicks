@@ -210,8 +210,8 @@ function renderTable() {
     const lineDiff = (b.fd_line != null && b.pp_line !== b.fd_line)
       ? `<span class="line-diff"> (FD: ${b.fd_line})</span>` : "";
 
-    const liveBadge = isLive
-      ? ` <span class="live-badge">LIVE</span>`
+    const loggedBadge = isLive
+      ? ` <span class="logged-badge">LOGGED</span>`
       : "";
 
     // Build book odds display with source tags
@@ -226,7 +226,7 @@ function renderTable() {
 
     return `<tr class="${rowClass}" data-id="${b.bet_id}">
       <td><input type="checkbox" class="row-chk" data-id="${b.bet_id}" ${checked} /></td>
-      <td>${b.player_name}${liveBadge}</td>
+      <td>${b.player_name}${loggedBadge}</td>
       <td>${b.league}</td>
       <td>${b.prop_type}</td>
       <td>${b.pp_line}${lineDiff}</td>
@@ -1473,6 +1473,24 @@ function renderBacktest() {
   }
   const payoutRatio = resolvedSlips > 0 ? (totalEarnings / resolvedSlips).toFixed(2) + "x" : "—";
 
+  // Legal Hit Rate 95% Confidence Interval (Wald)
+  let hitCiText = "—";
+  let hitCiClass = "bt-card-value";
+  if (checked.length > 0) {
+    const pHat = hits / checked.length;
+    const margin = 1.96 * Math.sqrt((pHat * (1 - pHat)) / checked.length);
+    const lower = Math.max(0, pHat - margin);
+    const upper = Math.min(1, pHat + margin);
+    hitCiText = `[${(lower * 100).toFixed(1)}%, ${(upper * 100).toFixed(1)}%]`;
+    
+    const target = 0.540833; // ~54.08%
+    if (lower > target) {
+      hitCiClass += " positive";
+    } else if (upper < target) {
+      hitCiClass += " negative";
+    }
+  }
+
   $("bt-total-slips").textContent = totalSlips;
   $("bt-legs-checked").textContent = checked.length;
   $("bt-hit-rate").textContent = hitRate;
@@ -1482,6 +1500,11 @@ function renderBacktest() {
   $("bt-avg-ev").className = "bt-card-value" + (evVals.length > 0 && evVals.reduce((a, b) => a + b, 0) / evVals.length > 0 ? " positive" : "");
   $("bt-payout-ratio").textContent = payoutRatio;
   $("bt-payout-ratio").className = "bt-card-value" + (resolvedSlips > 0 && totalEarnings / resolvedSlips >= 1.0 ? " positive" : resolvedSlips > 0 ? " negative" : "");
+  
+  if ($("bt-hit-ci")) {
+    $("bt-hit-ci").textContent = hitCiText;
+    $("bt-hit-ci").className = hitCiClass;
+  }
 
   // Table
   const tbody = $("bt-tbody");
