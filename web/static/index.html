@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CoreProp</title>
-  <link rel="stylesheet" href="/static/style.css?v=3" />
+  <link rel="stylesheet" href="/static/style.css?v=4" />
 </head>
 <body>
   <!-- ── Slip notification banner ── -->
@@ -425,28 +425,28 @@
         <div class="bt-card-value" id="bt-total-slips">0</div>
       </div>
       <div class="bt-card">
-        <div class="bt-card-label">Legs Checked</div>
-        <div class="bt-card-value" id="bt-legs-checked">0</div>
+        <div class="bt-card-label">Completed</div>
+        <div class="bt-card-value" id="bt-completed">0</div>
       </div>
       <div class="bt-card">
-        <div class="bt-card-label">Leg Hit Rate</div>
+        <div class="bt-card-label">Slip Hit Rate</div>
         <div class="bt-card-value" id="bt-hit-rate">—</div>
+      </div>
+      <div class="bt-card">
+        <div class="bt-card-label">Actual ROI</div>
+        <div class="bt-card-value" id="bt-roi">—</div>
+      </div>
+      <div class="bt-card">
+        <div class="bt-card-label">Avg Proj. EV</div>
+        <div class="bt-card-value" id="bt-avg-ev">—</div>
       </div>
       <div class="bt-card">
         <div class="bt-card-label">Pending</div>
         <div class="bt-card-value" id="bt-pending">0</div>
       </div>
       <div class="bt-card">
-        <div class="bt-card-label">Avg Slip EV</div>
-        <div class="bt-card-value" id="bt-avg-ev">—</div>
-      </div>
-      <div class="bt-card">
-        <div class="bt-card-label">Payout Ratio</div>
-        <div class="bt-card-value" id="bt-payout-ratio">—</div>
-      </div>
-      <div class="bt-card">
         <div class="bt-card-label" title="Break-even target: 54.08% (sixth root of 1/40 for 6-leg power plays).">
-          Hit Rate 95% CI <span style="font-size:0.85em; opacity:0.8; cursor:help;">ⓘ</span>
+          Leg Hit 95% CI <span style="font-size:0.85em; opacity:0.8; cursor:help;">ⓘ</span>
         </div>
         <div class="bt-card-value" id="bt-hit-ci" style="font-size:0.9em">—</div>
       </div>
@@ -470,6 +470,7 @@
               <th>Type</th>
               <th>Legs</th>
               <th>Proj EV%</th>
+              <th>Payout</th>
               <th>Player</th>
               <th>League</th>
               <th>Prop</th>
@@ -515,6 +516,6 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=7"></script>
+  <script src="/static/app.js?v=8"></script>
 </body>
 </html>

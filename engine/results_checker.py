@@ -218,19 +218,23 @@ class ESPNResultsChecker:
         """
         Parse ESPN summary JSON → {player_name_lower: {stat_name: raw_value}}.
         ESPN returns stats as parallel arrays: names[] and athletes[].stats[].
+        Note: NBA/MLB populate `names`; NHL only populates `keys`.
+        We fall back to `keys` when `names` is empty.
         """
         result: dict = {}
         for section in summary.get("boxscore", {}).get("players", []):
             for stat_block in section.get("statistics", []):
-                names      = [n.lower() for n in stat_block.get("names", [])]
+                field_names = [n.lower() for n in stat_block.get("names", [])]
+                if not field_names:
+                    field_names = [k.lower() for k in stat_block.get("keys", [])]
                 for entry in stat_block.get("athletes", []):
                     display = entry.get("athlete", {}).get("displayName", "").lower()
                     raw     = entry.get("stats", [])
                     if not display or not raw:
                         continue
                     stat_dict = {
-                        names[i]: raw[i]
-                        for i in range(min(len(names), len(raw)))
+                        field_names[i]: raw[i]
+                        for i in range(min(len(field_names), len(raw)))
                     }
                     if display in result:
                         result[display].update(stat_dict)
@@ -277,7 +281,7 @@ class ESPNResultsChecker:
             return None if None in (r, a) else r + a
         if prop_type == "Steals":
             return _num("stl")
-        if prop_type == "Blocked Shots":
+        if prop_type == "Blocked Shots" and league != "NHL":
             return _num("blk")
         if prop_type == "Blks+Stls":
             b, s = _num("blk"), _num("stl")
@@ -287,31 +291,38 @@ class ESPNResultsChecker:
 
         # ── MLB ─────────────────────────────────────────────────
         if prop_type == "Pitcher Strikeouts":
-            return _num("so")
+            # ESPN box uses "k" (from names[]) or "strikeouts" (from keys[])
+            return _num("k") or _num("strikeouts") or _num("so")
+        if prop_type == "Hits Allowed":
+            # Pitcher stat block: "h" = hits allowed; "hits" from keys[]
+            return _num("h") or _num("hits")
         if prop_type == "Hits":
-            return _num("h")
+            return _num("h") or _num("hits")
         if prop_type == "Home Runs":
-            return _num("hr")
+            return _num("hr") or _num("homeruns")
         if prop_type == "RBIs":
-            return _num("rbi")
+            return _num("rbi") or _num("rbis")
         if prop_type == "Runs":
-            return _num("r")
+            return _num("r") or _num("runs")
         if prop_type == "Stolen Bases":
-            return _num("sb")
+            return _num("sb") or _num("stolenbases")
         if prop_type == "Total Bases":
-            h  = _num("h")
-            hr = _num("hr")
-            d2 = _num("2b")
-            d3 = _num("3b")
+            h  = _num("h") or _num("hits")
+            hr = _num("hr") or _num("homeruns")
+            d2 = _num("2b") or _num("doubles")
+            d3 = _num("3b") or _num("triples")
             if h is None or hr is None:
                 return None
             singles = h - (d2 or 0) - (d3 or 0) - hr
             return singles + 2 * (d2 or 0) + 3 * (d3 or 0) + 4 * hr
         if prop_type == "Hits+Runs+RBIs":
-            h, r, rbi = _num("h"), _num("r"), _num("rbi")
+            h   = _num("h") or _num("hits")
+            r   = _num("r") or _num("runs")
+            rbi = _num("rbi") or _num("rbis")
             return None if None in (h, r, rbi) else h + r + rbi
         if prop_type == "Runs+RBIs":
-            r, rbi = _num("r"), _num("rbi")
+            r   = _num("r") or _num("runs")
+            rbi = _num("rbi") or _num("rbis")
             return None if None in (r, rbi) else r + rbi
         if prop_type == "Singles":
             h, d2, d3, hr = _num("h"), _num("2b"), _num("3b"), _num("hr")
@@ -327,8 +338,8 @@ class ESPNResultsChecker:
         if prop_type == "Hits Allowed":
             return _num("h")
         if prop_type == "Pitching Outs":
-            # ESPN stores IP like "6.1" — convert to outs
-            ip = stats.get("ip")
+            # ESPN stores IP as "6.1" (names) or via keys: "fullinnings.partinnings"
+            ip = stats.get("ip") or stats.get("fullinnings.partinnings")
             if ip is None:
                 return None
             try:
@@ -338,17 +349,22 @@ class ESPNResultsChecker:
                 return None
 
         # ── NHL ─────────────────────────────────────────────────
-        if prop_type == "Goals" or (prop_type == "Goals" and league == "NHL"):
-            return _num("g")
+        # ESPN NHL keys: goals, assists, shotsTotal, blockedShots, saves, etc.
+        # (all lowercased by _parse_box_score)
+        if prop_type == "Goals":
+            return _num("goals") or _num("g")
         if prop_type == "Assists" and league == "NHL":
-            return _num("a")
+            return _num("assists") or _num("a")
         if prop_type == "Points" and league == "NHL":
-            g, a = _num("g"), _num("a")
+            g = _num("goals") or _num("g")
+            a = _num("assists") or _num("a")
             return None if None in (g, a) else g + a
         if prop_type.lower() == "shots on goal":
-            return _num("sog") or _num("shots") or _num("s")
-        if prop_type == "Saves":
-            return _num("sv") or _num("saves")
+            return _num("shotstotal") or _num("sog") or _num("shots") or _num("s")
+        if prop_type in ("Goalie Saves", "Saves"):
+            return _num("saves") or _num("sv")
+        if prop_type == "Blocked Shots":
+            return _num("blockedshots") or _num("blk")
 
         return None
 

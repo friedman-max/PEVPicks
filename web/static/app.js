@@ -1425,90 +1425,95 @@ function renderBacktest() {
   const filterResult = $("bt-filter-result").value;
   const filterLeague = $("bt-filter-league").value.toUpperCase();
 
+  // Build a payout lookup by slip_id from the API data
+  const payoutBySlip = {};
+  for (const slip of btSlips) {
+    payoutBySlip[slip.slip_id] = {
+      payout: slip.payout,       // null if incomplete, number if complete
+      hits: slip.hits,
+      completed: slip.completed,
+    };
+  }
+
   // Flatten all legs for the table, applying filters
   let allLegs = [];
   for (const slip of btSlips) {
     for (const leg of (slip.legs || [])) {
       const row = { ...leg, slip_id: slip.slip_id, timestamp: slip.timestamp,
                      slip_type: slip.slip_type, n_legs: slip.n_legs,
-                     proj_slip_ev_pct: slip.proj_slip_ev_pct };
+                     proj_slip_ev_pct: slip.proj_slip_ev_pct,
+                     slip_payout: slip.payout, slip_hits: slip.hits,
+                     slip_completed: slip.completed };
       if (filterResult && (leg.result || "pending") !== filterResult) continue;
       if (filterLeague && (leg.league || "").toUpperCase() !== filterLeague) continue;
       allLegs.push(row);
     }
   }
 
-  // Summary stats
+  // ── Summary stats (slip-level) ─────────────────────────────────────────
   const totalSlips = btSlips.length;
-  const checked = allLegs.filter(l => l.result === "hit" || l.result === "miss");
-  const hits = checked.filter(l => l.result === "hit").length;
-  const pending = allLegs.filter(l => !l.result || l.result === "pending").length;
-  const hitRate = checked.length > 0 ? ((hits / checked.length) * 100).toFixed(1) + "%" : "—";
+  const completedSlips = btSlips.filter(s => s.completed);
+  const pendingSlips = totalSlips - completedSlips.length;
+
+  // Slip hit rate: payout > 1x counts as a "hit"
+  const slipHits = completedSlips.filter(s => s.payout > 1.0).length;
+  const slipHitRate = completedSlips.length > 0
+    ? ((slipHits / completedSlips.length) * 100).toFixed(1) + "%"
+    : "—";
+
+  // Actual ROI: (total payouts - total wagered) / total wagered × 100
+  // Each slip is 1 unit wagered
+  const totalPayouts = completedSlips.reduce((sum, s) => sum + (s.payout || 0), 0);
+  const totalWagered = completedSlips.length;  // 1 unit per slip
+  const roi = totalWagered > 0
+    ? (((totalPayouts - totalWagered) / totalWagered) * 100).toFixed(1) + "%"
+    : "—";
+  const roiPositive = totalWagered > 0 && totalPayouts > totalWagered;
+
+  // Avg projected EV
   const evVals = btSlips.map(s => parseFloat(s.proj_slip_ev_pct) || 0);
-  const avgEv = evVals.length > 0 ? ((evVals.reduce((a, b) => a + b, 0) / evVals.length) * 100).toFixed(1) + "%" : "—";
+  const avgEv = evVals.length > 0
+    ? ((evVals.reduce((a, b) => a + b, 0) / evVals.length) * 100).toFixed(1) + "%"
+    : "—";
 
-  // Payout Ratio calculation
-  let totalEarnings = 0;
-  let resolvedSlips = 0;
-  for (const slip of btSlips) {
-    const legs = slip.legs || [];
-    if (legs.length === 0) continue;
-    
-    // A slip is resolved if all legs have hit/miss result
-    const isResolved = legs.every(l => l.result === "hit" || l.result === "miss");
-    if (!isResolved) continue;
 
-    resolvedSlips++;
-    const n = parseInt(slip.n_legs);
-    const nHits = legs.filter(l => l.result === "hit").length;
-    const type = (slip.slip_type || "").toLowerCase();
 
-    let payout = 0;
-    if (type === "power") {
-      if (nHits === n) payout = POWER_PAYOUTS[n] || 0;
-    } else if (type === "flex") {
-      payout = (FLEX_PAYOUTS[n] && FLEX_PAYOUTS[n][nHits]) || 0;
-    }
-    totalEarnings += payout;
-  }
-  const payoutRatio = resolvedSlips > 0 ? (totalEarnings / resolvedSlips).toFixed(2) + "x" : "—";
-
-  // Legal Hit Rate 95% Confidence Interval (Wald)
+  $("bt-total-slips").textContent = totalSlips;
+  $("bt-completed").textContent = completedSlips.length;
+  $("bt-hit-rate").textContent = slipHitRate;
+  $("bt-hit-rate").className = "bt-card-value" + (completedSlips.length > 0 && slipHits / completedSlips.length >= 0.3 ? " positive" : completedSlips.length > 0 ? " negative" : "");
+  $("bt-roi").textContent = roi;
+  $("bt-roi").className = "bt-card-value" + (roiPositive ? " positive" : totalWagered > 0 ? " negative" : "");
+  $("bt-pending").textContent = pendingSlips;
+  $("bt-avg-ev").textContent = avgEv;
+  $("bt-avg-ev").className = "bt-card-value" + (evVals.length > 0 && evVals.reduce((a, b) => a + b, 0) / evVals.length > 0 ? " positive" : "");
+  const checkedLegs = allLegs.filter(l => l.result === "hit" || l.result === "miss");
+  const hitLegs = checkedLegs.filter(l => l.result === "hit").length;
   let hitCiText = "—";
   let hitCiClass = "bt-card-value";
-  if (checked.length > 0) {
-    const pHat = hits / checked.length;
-    const margin = 1.96 * Math.sqrt((pHat * (1 - pHat)) / checked.length);
+  if (checkedLegs.length > 0) {
+    const pHat = hitLegs / checkedLegs.length;
+    const margin = 1.96 * Math.sqrt((pHat * (1 - pHat)) / checkedLegs.length);
     const lower = Math.max(0, pHat - margin);
     const upper = Math.min(1, pHat + margin);
     hitCiText = `[${(lower * 100).toFixed(1)}%, ${(upper * 100).toFixed(1)}%]`;
     
-    const target = 0.540833; // ~54.08%
+    const target = 0.540833;
     if (lower > target) {
       hitCiClass += " positive";
     } else if (upper < target) {
       hitCiClass += " negative";
     }
   }
-
-  $("bt-total-slips").textContent = totalSlips;
-  $("bt-legs-checked").textContent = checked.length;
-  $("bt-hit-rate").textContent = hitRate;
-  $("bt-hit-rate").className = "bt-card-value" + (checked.length > 0 && hits / checked.length >= 0.5 ? " positive" : checked.length > 0 ? " negative" : "");
-  $("bt-pending").textContent = pending;
-  $("bt-avg-ev").textContent = avgEv;
-  $("bt-avg-ev").className = "bt-card-value" + (evVals.length > 0 && evVals.reduce((a, b) => a + b, 0) / evVals.length > 0 ? " positive" : "");
-  $("bt-payout-ratio").textContent = payoutRatio;
-  $("bt-payout-ratio").className = "bt-card-value" + (resolvedSlips > 0 && totalEarnings / resolvedSlips >= 1.0 ? " positive" : resolvedSlips > 0 ? " negative" : "");
   
   if ($("bt-hit-ci")) {
     $("bt-hit-ci").textContent = hitCiText;
     $("bt-hit-ci").className = hitCiClass;
   }
 
-  // Table
+  // ── Table ──────────────────────────────────────────────────────────────
   const tbody = $("bt-tbody");
-  
+
   const totalItems = allLegs.length;
   const totalPages = Math.ceil(totalItems / btState.pageSize) || 1;
   if (btState.page > totalPages) btState.page = totalPages;
@@ -1519,7 +1524,7 @@ function renderBacktest() {
   renderPagination("bt-pagination", btState, totalItems, renderBacktest);
 
   if (totalItems === 0) {
-    tbody.innerHTML = `<tr><td colspan="16" class="empty-msg">No backtest data yet. Slips will appear here as they are logged.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="17" class="empty-msg">No backtest data yet. Slips will appear here as they are logged.</td></tr>`;
     return;
   }
 
@@ -1534,12 +1539,27 @@ function renderBacktest() {
     const resultText = l.result || "pending";
     const gameTime = l.game_start ? new Date(l.game_start).toLocaleString([], { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) : "";
     const ts = l.timestamp ? new Date(l.timestamp).toLocaleString([], { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) : "";
+
+    // Payout cell: only show on the first row of a slip
+    let payoutHtml = "";
+    if (isFirst) {
+      if (l.slip_completed) {
+        const p = l.slip_payout || 0;
+        const cls = p > 1 ? "ev-high" : p > 0 ? "ev-medium" : "ev-low";
+        const hitsLabel = l.slip_hits + "/" + l.n_legs;
+        payoutHtml = `<span class="${cls}" style="font-weight:700;">${p}x</span> <span style="color:var(--text-muted);font-size:11px;">(${hitsLabel})</span>`;
+      } else {
+        payoutHtml = `<span class="result-pending">—</span>`;
+      }
+    }
+
     return `<tr class="${isFirst ? "slip-first" : ""}">
       <td><code>${l.slip_id || ""}</code></td>
       <td>${ts}</td>
       <td>${l.slip_type || ""}</td>
       <td>${l.n_legs || ""}</td>
       <td class="ev-high">${isFirst ? evPct : ""}</td>
+      <td>${payoutHtml}</td>
       <td><strong>${l.player || ""}</strong></td>
       <td><span class="league-tag league-${(l.league || "").toUpperCase()}">${l.league || ""}</span></td>
       <td>${l.prop || ""}</td>
