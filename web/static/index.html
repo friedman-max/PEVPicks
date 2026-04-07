@@ -39,7 +39,8 @@
     <button class="tab" data-tab="pin">Pinnacle Lines</button>
     <button class="tab" data-tab="backtest">Backtest</button>
   </div>
-
+  
+  <main class="app-content">
   <!-- ── Filters bar (EV tab) ── -->
   <div class="filters-bar" id="ev-filters">
     <label>League:
@@ -425,12 +426,26 @@
         <div class="bt-card-value" id="bt-total-slips">0</div>
       </div>
       <div class="bt-card">
-        <div class="bt-card-label">Completed</div>
+        <div class="bt-card-label">Completed Slips</div>
         <div class="bt-card-value" id="bt-completed">0</div>
       </div>
       <div class="bt-card">
         <div class="bt-card-label">Slip Hit Rate</div>
         <div class="bt-card-value" id="bt-hit-rate">—</div>
+      </div>
+      <div class="bt-card">
+        <div class="bt-card-label">Total Legs</div>
+        <div class="bt-card-value" id="bt-total-legs">0</div>
+      </div>
+      <div class="bt-card">
+        <div class="bt-card-label">Completed Legs</div>
+        <div class="bt-card-value" id="bt-completed-legs">0</div>
+      </div>
+      <div class="bt-card">
+        <div class="bt-card-label" title="Break-even target: 54.08% (sixth root of 1/40 for 6-leg power plays).">
+          Leg Hit Rate <span style="font-size:0.85em; opacity:0.8; cursor:help;">ⓘ</span>
+        </div>
+        <div class="bt-card-value" id="bt-leg-hit-rate">—</div>
       </div>
       <div class="bt-card">
         <div class="bt-card-label">Actual ROI</div>
@@ -440,16 +455,7 @@
         <div class="bt-card-label">Avg Proj. EV</div>
         <div class="bt-card-value" id="bt-avg-ev">—</div>
       </div>
-      <div class="bt-card">
-        <div class="bt-card-label">Pending</div>
-        <div class="bt-card-value" id="bt-pending">0</div>
-      </div>
-      <div class="bt-card">
-        <div class="bt-card-label" title="Break-even target: 54.08% (sixth root of 1/40 for 6-leg power plays).">
-          Leg Hit 95% CI <span style="font-size:0.85em; opacity:0.8; cursor:help;">ⓘ</span>
-        </div>
-        <div class="bt-card-value" id="bt-hit-ci" style="font-size:0.9em">—</div>
-      </div>
+
     </div>
 
     <!-- Actions -->
@@ -491,6 +497,8 @@
 </div>
 
 
+  </main>
+  
   <!-- ── Settings modal ── -->
   <div class="modal-overlay hidden" id="settings-modal">
     <div class="modal">

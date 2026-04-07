@@ -1478,38 +1478,48 @@ function renderBacktest() {
 
 
 
+  const totalLegsCount = allLegs.length;
+  const checkedLegs = allLegs.filter(l => l.result === "hit" || l.result === "miss");
+  const hitLegs = checkedLegs.filter(l => l.result === "hit").length;
+  const completedLegsCount = checkedLegs.length;
+
+  let legHitRateText = "—";
+  let legHitRateClass = "bt-card-value";
+  if (completedLegsCount > 0) {
+    const pHat = hitLegs / completedLegsCount;
+    const margin = 1.96 * Math.sqrt((pHat * (1 - pHat)) / completedLegsCount);
+    const lower = Math.max(0, pHat - margin);
+    const upper = Math.min(1, pHat + margin);
+    const ciText = `[${(lower * 100).toFixed(1)}%, ${(upper * 100).toFixed(1)}%]`;
+    const rateText = (pHat * 100).toFixed(1) + "%";
+    
+    legHitRateText = `${rateText} <span style="font-size:0.5em; opacity:0.8; vertical-align:middle; margin-left:4px;">${ciText}</span>`;
+    
+    const target = 0.540833;
+    if (lower > target) {
+      legHitRateClass += " positive";
+    } else if (upper < target) {
+      legHitRateClass += " negative";
+    }
+  }
+
   $("bt-total-slips").textContent = totalSlips;
   $("bt-completed").textContent = completedSlips.length;
   $("bt-hit-rate").textContent = slipHitRate;
   $("bt-hit-rate").className = "bt-card-value" + (completedSlips.length > 0 && slipHits / completedSlips.length >= 0.3 ? " positive" : completedSlips.length > 0 ? " negative" : "");
+  
+  $("bt-total-legs").textContent = totalLegsCount;
+  $("bt-completed-legs").textContent = completedLegsCount;
+  if ($("bt-leg-hit-rate")) {
+    $("bt-leg-hit-rate").innerHTML = legHitRateText;
+    $("bt-leg-hit-rate").className = legHitRateClass;
+  }
+
   $("bt-roi").textContent = roi;
   $("bt-roi").className = "bt-card-value" + (roiPositive ? " positive" : totalWagered > 0 ? " negative" : "");
-  $("bt-pending").textContent = pendingSlips;
   $("bt-avg-ev").textContent = avgEv;
   $("bt-avg-ev").className = "bt-card-value" + (evVals.length > 0 && evVals.reduce((a, b) => a + b, 0) / evVals.length > 0 ? " positive" : "");
-  const checkedLegs = allLegs.filter(l => l.result === "hit" || l.result === "miss");
-  const hitLegs = checkedLegs.filter(l => l.result === "hit").length;
-  let hitCiText = "—";
-  let hitCiClass = "bt-card-value";
-  if (checkedLegs.length > 0) {
-    const pHat = hitLegs / checkedLegs.length;
-    const margin = 1.96 * Math.sqrt((pHat * (1 - pHat)) / checkedLegs.length);
-    const lower = Math.max(0, pHat - margin);
-    const upper = Math.min(1, pHat + margin);
-    hitCiText = `[${(lower * 100).toFixed(1)}%, ${(upper * 100).toFixed(1)}%]`;
-    
-    const target = 0.540833;
-    if (lower > target) {
-      hitCiClass += " positive";
-    } else if (upper < target) {
-      hitCiClass += " negative";
-    }
-  }
-  
-  if ($("bt-hit-ci")) {
-    $("bt-hit-ci").textContent = hitCiText;
-    $("bt-hit-ci").className = hitCiClass;
-  }
+
 
   // ── Table ──────────────────────────────────────────────────────────────
   const tbody = $("bt-tbody");
