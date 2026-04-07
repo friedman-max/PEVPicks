@@ -394,6 +394,28 @@
     </div>
   </div>
 
+  <!-- ── Filters bar (Backtest tab) ── -->
+  <div class="filters-bar hidden" id="backtest-filters">
+    <label>Filter result:
+      <select id="bt-filter-result">
+        <option value="">All</option>
+        <option value="pending">Pending</option>
+        <option value="hit">Hit</option>
+        <option value="miss">Miss</option>
+      </select>
+    </label>
+    <label>Filter league:
+      <select id="bt-filter-league">
+        <option value="">All</option>
+        <option value="NBA">NBA</option>
+        <option value="MLB">MLB</option>
+        <option value="NHL">NHL</option>
+        <option value="NCAAB">NCAAB</option>
+      </select>
+    </label>
+    <div id="bt-pagination" class="pagination-controls"></div>
+  </div>
+
   <!-- ── Backtest view ── -->
   <div class="backtest-view hidden" id="backtest-view">
     <!-- Summary cards -->
@@ -457,26 +479,6 @@
   </div>
 </div>
 
-  <div class="filters-bar hidden" id="backtest-filters">
-    <label>Filter result:
-      <select id="bt-filter-result">
-        <option value="">All</option>
-        <option value="pending">Pending</option>
-        <option value="hit">Hit</option>
-        <option value="miss">Miss</option>
-      </select>
-    </label>
-    <label>Filter league:
-      <select id="bt-filter-league">
-        <option value="">All</option>
-        <option value="NBA">NBA</option>
-        <option value="MLB">MLB</option>
-        <option value="NHL">NHL</option>
-        <option value="NCAAB">NCAAB</option>
-      </select>
-    </label>
-    <div id="bt-pagination" class="pagination-controls"></div>
-  </div>
 
   <!-- ── Settings modal ── -->
   <div class="modal-overlay hidden" id="settings-modal">
