@@ -897,7 +897,7 @@ function renderPPTable() {
   ppTotalBadge.textContent = `${totalItems} lines`;
 
   if (totalItems === 0) {
-    ppTbody.innerHTML = `<tr><td colspan="5" class="empty-msg">
+    ppTbody.innerHTML = `<tr><td colspan="6" class="empty-msg">
       ${ppState.allLines.length === 0 ? 'Click "Load PrizePicks Lines" to fetch data.' : "No lines match current filters."}
     </td></tr>`;
     return;
@@ -915,6 +915,7 @@ function renderPPTable() {
       <td><span class="league-tag league-${l.league}">${l.league}</span></td>
       <td>${l.stat_type}</td>
       <td class="line-value">${l.line_score}</td>
+      <td class="side-${l.side}">${l.side.toUpperCase()}</td>
       <td class="game-time">${gameTime}</td>
     </tr>`;
   }).join("");
@@ -1041,7 +1042,7 @@ function renderFDTable() {
   fdTotalBadge.textContent = `${totalItems} lines`;
 
   if (totalItems === 0) {
-    fdTbody.innerHTML = `<tr><td colspan="6" class="empty-msg">
+    fdTbody.innerHTML = `<tr><td colspan="8" class="empty-msg">
       ${fdState.allLines.length === 0 ? 'Click "Load FanDuel Lines" to fetch data.' : "No lines match current filters."}
     </td></tr>`;
     return;
@@ -1059,6 +1060,7 @@ function renderFDTable() {
       <td><span class="league-tag league-${l.league}">${l.league}</span></td>
       <td>${l.stat_type}</td>
       <td class="line-value">${l.line_score}</td>
+      <td class="side-${l.side}">${l.side.toUpperCase()}</td>
       <td class="line-value">${fmt.trueOdds(l.true_odds)}</td>
       <td class="line-value">${fmt.odds(l.line_odds)}</td>
       <td class="game-time">${gameTime}</td>
@@ -1187,20 +1189,28 @@ function renderDKTable() {
   dkTotalBadge.textContent = `${totalItems} lines`;
 
   if (totalItems === 0) {
-    dkTbody.innerHTML = `<tr><td colspan="6" class="empty-msg">
+    dkTbody.innerHTML = `<tr><td colspan="8" class="empty-msg">
       ${dkState.allLines.length === 0 ? 'Click "Load DraftKings Lines" to fetch data.' : "No lines match current filters."}
     </td></tr>`;
     return;
   }
 
   dkTbody.innerHTML = paginated.map(l => {
+    let gameTime = "—";
+    if (l.start_time) {
+      const d = new Date(l.start_time);
+      gameTime = d.toLocaleDateString([], { month: "numeric", day: "numeric" }) +
+        " " + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    }
     return `<tr>
       <td>${l.player_name}</td>
       <td><span class="league-tag league-${l.league}">${l.league}</span></td>
       <td>${l.stat_type}</td>
       <td class="line-value">${l.line_score}</td>
+      <td class="side-${l.side}">${l.side.toUpperCase()}</td>
       <td class="line-value">${fmt.trueOdds(l.true_odds)}</td>
       <td class="line-value">${fmt.odds(l.line_odds)}</td>
+      <td class="game-time">${gameTime}</td>
     </tr>`;
   }).join("");
 }
@@ -1326,20 +1336,28 @@ function renderPinTable() {
   pinTotalBadge.textContent = `${totalItems} lines`;
 
   if (totalItems === 0) {
-    pinTbody.innerHTML = `<tr><td colspan="6" class="empty-msg">
+    pinTbody.innerHTML = `<tr><td colspan="8" class="empty-msg">
       ${pinState.allLines.length === 0 ? 'Click "Load Pinnacle Lines" to fetch data.' : "No lines match current filters."}
     </td></tr>`;
     return;
   }
 
   pinTbody.innerHTML = paginated.map(l => {
+    let gameTime = "—";
+    if (l.start_time) {
+      const d = new Date(l.start_time);
+      gameTime = d.toLocaleDateString([], { month: "numeric", day: "numeric" }) +
+        " " + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    }
     return `<tr>
       <td>${l.player_name}</td>
       <td><span class="league-tag league-${l.league}">${l.league}</span></td>
       <td>${l.stat_type}</td>
       <td class="line-value">${l.line_score}</td>
+      <td class="side-${l.side}">${l.side.toUpperCase()}</td>
       <td class="line-value">${fmt.trueOdds(l.true_odds)}</td>
       <td class="line-value">${fmt.odds(l.line_odds)}</td>
+      <td class="game-time">${gameTime}</td>
     </tr>`;
   }).join("");
 }

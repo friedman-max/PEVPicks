@@ -226,8 +226,10 @@ async def _fetch_subcategory(
             league, subcat_name, len(markets), len(selections),
         )
 
-        # Build market lookup
+        # Build market lookup and event lookup
         market_map = {m["id"]: m for m in markets}
+        events = data.get("events", [])
+        event_map = {e["id"]: e.get("startEventDate") for e in events}
 
         # Group selections by market to find Over/Under pairs
         by_market: Dict[tuple, Dict] = {}
@@ -239,6 +241,8 @@ async def _fetch_subcategory(
 
             mkt = market_map[mkt_id]
             mkt_name = mkt.get("name", "")
+            event_id = mkt.get("eventId")
+            start_time = event_map.get(event_id)
             outcome_type = sel.get("outcomeType", "")  # Over, Under, Home, Away
             label = sel.get("label", "")
 
@@ -279,6 +283,7 @@ async def _fetch_subcategory(
                     "line": line,
                     "over_odds": None,
                     "under_odds": None,
+                    "start_time": start_time,
                 }
 
             if outcome_type == "Over" or "+" in label:
@@ -302,6 +307,7 @@ async def _fetch_subcategory(
                         entry["over_odds"] is not None
                         and entry["under_odds"] is not None
                     ),
+                    start_time=entry.get("start_time", ""),
                 )
             )
 

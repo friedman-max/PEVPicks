@@ -137,6 +137,7 @@ def run_pipeline():
                 "player_name": l.player_name,
                 "stat_type": l.stat_type,
                 "line_score": l.line_score,
+                "side": l.side,
                 "start_time": l.start_time,
             }
             for l in pp_lines
@@ -158,8 +159,9 @@ def run_pipeline():
                 serialized_fd.append({
                     "league": p.league,
                     "player_name": p.player_name,
-                    "stat_type": p.prop_type + " (O)",
+                    "stat_type": p.prop_type,
                     "line_score": p.line,
+                    "side": "over",
                     "line_odds": p.over_odds,
                     "true_odds": prob_to_american(true_over) if true_over else None,
                     "start_time": getattr(p, "start_time", None),
@@ -168,8 +170,9 @@ def run_pipeline():
                 serialized_fd.append({
                     "league": p.league,
                     "player_name": p.player_name,
-                    "stat_type": p.prop_type + " (U)",
+                    "stat_type": p.prop_type,
                     "line_score": p.line,
+                    "side": "under",
                     "line_odds": p.under_odds,
                     "true_odds": prob_to_american(true_under) if true_under else None,
                     "start_time": getattr(p, "start_time", None),
@@ -190,8 +193,9 @@ def run_pipeline():
                 serialized_dk.append({
                     "league": p.league,
                     "player_name": p.player_name,
-                    "stat_type": p.prop_type + " (O)",
+                    "stat_type": p.prop_type,
                     "line_score": p.line,
+                    "side": "over",
                     "line_odds": p.over_odds,
                     "true_odds": prob_to_american(true_over) if true_over else None,
                     "start_time": getattr(p, "start_time", None),
@@ -200,8 +204,9 @@ def run_pipeline():
                 serialized_dk.append({
                     "league": p.league,
                     "player_name": p.player_name,
-                    "stat_type": p.prop_type + " (U)",
+                    "stat_type": p.prop_type,
                     "line_score": p.line,
+                    "side": "under",
                     "line_odds": p.under_odds,
                     "true_odds": prob_to_american(true_under) if true_under else None,
                     "start_time": getattr(p, "start_time", None),
@@ -222,21 +227,23 @@ def run_pipeline():
                 serialized_pin.append({
                     "league": p.league,
                     "player_name": p.player_name,
-                    "stat_type": p.prop_type + " (O)",
+                    "stat_type": p.prop_type,
                     "line_score": p.line,
+                    "side": "over",
                     "line_odds": p.over_odds,
                     "true_odds": prob_to_american(true_over) if true_over else None,
-                    "start_time": None,
+                    "start_time": getattr(p, "start_time", None),
                 })
             if p.under_odds is not None:
                 serialized_pin.append({
                     "league": p.league,
                     "player_name": p.player_name,
-                    "stat_type": p.prop_type + " (U)",
+                    "stat_type": p.prop_type,
                     "line_score": p.line,
+                    "side": "under",
                     "line_odds": p.under_odds,
                     "true_odds": prob_to_american(true_under) if true_under else None,
-                    "start_time": None,
+                    "start_time": getattr(p, "start_time", None),
                 })
 
         logger.info("Pipeline: matching %d PP lines vs %d FD, %d DK, %d Pinnacle props...", len(pp_lines), len(fd_props), len(dk_props), len(pin_props))
@@ -750,6 +757,7 @@ def _run_pp_scrape():
                 "player_name": l.player_name,
                 "stat_type": l.stat_type,
                 "line_score": l.line_score,
+                "side": l.side,
                 "start_time": l.start_time,
             }
             for l in pp_lines
@@ -819,8 +827,9 @@ def _run_fd_scrape():
                 serialized.append({
                     "league": p.league,
                     "player_name": p.player_name,
-                    "stat_type": p.prop_type + " (O)",
+                    "stat_type": p.prop_type,
                     "line_score": p.line,
+                    "side": "over",
                     "line_odds": p.over_odds,
                     "true_odds": prob_to_american(true_over) if true_over else None,
                     "start_time": getattr(p, "start_time", None),
@@ -829,8 +838,9 @@ def _run_fd_scrape():
                 serialized.append({
                     "league": p.league,
                     "player_name": p.player_name,
-                    "stat_type": p.prop_type + " (U)",
+                    "stat_type": p.prop_type,
                     "line_score": p.line,
+                    "side": "under",
                     "line_odds": p.under_odds,
                     "true_odds": prob_to_american(true_under) if true_under else None,
                     "start_time": getattr(p, "start_time", None),
@@ -901,8 +911,9 @@ def _run_dk_scrape():
                 serialized.append({
                     "league": p.league,
                     "player_name": p.player_name,
-                    "stat_type": p.prop_type + " (O)",
+                    "stat_type": p.prop_type,
                     "line_score": p.line,
+                    "side": "over",
                     "line_odds": p.over_odds,
                     "true_odds": prob_to_american(true_over) if true_over else None,
                     "start_time": getattr(p, "start_time", None),
@@ -911,8 +922,9 @@ def _run_dk_scrape():
                 serialized.append({
                     "league": p.league,
                     "player_name": p.player_name,
-                    "stat_type": p.prop_type + " (U)",
+                    "stat_type": p.prop_type,
                     "line_score": p.line,
+                    "side": "under",
                     "line_odds": p.under_odds,
                     "true_odds": prob_to_american(true_under) if true_under else None,
                     "start_time": getattr(p, "start_time", None),
@@ -983,21 +995,23 @@ def _run_pin_scrape():
                 serialized.append({
                     "league": p.league,
                     "player_name": p.player_name,
-                    "stat_type": p.prop_type + " (O)",
+                    "stat_type": p.prop_type,
                     "line_score": p.line,
+                    "side": "over",
                     "line_odds": p.over_odds,
                     "true_odds": prob_to_american(true_over) if true_over else None,
-                    "start_time": None,
+                    "start_time": getattr(p, "start_time", None),
                 })
             if p.under_odds is not None:
                 serialized.append({
                     "league": p.league,
                     "player_name": p.player_name,
-                    "stat_type": p.prop_type + " (U)",
+                    "stat_type": p.prop_type,
                     "line_score": p.line,
+                    "side": "under",
                     "line_odds": p.under_odds,
                     "true_odds": prob_to_american(true_under) if true_under else None,
-                    "start_time": None,
+                    "start_time": getattr(p, "start_time", None),
                 })
         with _lock:
             _state["pin_lines"] = serialized

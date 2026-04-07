@@ -140,6 +140,7 @@ async def _scrape_league(session: requests.AsyncSession, league: str) -> List[Pi
             "prop_type": normalized,
             "over_pid": over_pid,
             "under_pid": under_pid,
+            "start_time": item.get("startTime"),
         }
 
     # ── Step 2: Join with markets to get odds & lines ──────────────────────
@@ -182,6 +183,7 @@ async def _scrape_league(session: requests.AsyncSession, league: str) -> List[Pi
             over_odds=over_odds,
             under_odds=under_odds,
             both_sided=both_sided,
+            start_time=info.get("start_time", ""),
         ))
 
     logger.info("Pinnacle [%s]: %d props captured", league, len(props))
