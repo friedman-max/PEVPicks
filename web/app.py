@@ -1098,8 +1098,33 @@ def get_backtest_slips():
             "stat_actual":row.get("stat_actual"),
         })
 
-    # Sort by timestamp descending, return last 50
+    # Compute payout per slip
+    from engine.constants import POWER_PAYOUTS, FLEX_PAYOUTS
+
     all_slips = list(slips_by_id.values())
+    for slip in all_slips:
+        legs = slip.get("legs", [])
+        n_legs = int(slip.get("n_legs") or len(legs))
+        slip_type = (slip.get("slip_type") or "").lower()
+        results = [l.get("result", "pending") for l in legs]
+
+        # A slip is "completed" when all legs have a result
+        completed = all(r in ("hit", "miss") for r in results)
+        slip["completed"] = completed
+
+        if completed:
+            hits = sum(1 for r in results if r == "hit")
+            if slip_type == "power":
+                payout = POWER_PAYOUTS.get(n_legs, 0) if hits == n_legs else 0
+            else:  # flex
+                payout = FLEX_PAYOUTS.get(n_legs, {}).get(hits, 0)
+            slip["payout"] = payout
+            slip["hits"] = hits
+        else:
+            slip["payout"] = None
+            slip["hits"] = None
+
+    # Sort by timestamp descending, return last 50
     all_slips.sort(key=lambda s: s.get("timestamp") or "", reverse=True)
     return {"slips": all_slips[:50], "total": len(all_slips)}
 
