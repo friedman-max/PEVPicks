@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CoreProp</title>
   <link rel="stylesheet" href="/static/style.css?v=4" />
 </head>
+
 <body>
   <!-- ── Slip notification banner ── -->
   <div id="slip-banner" class="slip-banner hidden"></div>
@@ -39,467 +41,477 @@
     <button class="tab" data-tab="pin">Pinnacle Lines</button>
     <button class="tab" data-tab="backtest">Backtest</button>
   </div>
-  
+
   <main class="app-content">
-  <!-- ── Filters bar (EV tab) ── -->
-  <div class="filters-bar" id="ev-filters">
-    <label>League:
-      <select id="filter-league">
-        <option value="">All</option>
-        <option value="NBA">NBA</option>
-        <option value="MLB">MLB</option>
-        <option value="NHL">NHL</option>
-        <option value="NCAAB">NCAAB</option>
-      </select>
-    </label>
-    <label>Prop Type:
-      <input type="text" id="filter-prop" placeholder="e.g. Points" />
-    </label>
-    <label>Max Odds:
-      <input type="number" id="filter-max-odds" placeholder="-110" style="width:70px" />
-    </label>
-    <label>Min EV%:
-      <input type="number" id="filter-min-ev" value="0" step="0.5" style="width:60px" />
-    </label>
-    <label>Side:
-      <select id="filter-side">
-        <option value="">Both</option>
-        <option value="over">Over</option>
-        <option value="under">Under</option>
-      </select>
-    </label>
-    <button class="btn btn-secondary" id="btn-clear-filters">Clear</button>
-    <span class="badge" id="total-badge">0 bets</span>
-    <div id="ev-pagination" class="pagination-controls"></div>
-  </div>
+    <!-- ── Filters bar (EV tab) ── -->
+    <div class="filters-bar" id="ev-filters">
+      <label>League:
+        <select id="filter-league">
+          <option value="">All</option>
+          <option value="NBA">NBA</option>
+          <option value="MLB">MLB</option>
+          <option value="NHL">NHL</option>
+          <option value="NCAAB">NCAAB</option>
+        </select>
+      </label>
+      <label>Prop Type:
+        <input type="text" id="filter-prop" placeholder="e.g. Points" />
+      </label>
+      <label>Max Odds:
+        <input type="number" id="filter-max-odds" placeholder="-110" style="width:70px" />
+      </label>
+      <label>Min EV%:
+        <input type="number" id="filter-min-ev" value="0" step="0.5" style="width:60px" />
+      </label>
+      <label>Side:
+        <select id="filter-side">
+          <option value="">Both</option>
+          <option value="over">Over</option>
+          <option value="under">Under</option>
+        </select>
+      </label>
+      <button class="btn btn-secondary" id="btn-clear-filters">Clear</button>
+      <span class="badge" id="total-badge">0 bets</span>
+      <div id="ev-pagination" class="pagination-controls"></div>
+    </div>
 
-  <!-- ── Filters bar (Matched tab) ── -->
-  <div class="filters-bar hidden" id="matched-filters">
-    <label>League:
-      <select id="matched-filter-league">
-        <option value="">All</option>
-        <option value="NBA">NBA</option>
-        <option value="MLB">MLB</option>
-        <option value="NHL">NHL</option>
-        <option value="NCAAB">NCAAB</option>
-      </select>
-    </label>
-    <label>Prop Type:
-      <input type="text" id="matched-filter-prop" placeholder="e.g. Points" />
-    </label>
-    <label>Player:
-      <input type="text" id="matched-filter-player" placeholder="e.g. LeBron" />
-    </label>
-    <button class="btn btn-secondary" id="btn-clear-matched-filters">Clear</button>
-    <span class="badge" id="matched-total-badge">0 lines</span>
-    <div id="matched-pagination" class="pagination-controls"></div>
-  </div>
+    <!-- ── Filters bar (Matched tab) ── -->
+    <div class="filters-bar hidden" id="matched-filters">
+      <label>League:
+        <select id="matched-filter-league">
+          <option value="">All</option>
+          <option value="NBA">NBA</option>
+          <option value="MLB">MLB</option>
+          <option value="NHL">NHL</option>
+          <option value="NCAAB">NCAAB</option>
+        </select>
+      </label>
+      <label>Prop Type:
+        <input type="text" id="matched-filter-prop" placeholder="e.g. Points" />
+      </label>
+      <label>Player:
+        <input type="text" id="matched-filter-player" placeholder="e.g. LeBron" />
+      </label>
+      <button class="btn btn-secondary" id="btn-clear-matched-filters">Clear</button>
+      <span class="badge" id="matched-total-badge">0 lines</span>
+      <div id="matched-pagination" class="pagination-controls"></div>
+    </div>
 
-  <!-- ── Filters bar (PP tab) ── -->
-  <div class="filters-bar hidden" id="pp-filters">
-    <label>League:
-      <select id="pp-filter-league">
-        <option value="">All</option>
-        <option value="NBA">NBA</option>
-        <option value="MLB">MLB</option>
-        <option value="NHL">NHL</option>
-        <option value="NCAAB">NCAAB</option>
-      </select>
-    </label>
-    <label>Stat Type:
-      <input type="text" id="pp-filter-stat" placeholder="e.g. Points" />
-    </label>
-    <label>Player:
-      <input type="text" id="pp-filter-player" placeholder="e.g. LeBron" />
-    </label>
-    <button class="btn btn-secondary" id="btn-clear-pp-filters">Clear</button>
-    <button class="btn btn-primary" id="btn-load-pp">Load PrizePicks Lines</button>
-    <span class="badge" id="pp-total-badge">0 lines</span>
-    <div id="pp-pagination" class="pagination-controls"></div>
-    <span id="pp-status-label" style="color:var(--text-muted);font-size:12px;"></span>
-  </div>
+    <!-- ── Filters bar (PP tab) ── -->
+    <div class="filters-bar hidden" id="pp-filters">
+      <label>League:
+        <select id="pp-filter-league">
+          <option value="">All</option>
+          <option value="NBA">NBA</option>
+          <option value="MLB">MLB</option>
+          <option value="NHL">NHL</option>
+          <option value="NCAAB">NCAAB</option>
+        </select>
+      </label>
+      <label>Prop Type:
+        <input type="text" id="pp-filter-stat" placeholder="e.g. Points" />
+      </label>
+      <label>Player:
+        <input type="text" id="pp-filter-player" placeholder="e.g. LeBron" />
+      </label>
+      <button class="btn btn-secondary" id="btn-clear-pp-filters">Clear</button>
+      <button class="btn btn-primary" id="btn-load-pp">Load PrizePicks Lines</button>
+      <span class="badge" id="pp-total-badge">0 lines</span>
+      <div id="pp-pagination" class="pagination-controls"></div>
+      <span id="pp-status-label" style="color:var(--text-muted);font-size:12px;"></span>
+    </div>
 
-  <!-- ── Filters bar (FD tab) ── -->
-  <div class="filters-bar hidden" id="fd-filters">
-    <label>League:
-      <select id="fd-filter-league">
-        <option value="">All</option>
-        <option value="NBA">NBA</option>
-        <option value="MLB">MLB</option>
-        <option value="NHL">NHL</option>
-        <option value="NCAAB">NCAAB</option>
-      </select>
-    </label>
-    <label>Stat Type:
-      <input type="text" id="fd-filter-stat" placeholder="e.g. Points" />
-    </label>
-    <label>Player:
-      <input type="text" id="fd-filter-player" placeholder="e.g. LeBron" />
-    </label>
-    <button class="btn btn-secondary" id="btn-clear-fd-filters">Clear</button>
-    <button class="btn btn-primary" id="btn-load-fd">Load FanDuel Lines</button>
-    <span class="badge" id="fd-total-badge">0 lines</span>
-    <div id="fd-pagination" class="pagination-controls"></div>
-    <span id="fd-status-label" style="color:var(--text-muted);font-size:12px;"></span>
-  </div>
-  
-  <!-- ── Filters bar (DK tab) ── -->
-  <div class="filters-bar hidden" id="dk-filters">
-    <label>League:
-      <select id="dk-filter-league">
-        <option value="">All</option>
-        <option value="NBA">NBA</option>
-        <option value="MLB">MLB</option>
-        <option value="NHL">NHL</option>
-        <option value="NCAAB">NCAAB</option>
-      </select>
-    </label>
-    <label>Stat Type:
-      <input type="text" id="dk-filter-stat" placeholder="e.g. Points" />
-    </label>
-    <label>Player:
-      <input type="text" id="dk-filter-player" placeholder="e.g. LeBron" />
-    </label>
-    <button class="btn btn-secondary" id="btn-clear-dk-filters">Clear</button>
-    <button class="btn btn-primary" id="btn-load-dk">Load DraftKings Lines</button>
-    <span class="badge" id="dk-total-badge">0 lines</span>
-    <div id="dk-pagination" class="pagination-controls"></div>
-    <span id="dk-status-label" style="color:var(--text-muted);font-size:12px;"></span>
-  </div>
+    <!-- ── Filters bar (FD tab) ── -->
+    <div class="filters-bar hidden" id="fd-filters">
+      <label>League:
+        <select id="fd-filter-league">
+          <option value="">All</option>
+          <option value="NBA">NBA</option>
+          <option value="MLB">MLB</option>
+          <option value="NHL">NHL</option>
+          <option value="NCAAB">NCAAB</option>
+        </select>
+      </label>
+      <label>Prop Type:
+        <input type="text" id="fd-filter-stat" placeholder="e.g. Points" />
+      </label>
+      <label>Player:
+        <input type="text" id="fd-filter-player" placeholder="e.g. LeBron" />
+      </label>
+      <button class="btn btn-secondary" id="btn-clear-fd-filters">Clear</button>
+      <button class="btn btn-primary" id="btn-load-fd">Load FanDuel Lines</button>
+      <span class="badge" id="fd-total-badge">0 lines</span>
+      <div id="fd-pagination" class="pagination-controls"></div>
+      <span id="fd-status-label" style="color:var(--text-muted);font-size:12px;"></span>
+    </div>
 
-  <!-- ── Main layout (EV tab) ── -->
-  <div class="main-layout" id="ev-view">
-    <!-- Bets table -->
-    <div class="table-section">
-      <div class="table-header-row">
-        <div class="table-actions">
-          <span id="selected-count">0 selected</span>
-          <button class="btn btn-accent" id="btn-build-slip" disabled>Build Slip</button>
-          <button class="btn btn-secondary" id="btn-add-to-backtest" disabled title="Log selected bets as a slip in the backtest CSV">+ Add to Backtest</button>
-          <button class="btn btn-secondary" id="btn-clear-selection">Clear</button>
+    <!-- ── Filters bar (DK tab) ── -->
+    <div class="filters-bar hidden" id="dk-filters">
+      <label>League:
+        <select id="dk-filter-league">
+          <option value="">All</option>
+          <option value="NBA">NBA</option>
+          <option value="MLB">MLB</option>
+          <option value="NHL">NHL</option>
+          <option value="NCAAB">NCAAB</option>
+        </select>
+      </label>
+      <label>Prop Type:
+        <input type="text" id="dk-filter-stat" placeholder="e.g. Points" />
+      </label>
+      <label>Player:
+        <input type="text" id="dk-filter-player" placeholder="e.g. LeBron" />
+      </label>
+      <button class="btn btn-secondary" id="btn-clear-dk-filters">Clear</button>
+      <button class="btn btn-primary" id="btn-load-dk">Load DraftKings Lines</button>
+      <span class="badge" id="dk-total-badge">0 lines</span>
+      <div id="dk-pagination" class="pagination-controls"></div>
+      <span id="dk-status-label" style="color:var(--text-muted);font-size:12px;"></span>
+    </div>
+
+    <!-- ── Main layout (EV tab) ── -->
+    <div class="main-layout" id="ev-view">
+      <!-- Bets table -->
+      <div class="table-section">
+        <div class="table-header-row">
+          <div class="table-actions">
+            <span id="selected-count">0 selected</span>
+            <button class="btn btn-accent" id="btn-build-slip" disabled>Build Slip</button>
+            <button class="btn btn-secondary" id="btn-add-to-backtest" disabled
+              title="Log selected bets as a slip in the backtest CSV">+ Add to Backtest</button>
+            <button class="btn btn-secondary" id="btn-clear-selection">Clear</button>
+          </div>
+        </div>
+
+        <div class="table-wrapper">
+          <table id="bets-table">
+            <thead>
+              <tr>
+                <th><input type="checkbox" id="chk-all" title="Select all visible" /></th>
+                <th class="sortable" data-col="player_name">Player</th>
+                <th class="sortable" data-col="league">League</th>
+                <th class="sortable" data-col="prop_type">Prop Type</th>
+                <th class="sortable" data-col="pp_line">Line</th>
+                <th class="sortable" data-col="side">Side</th>
+                <th class="sortable" data-col="true_odds">True Odds</th>
+                <th class="sortable" data-col="edge">Edge</th>
+                <th class="sortable active desc" data-col="individual_ev_pct">Ind. EV%</th>
+                <th>Book Odds</th>
+              </tr>
+            </thead>
+            <tbody id="bets-tbody">
+              <tr id="empty-row">
+                <td colspan="10" class="empty-msg">Click "Refresh Now" to load bets.</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
-      <div class="table-wrapper">
-        <table id="bets-table">
-          <thead>
-            <tr>
-              <th><input type="checkbox" id="chk-all" title="Select all visible" /></th>
-              <th class="sortable" data-col="player_name">Player</th>
-              <th class="sortable" data-col="league">League</th>
-              <th class="sortable" data-col="prop_type">Prop</th>
-              <th class="sortable" data-col="pp_line">Line</th>
-              <th class="sortable" data-col="side">Side</th>
-              <th class="sortable" data-col="true_odds">True Odds</th>
-              <th class="sortable" data-col="edge">Edge</th>
-              <th class="sortable active desc" data-col="individual_ev_pct">Ind. EV%</th>
-              <th>Book Odds</th>
-            </tr>
-          </thead>
-          <tbody id="bets-tbody">
-            <tr id="empty-row">
-              <td colspan="10" class="empty-msg">Click "Refresh Now" to load bets.</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+      <!-- Slip builder panel -->
+      <div class="slip-panel" id="slip-panel">
+        <h2>Slip Builder</h2>
 
-    <!-- Slip builder panel -->
-    <div class="slip-panel" id="slip-panel">
-      <h2>Slip Builder</h2>
-
-      <div class="bankroll-row">
-        <label>Bankroll ($)
-          <input type="number" id="bankroll-input" value="100" min="1" step="10" />
-        </label>
-      </div>
-
-      <div id="slip-legs" class="slip-legs">
-        <p class="empty-msg">Select 2–6 bets from the table.</p>
-      </div>
-
-      <div id="slip-results" class="slip-results hidden">
-        <div class="slip-result-row">
-          <span>Power EV</span>
-          <span id="power-ev" class="ev-value">—</span>
+        <div class="bankroll-row">
+          <label>Bankroll ($)
+            <input type="number" id="bankroll-input" value="100" min="1" step="10" />
+          </label>
         </div>
-        <div class="slip-result-row">
-          <span>Flex EV</span>
-          <span id="flex-ev" class="ev-value">—</span>
+
+        <div id="slip-legs" class="slip-legs">
+          <p class="empty-msg">Select 2–6 bets from the table.</p>
         </div>
-        <div class="slip-result-row best-play">
-          <span id="best-play-label">Best Play</span>
-          <span id="best-play-ev" class="ev-value highlight">—</span>
+
+        <div id="slip-results" class="slip-results hidden">
+          <div class="slip-result-row">
+            <span>Power EV</span>
+            <span id="power-ev" class="ev-value">—</span>
+          </div>
+          <div class="slip-result-row">
+            <span>Flex EV</span>
+            <span id="flex-ev" class="ev-value">—</span>
+          </div>
+          <div class="slip-result-row best-play">
+            <span id="best-play-label">Best Play</span>
+            <span id="best-play-ev" class="ev-value highlight">—</span>
+          </div>
+          <div class="slip-result-row profit-row">
+            <span>Expected Profit</span>
+            <span id="expected-profit" class="ev-value profit">—</span>
+          </div>
         </div>
-        <div class="slip-result-row profit-row">
-          <span>Expected Profit</span>
-          <span id="expected-profit" class="ev-value profit">—</span>
+
+        <button class="btn btn-accent btn-full" id="btn-calculate" disabled>Calculate EV</button>
+        <button class="btn btn-primary btn-full" id="btn-auto-build" style="margin-top: 10px;">Auto-Build Best
+          Slip</button>
+      </div>
+    </div>
+
+    <!-- ── Matched Lines view ── -->
+    <div class="pp-view hidden" id="matched-view">
+      <div class="table-section" style="flex: 1; max-width: 100%;">
+        <div class="table-wrapper">
+          <table id="matched-table">
+            <thead>
+              <tr>
+                <th class="sortable-matched" data-col="player_name">Player</th>
+                <th class="sortable-matched" data-col="league">League</th>
+                <th class="sortable-matched" data-col="stat_type">Prop Type</th>
+                <th class="sortable-matched" data-col="pp_line">Line</th>
+                <th class="sortable-matched" data-col="side">Side</th>
+                <th class="sortable-matched" data-col="true_odds">True Odds</th>
+                <th class="sortable-matched" data-col="best_odds">Best Odds</th>
+                <th class="sortable-matched" data-col="fd_odds">FD Odds</th>
+                <th class="sortable-matched" data-col="dk_odds">DK Odds</th>
+                <th class="sortable-matched" data-col="pin_odds">PIN Odds</th>
+                <th class="sortable-matched" data-col="start_time">Game Time</th>
+              </tr>
+            </thead>
+            <tbody id="matched-tbody">
+              <tr id="matched-empty-row">
+                <td colspan="11" class="empty-msg">Waiting for data...</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
-
-      <button class="btn btn-accent btn-full" id="btn-calculate" disabled>Calculate EV</button>
-      <button class="btn btn-primary btn-full" id="btn-auto-build" style="margin-top: 10px;">Auto-Build Best Slip</button>
     </div>
-  </div>
 
-  <!-- ── Matched Lines view ── -->
-  <div class="pp-view hidden" id="matched-view">
-    <div class="table-section" style="flex: 1; max-width: 100%;">
-      <div class="table-wrapper">
-        <table id="matched-table">
-          <thead>
-            <tr>
-              <th class="sortable-matched" data-col="player_name">Player</th>
-              <th class="sortable-matched" data-col="league">League</th>
-              <th class="sortable-matched" data-col="stat_type">Prop</th>
-              <th class="sortable-matched" data-col="pp_line">Line</th>
-              <th class="sortable-matched" data-col="side">Side</th>
-              <th class="sortable-matched" data-col="true_odds">True Odds</th>
-              <th class="sortable-matched" data-col="best_odds">Best Odds</th>
-              <th class="sortable-matched" data-col="fd_odds">FD Odds</th>
-              <th class="sortable-matched" data-col="dk_odds">DK Odds</th>
-              <th class="sortable-matched" data-col="pin_odds">PIN Odds</th>
-              <th class="sortable-matched" data-col="start_time">Game Time</th>
-            </tr>
-          </thead>
-          <tbody id="matched-tbody">
-            <tr id="matched-empty-row">
-              <td colspan="11" class="empty-msg">Waiting for data...</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── PrizePicks Lines view ── -->
-  <div class="pp-view hidden" id="pp-view">
-    <div class="table-section">
-      <div class="table-wrapper">
-        <table id="pp-table">
-          <thead>
-            <tr>
-              <th class="sortable-pp" data-col="player_name">Player</th>
-              <th class="sortable-pp" data-col="league">League</th>
-              <th class="sortable-pp" data-col="stat_type">Stat Type</th>
-              <th class="sortable-pp" data-col="line_score">Line</th>
-              <th class="sortable-pp" data-col="side">Side</th>
-              <th class="sortable-pp" data-col="start_time">Game Time</th>
-            </tr>
-          </thead>
-          <tbody id="pp-tbody">
-            <tr><td colspan="6" class="empty-msg">Click "Load PrizePicks Lines" to fetch data.</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── FanDuel Lines view ── -->
-  <div class="pp-view hidden" id="fd-view">
-    <div class="table-section">
-      <div class="table-wrapper">
-        <table id="fd-table">
-          <thead>
-            <tr>
-              <th class="sortable-fd" data-col="player_name">Player</th>
-              <th class="sortable-fd" data-col="league">League</th>
-              <th class="sortable-fd" data-col="stat_type">Stat Type</th>
-              <th class="sortable-fd" data-col="line_score">Line</th>
-              <th class="sortable-fd" data-col="side">Side</th>
-              <th class="sortable-fd" data-col="true_odds">True Odds</th>
-              <th class="sortable-fd" data-col="line_odds">Line Odds</th>
-              <th class="sortable-fd" data-col="start_time">Game Time</th>
-            </tr>
-          </thead>
-          <tbody id="fd-tbody">
-            <tr><td colspan="8" class="empty-msg">Click "Load FanDuel Lines" to fetch data.</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── DraftKings Lines view ── -->
-  <div class="pp-view hidden" id="dk-view">
-    <div class="table-section">
-      <div class="table-wrapper">
-        <table id="dk-table">
-          <thead>
-            <tr>
-              <th class="sortable-dk" data-col="player_name">Player</th>
-              <th class="sortable-dk" data-col="league">League</th>
-              <th class="sortable-dk" data-col="stat_type">Stat Type</th>
-              <th class="sortable-dk" data-col="line_score">Line</th>
-              <th class="sortable-dk" data-col="side">Side</th>
-              <th class="sortable-dk" data-col="true_odds">True Odds</th>
-              <th class="sortable-dk" data-col="line_odds">Line Odds</th>
-              <th class="sortable-dk" data-col="start_time">Game Time</th>
-            </tr>
-          </thead>
-          <tbody id="dk-tbody">
-            <tr><td colspan="8" class="empty-msg">Click "Load DraftKings Lines" to fetch data.</td></tr>
-          </tbody>
-        </table>
-    </div>
-  </div>
-</div>
-
-  <!-- ── Filters bar (Pinnacle tab) ── -->
-  <div class="filters-bar hidden" id="pin-filters">
-    <label>League:
-      <select id="pin-filter-league">
-        <option value="">All</option>
-        <option value="NBA">NBA</option>
-        <option value="MLB">MLB</option>
-        <option value="NHL">NHL</option>
-        <option value="NCAAB">NCAAB</option>
-      </select>
-    </label>
-    <label>Stat Type:
-      <input type="text" id="pin-filter-stat" placeholder="e.g. Points" />
-    </label>
-    <label>Player:
-      <input type="text" id="pin-filter-player" placeholder="e.g. LeBron" />
-    </label>
-    <button class="btn btn-secondary" id="btn-clear-pin-filters">Clear</button>
-    <button class="btn btn-primary" id="btn-load-pin">Load Pinnacle Lines</button>
-    <span class="badge" id="pin-total-badge">0 lines</span>
-    <div id="pin-pagination" class="pagination-controls"></div>
-    <span id="pin-status-label" style="color:var(--text-muted);font-size:12px;"></span>
-  </div>
-
-  <!-- ── Pinnacle Lines view ── -->
-  <div class="pp-view hidden" id="pin-view">
-    <div class="table-section">
-      <div class="table-wrapper">
-        <table id="pin-table">
-          <thead>
-            <tr>
-              <th class="sortable-pin" data-col="player_name">Player</th>
-              <th class="sortable-pin" data-col="league">League</th>
-              <th class="sortable-pin" data-col="stat_type">Stat Type</th>
-              <th class="sortable-pin" data-col="line_score">Line</th>
-              <th class="sortable-pin" data-col="side">Side</th>
-              <th class="sortable-pin" data-col="true_odds">True Odds</th>
-              <th class="sortable-pin" data-col="line_odds">Line Odds</th>
-              <th class="sortable-pin" data-col="start_time">Game Time</th>
-            </tr>
-          </thead>
-          <tbody id="pin-tbody">
-            <tr><td colspan="8" class="empty-msg">Click "Load Pinnacle Lines" to fetch data.</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Filters bar (Backtest tab) ── -->
-  <div class="filters-bar hidden" id="backtest-filters">
-    <label>Filter result:
-      <select id="bt-filter-result">
-        <option value="">All</option>
-        <option value="pending">Pending</option>
-        <option value="hit">Hit</option>
-        <option value="miss">Miss</option>
-        <option value="push">Push / Void</option>
-      </select>
-    </label>
-    <label>Filter league:
-      <select id="bt-filter-league">
-        <option value="">All</option>
-        <option value="NBA">NBA</option>
-        <option value="MLB">MLB</option>
-        <option value="NHL">NHL</option>
-        <option value="NCAAB">NCAAB</option>
-      </select>
-    </label>
-    <div id="bt-pagination" class="pagination-controls"></div>
-  </div>
-
-  <!-- ── Backtest view ── -->
-  <div class="backtest-view hidden" id="backtest-view">
-    <!-- Summary cards -->
-    <div class="bt-summary" id="bt-summary">
-      <div class="bt-card">
-        <div class="bt-card-label">Total Slips</div>
-        <div class="bt-card-value" id="bt-total-slips">0</div>
-      </div>
-      <div class="bt-card">
-        <div class="bt-card-label">Completed Slips</div>
-        <div class="bt-card-value" id="bt-completed">0</div>
-      </div>
-      <div class="bt-card">
-        <div class="bt-card-label">Slip Hit Rate</div>
-        <div class="bt-card-value" id="bt-hit-rate">—</div>
-      </div>
-      <div class="bt-card">
-        <div class="bt-card-label">Total Legs</div>
-        <div class="bt-card-value" id="bt-total-legs">0</div>
-      </div>
-      <div class="bt-card">
-        <div class="bt-card-label">Completed Legs</div>
-        <div class="bt-card-value" id="bt-completed-legs">0</div>
-      </div>
-      <div class="bt-card">
-        <div class="bt-card-label" title="Break-even target: 54.08% (sixth root of 1/40 for 6-leg power plays).">
-          Leg Hit Rate <span style="font-size:0.85em; opacity:0.8; cursor:help;">ⓘ</span>
+    <!-- ── PrizePicks Lines view ── -->
+    <div class="pp-view hidden" id="pp-view">
+      <div class="table-section">
+        <div class="table-wrapper">
+          <table id="pp-table">
+            <thead>
+              <tr>
+                <th class="sortable-pp" data-col="player_name">Player</th>
+                <th class="sortable-pp" data-col="league">League</th>
+                <th class="sortable-pp" data-col="stat_type">Prop Type</th>
+                <th class="sortable-pp" data-col="line_score">Line</th>
+                <th class="sortable-pp" data-col="side">Side</th>
+                <th class="sortable-pp" data-col="start_time">Game Time</th>
+              </tr>
+            </thead>
+            <tbody id="pp-tbody">
+              <tr>
+                <td colspan="6" class="empty-msg">Click "Load PrizePicks Lines" to fetch data.</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-        <div class="bt-card-value" id="bt-leg-hit-rate">—</div>
       </div>
-      <div class="bt-card">
-        <div class="bt-card-label">Actual ROI</div>
-        <div class="bt-card-value" id="bt-roi">—</div>
-      </div>
-      <div class="bt-card">
-        <div class="bt-card-label">Avg Proj. EV</div>
-        <div class="bt-card-value" id="bt-avg-ev">—</div>
-      </div>
-
     </div>
 
-    <!-- Actions -->
-    <div class="bt-actions">
-      <button class="btn btn-primary" id="btn-bt-refresh">Refresh</button>
-      <button class="btn btn-secondary" id="btn-bt-download">Download CSV</button>
-      <button class="btn btn-secondary" id="btn-bt-check-results">Check Results (ESPN)</button>
+    <!-- ── FanDuel Lines view ── -->
+    <div class="pp-view hidden" id="fd-view">
+      <div class="table-section">
+        <div class="table-wrapper">
+          <table id="fd-table">
+            <thead>
+              <tr>
+                <th class="sortable-fd" data-col="player_name">Player</th>
+                <th class="sortable-fd" data-col="league">League</th>
+                <th class="sortable-fd" data-col="stat_type">Prop Type</th>
+                <th class="sortable-fd" data-col="line_score">Line</th>
+                <th class="sortable-fd" data-col="side">Side</th>
+                <th class="sortable-fd" data-col="true_odds">True Odds</th>
+                <th class="sortable-fd" data-col="line_odds">Line Odds</th>
+                <th class="sortable-fd" data-col="start_time">Game Time</th>
+              </tr>
+            </thead>
+            <tbody id="fd-tbody">
+              <tr>
+                <td colspan="8" class="empty-msg">Click "Load FanDuel Lines" to fetch data.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
-    <!-- Slips table -->
-    <div class="table-section" style="flex:1;">
-      <div class="table-wrapper">
-        <table id="bt-table">
-          <thead>
-            <tr>
-              <th>Slip ID</th>
-              <th>Time</th>
-              <th>Type</th>
-              <th>Legs</th>
-              <th>Proj EV%</th>
-              <th>Payout</th>
-              <th>Player</th>
-              <th>League</th>
-              <th>Prop</th>
-              <th>Line</th>
-              <th>Side</th>
-              <th>True Prob</th>
-              <th>Ind EV%</th>
-              <th>Urgency</th>
-              <th>Game Start</th>
-              <th>Result</th>
-              <th>Actual</th>
-            </tr>
-          </thead>
-          <tbody id="bt-tbody"></tbody>
-        </table>
+    <!-- ── DraftKings Lines view ── -->
+    <div class="pp-view hidden" id="dk-view">
+      <div class="table-section">
+        <div class="table-wrapper">
+          <table id="dk-table">
+            <thead>
+              <tr>
+                <th class="sortable-dk" data-col="player_name">Player</th>
+                <th class="sortable-dk" data-col="league">League</th>
+                <th class="sortable-dk" data-col="stat_type">Prop Type</th>
+                <th class="sortable-dk" data-col="line_score">Line</th>
+                <th class="sortable-dk" data-col="side">Side</th>
+                <th class="sortable-dk" data-col="true_odds">True Odds</th>
+                <th class="sortable-dk" data-col="line_odds">Line Odds</th>
+                <th class="sortable-dk" data-col="start_time">Game Time</th>
+              </tr>
+            </thead>
+            <tbody id="dk-tbody">
+              <tr>
+                <td colspan="8" class="empty-msg">Click "Load DraftKings Lines" to fetch data.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
-  </div>
-</div>
+
+    <!-- ── Filters bar (Pinnacle tab) ── -->
+    <div class="filters-bar hidden" id="pin-filters">
+      <label>League:
+        <select id="pin-filter-league">
+          <option value="">All</option>
+          <option value="NBA">NBA</option>
+          <option value="MLB">MLB</option>
+          <option value="NHL">NHL</option>
+          <option value="NCAAB">NCAAB</option>
+        </select>
+      </label>
+      <label>Prop Type:
+        <input type="text" id="pin-filter-stat" placeholder="e.g. Points" />
+      </label>
+      <label>Player:
+        <input type="text" id="pin-filter-player" placeholder="e.g. LeBron" />
+      </label>
+      <button class="btn btn-secondary" id="btn-clear-pin-filters">Clear</button>
+      <button class="btn btn-primary" id="btn-load-pin">Load Pinnacle Lines</button>
+      <span class="badge" id="pin-total-badge">0 lines</span>
+      <div id="pin-pagination" class="pagination-controls"></div>
+      <span id="pin-status-label" style="color:var(--text-muted);font-size:12px;"></span>
+    </div>
+
+    <!-- ── Pinnacle Lines view ── -->
+    <div class="pp-view hidden" id="pin-view">
+      <div class="table-section">
+        <div class="table-wrapper">
+          <table id="pin-table">
+            <thead>
+              <tr>
+                <th class="sortable-pin" data-col="player_name">Player</th>
+                <th class="sortable-pin" data-col="league">League</th>
+                <th class="sortable-pin" data-col="stat_type">Prop Type</th>
+                <th class="sortable-pin" data-col="line_score">Line</th>
+                <th class="sortable-pin" data-col="side">Side</th>
+                <th class="sortable-pin" data-col="true_odds">True Odds</th>
+                <th class="sortable-pin" data-col="line_odds">Line Odds</th>
+                <th class="sortable-pin" data-col="start_time">Game Time</th>
+              </tr>
+            </thead>
+            <tbody id="pin-tbody">
+              <tr>
+                <td colspan="8" class="empty-msg">Click "Load Pinnacle Lines" to fetch data.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Filters bar (Backtest tab) ── -->
+    <div class="filters-bar hidden" id="backtest-filters">
+      <label>Filter result:
+        <select id="bt-filter-result">
+          <option value="">All</option>
+          <option value="pending">Pending</option>
+          <option value="hit">Hit</option>
+          <option value="miss">Miss</option>
+          <option value="push">Push / Void</option>
+        </select>
+      </label>
+      <label>Filter league:
+        <select id="bt-filter-league">
+          <option value="">All</option>
+          <option value="NBA">NBA</option>
+          <option value="MLB">MLB</option>
+          <option value="NHL">NHL</option>
+          <option value="NCAAB">NCAAB</option>
+        </select>
+      </label>
+      <div id="bt-pagination" class="pagination-controls"></div>
+    </div>
+
+    <!-- ── Backtest view ── -->
+    <div class="backtest-view hidden" id="backtest-view">
+      <!-- Summary cards -->
+      <div class="bt-summary" id="bt-summary">
+        <div class="bt-card">
+          <div class="bt-card-label">Total Slips</div>
+          <div class="bt-card-value" id="bt-total-slips">0</div>
+        </div>
+        <div class="bt-card">
+          <div class="bt-card-label">Completed Slips</div>
+          <div class="bt-card-value" id="bt-completed">0</div>
+        </div>
+        <div class="bt-card">
+          <div class="bt-card-label">Slip Hit Rate</div>
+          <div class="bt-card-value" id="bt-hit-rate">—</div>
+        </div>
+        <div class="bt-card">
+          <div class="bt-card-label">Total Legs</div>
+          <div class="bt-card-value" id="bt-total-legs">0</div>
+        </div>
+        <div class="bt-card">
+          <div class="bt-card-label">Completed Legs</div>
+          <div class="bt-card-value" id="bt-completed-legs">0</div>
+        </div>
+        <div class="bt-card">
+          <div class="bt-card-label" title="Break-even target: 54.08% (sixth root of 1/40 for 6-leg power plays).">
+            Leg Hit Rate <span style="font-size:0.85em; opacity:0.8; cursor:help;">ⓘ</span>
+          </div>
+          <div class="bt-card-value" id="bt-leg-hit-rate">—</div>
+        </div>
+        <div class="bt-card">
+          <div class="bt-card-label">Actual ROI</div>
+          <div class="bt-card-value" id="bt-roi">—</div>
+        </div>
+        <div class="bt-card">
+          <div class="bt-card-label">Avg Proj. EV</div>
+          <div class="bt-card-value" id="bt-avg-ev">—</div>
+        </div>
+
+      </div>
+
+      <!-- Actions -->
+      <div class="bt-actions">
+        <button class="btn btn-primary" id="btn-bt-refresh">Refresh</button>
+        <button class="btn btn-secondary" id="btn-bt-download">Download CSV</button>
+        <button class="btn btn-secondary" id="btn-bt-check-results">Check Results (ESPN)</button>
+      </div>
+
+      <!-- Slips table -->
+      <div class="table-section" style="flex:1;">
+        <div class="table-wrapper">
+          <table id="bt-table">
+            <thead>
+              <tr>
+                <th>Slip ID</th>
+                <th>Time</th>
+                <th>Type</th>
+                <th>Legs</th>
+                <th>Proj EV%</th>
+                <th>Payout</th>
+                <th>Player</th>
+                <th>League</th>
+                <th>Prop Type</th>
+                <th>Line</th>
+                <th>Side</th>
+                <th>True Prob</th>
+                <th>Ind EV%</th>
+                <th>Urgency</th>
+                <th>Game Start</th>
+                <th>Result</th>
+                <th>Actual</th>
+              </tr>
+            </thead>
+            <tbody id="bt-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
 
 
   </main>
-  
+
   <!-- ── Settings modal ── -->
   <div class="modal-overlay hidden" id="settings-modal">
     <div class="modal">
@@ -527,4 +539,5 @@
 
   <script src="/static/app.js?v=9"></script>
 </body>
+
 </html>
