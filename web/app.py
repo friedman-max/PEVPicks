@@ -1112,13 +1112,13 @@ def get_backtest_slips():
         slip_type = (slip.get("slip_type") or "").lower()
         results = [l.get("result", "pending") for l in legs]
 
-        # A slip is "completed" when all legs have a result (hit, miss, or push)
-        completed = all(r in ("hit", "miss", "push") for r in results)
+        # A slip is "completed" when all legs have a result (hit, miss, push, or dnp)
+        completed = all(r in ("hit", "miss", "push", "dnp") for r in results)
         slip["completed"] = completed
 
         if completed:
-            # Revert logic: slips downgrade if there are pushes
-            effective_results = [r for r in results if r != "push"]
+            # Revert logic: slips downgrade if there are pushes or DNPs
+            effective_results = [r for r in results if r not in ("push", "dnp")]
             n_eff = len(effective_results)
             hits_eff = sum(1 for r in effective_results if r == "hit")
 
