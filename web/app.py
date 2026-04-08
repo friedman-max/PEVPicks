@@ -27,6 +27,7 @@ from engine.ev_calculator import BetResult, calculate_slip, evaluate_match
 from engine.matcher import match_props
 from engine.backtest import BacktestLogger
 from engine.results_checker import ESPNResultsChecker
+from engine.clv_checker import CLVTracker
 from scrapers.fanduel import scrape_fanduel
 from scrapers.prizepicks import scrape_prizepicks
 from scrapers.draftkings import scrape_draftkings
@@ -40,6 +41,7 @@ app = FastAPI(title="CoreProp")
 # Backtest / results-checker singletons
 _backtest         = BacktestLogger()
 _results_checker  = ESPNResultsChecker()
+_clv_tracker      = CLVTracker()
 
 # If a scraper returns 0 results but previous had at least this many,
 # reuse the previous data instead of wiping the state.

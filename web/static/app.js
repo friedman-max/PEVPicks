@@ -610,6 +610,7 @@ document.querySelectorAll(".tab").forEach(tab => {
     $("pin-filters").classList.add("hidden");
     $("backtest-view").classList.add("hidden");
     $("backtest-filters").classList.add("hidden");
+    $("analytics-view").classList.add("hidden");
 
     if (target === "ev") {
       $("ev-view").classList.remove("hidden");
@@ -639,6 +640,9 @@ document.querySelectorAll(".tab").forEach(tab => {
       $("backtest-view").classList.remove("hidden");
       $("backtest-filters").classList.remove("hidden");
       fetchBacktest();
+    } else if (target === "analytics") {
+      $("analytics-view").classList.remove("hidden");
+      fetchCalibration();
     }
   });
 });
@@ -1710,6 +1714,111 @@ async function pollLatestSlip() {
     isInitializingLatestSlip = false; // ensure we clear this even if no slip found
   } catch (e) { /* silent */ }
 }
+
+// ── Analytics / Calibration ────────────────────────────────────────────────
+
+async function fetchCalibration() {
+  try {
+    const resp = await fetch("/api/calibration");
+    if (!resp.ok) return;
+    const data = await resp.json();
+    renderCalibration(data);
+  } catch (e) {
+    console.error("Calibration fetch error:", e);
+  }
+}
+
+function renderCalibration(data) {
+  // Summary cards
+  const brierEl = $("cal-brier");
+  if (data.brier_score != null) {
+    const bs = data.brier_score;
+    brierEl.textContent = bs.toFixed(4);
+    // Below 0.25 = good (beating coin flip)
+    brierEl.className = "bt-card-value" + (bs < 0.25 ? " positive" : bs < 0.30 ? "" : " negative");
+  } else {
+    brierEl.textContent = "\u2014";
+    brierEl.className = "bt-card-value";
+  }
+
+  const llEl = $("cal-logloss");
+  if (data.log_loss != null) {
+    const ll = data.log_loss;
+    llEl.textContent = ll.toFixed(4);
+    llEl.className = "bt-card-value" + (ll < 0.693 ? " positive" : ll < 0.80 ? "" : " negative");
+  } else {
+    llEl.textContent = "\u2014";
+    llEl.className = "bt-card-value";
+  }
+
+  $("cal-resolved").textContent = data.n_resolved || 0;
+  $("cal-won").textContent = data.n_won || 0;
+  $("cal-lost").textContent = data.n_lost || 0;
+
+  if (data.hit_rate != null) {
+    $("cal-hitrate").textContent = (data.hit_rate * 100).toFixed(1) + "%";
+    $("cal-hitrate").className = "bt-card-value" + (data.hit_rate >= 0.54 ? " positive" : data.hit_rate >= 0.48 ? "" : " negative");
+  } else {
+    $("cal-hitrate").textContent = "\u2014";
+  }
+
+  if (data.avg_predicted_prob != null) {
+    $("cal-avgpred").textContent = (data.avg_predicted_prob * 100).toFixed(1) + "%";
+  } else {
+    $("cal-avgpred").textContent = "\u2014";
+  }
+
+  // Calibration buckets table
+  const bucketsTbody = $("cal-buckets-tbody");
+  const buckets = data.calibration_buckets || [];
+
+  if (buckets.length === 0) {
+    bucketsTbody.innerHTML = '<tr><td colspan="5" class="empty-msg">No resolved data available yet.</td></tr>';
+    return;
+  }
+
+  bucketsTbody.innerHTML = buckets.map(b => {
+    const predicted = (b.predicted_avg * 100).toFixed(1) + "%";
+    const actual = (b.actual_avg * 100).toFixed(1) + "%";
+    const diff = b.actual_avg - b.predicted_avg;
+    const diffPct = (diff * 100).toFixed(1);
+    const diffSign = diff >= 0 ? "+" : "";
+    const diffClass = Math.abs(diff) < 0.05 ? "ev-medium" : (diff >= 0 ? "ev-high" : "ev-low");
+    const calibLabel = Math.abs(diff) < 0.03 ? "\u2705 Well calibrated"
+                     : diff > 0 ? "\u2B06\uFE0F Underconfident" : "\u2B07\uFE0F Overconfident";
+
+    return `<tr>
+      <td><strong>${b.bucket}</strong></td>
+      <td>${predicted}</td>
+      <td class="${diffClass}">${actual}</td>
+      <td>${b.count}</td>
+      <td><span class="${diffClass}">${diffSign}${diffPct}pp</span> ${calibLabel}</td>
+    </tr>`;
+  }).join("");
+  // CLV Tracking section
+  $("clv-count").textContent = data.n_clv_tracked || 0;
+
+  const clvPlusEl = $("clv-positive-rate");
+  if (data.clv_plus_rate != null) {
+    clvPlusEl.textContent = (data.clv_plus_rate * 100).toFixed(1) + "%";
+    clvPlusEl.className = "bt-card-value" + (data.clv_plus_rate >= 0.50 ? " positive" : " negative");
+  } else {
+    clvPlusEl.textContent = "\u2014";
+    clvPlusEl.className = "bt-card-value";
+  }
+
+  const avgClvEl = $("clv-avg-pct");
+  if (data.avg_clv_pct != null) {
+    const r = data.avg_clv_pct;
+    avgClvEl.textContent = (r > 0 ? "+" : "") + (r * 100).toFixed(2) + "%";
+    avgClvEl.className = "bt-card-value" + (r > 0 ? " positive" : r < 0 ? " negative" : "");
+  } else {
+    avgClvEl.textContent = "\u2014";
+    avgClvEl.className = "bt-card-value";
+  }
+}
+
+$("btn-cal-refresh").addEventListener("click", fetchCalibration);
 
 // ── Init ───────────────────────────────────────────────────────────────────
 fetchStatus();

@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CoreProp</title>
-  <link rel="stylesheet" href="/static/style.css?v=4" />
+  <link rel="stylesheet" href="/static/style.css?v=5" />
 </head>
 
 <body>
@@ -40,6 +40,7 @@
     <button class="tab" data-tab="dk">DraftKings Lines</button>
     <button class="tab" data-tab="pin">Pinnacle Lines</button>
     <button class="tab" data-tab="backtest">Backtest</button>
+    <button class="tab" data-tab="analytics">Analytics</button>
   </div>
 
   <main class="app-content">
@@ -509,6 +510,117 @@
       </div>
     </div>
 
+    <!-- ── Analytics view ── -->
+    <div class="backtest-view hidden" id="analytics-view">
+      <!-- Calibration summary cards -->
+      <div class="bt-summary" id="cal-summary">
+        <div class="bt-card">
+          <div class="bt-card-label"
+            title="Mean squared error of predicted probabilities vs outcomes. Lower is better. 0.25 = coin-flip baseline.">
+            Brier Score <span style="font-size:0.85em; opacity:0.8; cursor:help;">ⓘ</span></div>
+          <div class="bt-card-value" id="cal-brier">—</div>
+        </div>
+        <div class="bt-card">
+          <div class="bt-card-label"
+            title="Cross-entropy loss. Penalises overconfident mispredictions. Lower is better.">Log-Loss <span
+              style="font-size:0.85em; opacity:0.8; cursor:help;">ⓘ</span></div>
+          <div class="bt-card-value" id="cal-logloss">—</div>
+        </div>
+        <div class="bt-card">
+          <div class="bt-card-label">Resolved Legs</div>
+          <div class="bt-card-value" id="cal-resolved">0</div>
+        </div>
+        <div class="bt-card">
+          <div class="bt-card-label">Won</div>
+          <div class="bt-card-value positive" id="cal-won">0</div>
+        </div>
+        <div class="bt-card">
+          <div class="bt-card-label">Lost</div>
+          <div class="bt-card-value negative" id="cal-lost">0</div>
+        </div>
+        <div class="bt-card">
+          <div class="bt-card-label">Raw Hit Rate</div>
+          <div class="bt-card-value" id="cal-hitrate">—</div>
+        </div>
+        <div class="bt-card">
+          <div class="bt-card-label">Avg Predicted Prob</div>
+          <div class="bt-card-value" id="cal-avgpred">—</div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="bt-actions">
+        <button class="btn btn-primary" id="btn-cal-refresh">Refresh Calibration</button>
+      </div>
+
+      <!-- Explanation -->
+      <div
+        style="margin: 0 16px 16px; padding: 14px 18px; background: var(--surface-2); border-radius: 8px; border: 1px solid var(--border);">
+        <h3 style="margin: 0 0 8px; font-size: 14px; color: var(--text);">How to Read These Metrics</h3>
+        <div style="font-size: 12px; color: var(--text-muted); line-height: 1.6;">
+          <p style="margin: 0 0 6px;"><strong>Brier Score</strong> — Range [0, 1]. Lower = better. A score of
+            <strong>0.25</strong> means coin-flip accuracy. Below 0.25 = your model identifies real edges.</p>
+          <p style="margin: 0 0 6px;"><strong>Log-Loss</strong> — Penalises overconfident wrong predictions
+            asymmetrically. A 95% prediction that fails is punished far more than a 55% prediction that fails. Lower =
+            better.</p>
+          <p style="margin: 0;"><strong>Calibration Buckets</strong> — If your model says "60% chance", it should win
+            ~60% of the time. The table below shows predicted vs actual win rates by decile.</p>
+        </div>
+      </div>
+
+      <!-- Calibration buckets table -->
+      <div class="table-section" style="flex:1;">
+        <h3 style="margin: 0 16px 8px; font-size: 14px; color: var(--text);">Calibration Buckets</h3>
+        <div class="table-wrapper">
+          <table id="cal-buckets-table">
+            <thead>
+              <tr>
+                <th>Probability Range</th>
+                <th>Avg Predicted</th>
+                <th>Actual Win Rate</th>
+                <th>Count</th>
+                <th>Calibration</th>
+              </tr>
+            </thead>
+            <tbody id="cal-buckets-tbody">
+              <tr>
+                <td colspan="5" class="empty-msg">Click "Refresh Calibration" to load data.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- CLV Tracking section -->
+      <div style="margin: 16px;">
+        <h3 style="font-size: 14px; color: var(--text); margin-bottom: 8px;">Closing Line Value (CLV) Tracking</h3>
+        <div
+          style="padding: 14px 18px; background: var(--surface-2); border-radius: 8px; border: 1px solid var(--border);">
+          <div class="bt-summary" id="clv-summary" style="margin: 0 0 12px;">
+            <div class="bt-card">
+              <div class="bt-card-label">CLV Tracked Bets</div>
+              <div class="bt-card-value" id="clv-count">0</div>
+            </div>
+            <div class="bt-card">
+              <div class="bt-card-label" title="How often your opening line beat the closing line.">CLV+ Rate <span
+                  style="font-size:0.85em; opacity:0.8; cursor:help;">ⓘ</span></div>
+              <div class="bt-card-value" id="clv-positive-rate">—</div>
+            </div>
+            <div class="bt-card">
+              <div class="bt-card-label" title="Average percentage edge over the closing line.">Avg CLV% <span
+                  style="font-size:0.85em; opacity:0.8; cursor:help;">ⓘ</span></div>
+              <div class="bt-card-value" id="clv-avg-pct">—</div>
+            </div>
+          </div>
+          <div style="font-size: 12px; color: var(--text-muted); line-height: 1.6;">
+            <p style="margin: 0;"><strong>CLV tracks whether you're consistently getting better odds than the market
+                settles at.</strong> If your CLV+ rate is above 50% and your average CLV% is positive, your probability
+              model is identifying real edges before the market corrects.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
 
   </main>
 
@@ -537,7 +649,7 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=9"></script>
+  <script src="/static/app.js?v=11"></script>
 </body>
 
 </html>

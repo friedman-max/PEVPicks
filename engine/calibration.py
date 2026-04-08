@@ -71,6 +71,27 @@ def _load_resolved_rows(csv_path: pathlib.Path | None = None) -> list[dict]:
 
     return rows
 
+def _load_clv_rows(csv_path: pathlib.Path | None = None) -> list[dict]:
+    """Read pending/resolved rows that have a closing_prob/clv_pct tracked."""
+    path = csv_path or CSV_PATH
+    if not path.exists():
+        return []
+
+    rows = []
+    try:
+        with open(path, newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                try:
+                    cp = float(row.get("closing_prob", ""))
+                    clv = float(row.get("clv_pct", ""))
+                    rows.append({"closing_prob": cp, "clv_pct": clv})
+                except ValueError:
+                    continue
+    except Exception:
+        pass
+    return rows
+
 
 def brier_score(rows: list[dict]) -> Optional[float]:
     """
@@ -159,6 +180,16 @@ def evaluate_calibration(csv_path: pathlib.Path | None = None) -> dict:
                 "count": len(bucket_rows),
             })
 
+    # CLV
+    clv_rows = _load_clv_rows(csv_path)
+    n_clv = len(clv_rows)
+    clv_plus_rate = None
+    avg_clv_pct = None
+    if n_clv > 0:
+        n_clv_plus = sum(1 for r in clv_rows if r["clv_pct"] > 0)
+        clv_plus_rate = n_clv_plus / n_clv
+        avg_clv_pct = sum(r["clv_pct"] for r in clv_rows) / n_clv
+
     return {
         "brier_score": round(bs, 6) if bs is not None else None,
         "log_loss": round(ll, 6) if ll is not None else None,
@@ -166,6 +197,9 @@ def evaluate_calibration(csv_path: pathlib.Path | None = None) -> dict:
         "n_won": n_won,
         "n_lost": n_lost,
         "hit_rate": round(hit_rate, 4) if hit_rate is not None else None,
-        "avg_predicted_prob": round(avg_pred, 4),
+        "avg_predicted_prob": round(avg_pred, 4) if n > 0 else None,
         "calibration_buckets": buckets,
+        "n_clv_tracked": n_clv,
+        "clv_plus_rate": round(clv_plus_rate, 4) if clv_plus_rate is not None else None,
+        "avg_clv_pct": round(avg_clv_pct, 4) if avg_clv_pct is not None else None,
     }

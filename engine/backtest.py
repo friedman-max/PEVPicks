@@ -26,7 +26,7 @@ CSV_COLUMNS = [
     "slip_id", "timestamp", "slip_type", "n_legs", "proj_slip_ev_pct",
     "leg_num", "player", "league", "prop", "line", "side",
     "true_prob", "ind_ev_pct", "urgency", "game_start",
-    "result", "stat_actual",
+    "closing_prob", "clv_pct", "result", "stat_actual",
 ]
 
 # Hard floor: legs with individual EV below this are never included
@@ -207,6 +207,8 @@ class BacktestLogger:
                 "ind_ev_pct":       round(_ev(bet), 4),
                 "urgency":          "NORMAL",  # urgency is now ignored entirely
                 "game_start":       bet.get("start_time", ""),
+                "closing_prob":     "",
+                "clv_pct":          "",
                 "result":           "pending",
                 "stat_actual":      "",
             })
