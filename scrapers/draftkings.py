@@ -1,6 +1,7 @@
 """
 DraftKings API scraper (Controlled Data strategy).
 Fetches lines directly from sportsbook-nash.draftkings.com.
+Includes both pre-game and live/in-progress markets.
 
 Subcategory IDs discovered via API enumeration (April 2026).
 """
@@ -202,8 +203,7 @@ async def _fetch_subcategory(
             f"AND clientMetadata/Subcategories/any(s: s/Id eq '{subcat_id}')"
         ),
         "marketsQuery": (
-            f"$filter=clientMetadata/subCategoryId eq '{subcat_id}' "
-            "AND tags/all(t: t ne 'SportcastBetBuilder')"
+            f"$filter=clientMetadata/subCategoryId eq '{subcat_id}'"
         ),
         "include": "Events",
         "entity": "events",
