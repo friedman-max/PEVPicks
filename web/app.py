@@ -548,6 +548,18 @@ def startup():
         replace_existing=True,
     )
     logger.info("Scheduler started. Auto-refresh every %d min.", _state["interval_min"])
+
+    # ── Startup recovery: finalize any missed CLV rows from when the app was down ──
+    def _startup_clv_recovery():
+        try:
+            finalized = _clv_tracker.finalize_missed()
+            if finalized:
+                logger.info("Startup CLV recovery: finalized %d missed rows", finalized)
+        except Exception as exc:
+            logger.warning("Startup CLV recovery error: %s", exc)
+
+    threading.Thread(target=_startup_clv_recovery, daemon=True).start()
+
     # Run pipeline immediately on startup so data is ready
     threading.Thread(target=run_pipeline, daemon=True).start()
 
