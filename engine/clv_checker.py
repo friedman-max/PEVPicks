@@ -98,8 +98,12 @@ class CLVTracker:
             player = row.get("player", "").lower().strip()
             prop = row.get("prop", "").lower().strip()
             side = row.get("side", "").lower().strip()
+            try:
+                line = float(row.get("line", 0))
+            except ValueError:
+                line = 0.0
 
-            key = (player, prop, side)
+            key = (player, prop, side, line)
             if key in current_probs:
                 new_cp_val = current_probs[key]
                 old_cp_str = row.get("closing_prob", "")
@@ -109,18 +113,20 @@ class CLVTracker:
                     old_cp_val = None
 
                 # Update if this is a new value or different from the old value.
-                # Tolerate small epsilon to avoid rewriting CSV for micro-rounding diffs.
                 if old_cp_val is None or abs(new_cp_val - old_cp_val) > 1e-4:
                     orig_true_prob = float(row.get("true_prob", 0))
 
                     # CLV edge: (Closing Prob - Original True Prob)
-                    # Positive CLV = market moved toward our pick = we beat the market.
                     clv_pct = new_cp_val - orig_true_prob
 
                     row["closing_prob"] = round(new_cp_val, 4)
                     row["clv_pct"] = round(clv_pct, 4)
                     updated_count += 1
                     changed = True
+                    logger.debug(
+                        "CLVTracker: Update %s %s %s @%s -> %.4f", 
+                        player, prop, side, line, new_cp_val
+                    )
 
         if changed:
             self._write_csv(self._csv_path, rows, list(fieldnames))
@@ -191,23 +197,43 @@ class CLVTracker:
 
     # ── Helpers ──────────────────────────────────────────────────────────────
 
-    def _build_current_probs(self, matches: list[Any]) -> dict[tuple[str, str, str], float]:
-        """Build a lookup: (player_lower, prop_lower, side) -> consensus probability."""
-        current_probs: dict[tuple[str, str, str], float] = {}
+    def _build_current_probs(self, matches: list[Any]) -> dict[tuple[str, str, str, float], float]:
+        """
+        Build a lookup: (player_lower, prop_lower, side, line) -> worst_case_probability.
+        
+        Only books that match the current PrizePicks line are used in the calculation.
+        Worst-case probability is used to ensure consistency with the 'True Prob' 
+        shown on the main dashboard and used for initial entry.
+        """
+        current_probs: dict[tuple[str, str, str, float], float] = {}
         for m in matches:
             if not getattr(m, "pp", None):
                 continue
 
+            # Core identifying fields from PrizePicks
             player = m.pp.player_name.lower().strip()
             prop = m.pp.stat_type.lower().strip()
+            line = float(m.pp.line_score)
             sides = ["over", "under"] if getattr(m.pp, "side", "both") == "both" else [m.pp.side]
 
-            match_books = books_from_match(m.fd, m.dk, m.pin)
+            # Line consistency check: only use books that agree with the PP line.
+            # This ensures that if FD moved the line but DK didn't, we only use
+            # the books that are still quoting the line we care about.
+            valid_fd = m.fd if (m.fd and abs(m.fd.line - line) < 1e-4) else None
+            valid_dk = m.dk if (m.dk and abs(m.dk.line - line) < 1e-4) else None
+            valid_pin = m.pin if (m.pin and abs(m.pin.line - line) < 1e-4) else None
+
+            # Only proceed if at least one book matches the PrizePicks line
+            if not any([valid_fd, valid_dk, valid_pin]):
+                continue
+
+            match_books = books_from_match(valid_fd, valid_dk, valid_pin)
 
             for side in sides:
+                # Use worst_case_prob for consistency with the rest of the app
                 consensus_prob, worst_case_prob, meta = compute_true_probability(match_books, side)
-                if consensus_prob is not None:
-                    current_probs[(player, prop, side)] = consensus_prob
+                if worst_case_prob is not None:
+                    current_probs[(player, prop, side, line)] = worst_case_prob
 
         return current_probs
 
