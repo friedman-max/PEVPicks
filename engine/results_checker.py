@@ -91,7 +91,7 @@ class ESPNResultsChecker:
         changed = False
 
         for row in rows:
-            if row.get("result") != "pending":
+            if row.get("result") not in ("pending", ""):
                 continue
 
             game_start_str = row.get("game_start", "")
