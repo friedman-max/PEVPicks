@@ -39,9 +39,14 @@ def _normalize(s: str) -> str:
     s = unidecode.unidecode(s).lower().strip()
     return s
 
-def _make_key(player: str, prop: str, side: str) -> tuple[str, str, str]:
-    """Build a unique signature for a bet leg."""
-    return (_normalize(player), _normalize(prop), _normalize(side))
+def _make_key(player: str, start_time: str) -> tuple[str, str]:
+    """Build a unique signature for a player in a specific game."""
+    # Normalize start_time to YYYY-MM-DDTHH:MM to handle tiny variations in ISO format
+    time_key = "no_time"
+    if start_time:
+        # Take first 16 chars: "2023-10-27T19:45"
+        time_key = start_time[:16]
+    return (_normalize(player), time_key)
 
 
 class BacktestLogger:
@@ -57,7 +62,7 @@ class BacktestLogger:
     """
 
     def __init__(self, csv_path: Optional[pathlib.Path] = None):
-        self.used_bets: set[tuple[str, str, str]] = set()
+        self.used_bets: set[tuple[str, str]] = set()
         self.last_reset_date: date = date.today()
         self._csv_path = csv_path or CSV_PATH
         DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -91,11 +96,10 @@ class BacktestLogger:
                     if is_recent:
                         self.used_bets.add(_make_key(
                             row.get("player", ""),
-                            row.get("prop", ""),
-                            row.get("side", "")
+                            row.get("game_start", "")
                         ))
             if self.used_bets:
-                logger.info("Backtest: rebuilt %d used-bet keys", len(self.used_bets))
+                logger.debug("Backtest: rebuilt %d used-player-game keys", len(self.used_bets))
         except Exception as exc:
             logger.warning("Backtest: could not rebuild used_players from CSV: %s", exc)
 
@@ -112,7 +116,7 @@ class BacktestLogger:
         self.used_bets = set()
         self.last_reset_date = date.today()
 
-    def used_bet_keys(self) -> set[tuple[str, str, str]]:
+    def used_bet_keys(self) -> set[tuple[str, str]]:
         return set(self.used_bets)
 
     def try_log_slip(self, bets: list[dict]) -> Optional[dict]:
@@ -131,8 +135,7 @@ class BacktestLogger:
         for bet in pool:
             p_key = _make_key(
                 bet.get("player_name", ""),
-                bet.get("prop_type", ""),
-                bet.get("side", "")
+                bet.get("start_time", "")
             )
             if p_key in self.used_bets or p_key in seen_in_this_slip:
                 continue
@@ -163,8 +166,7 @@ class BacktestLogger:
         for i, bet in enumerate(best_legs, start=1):
             p_key = _make_key(
                 bet.get("player_name", ""),
-                bet.get("prop_type", ""),
-                bet.get("side", "")
+                bet.get("start_time", "")
             )
             self.used_bets.add(p_key)
             rows.append({

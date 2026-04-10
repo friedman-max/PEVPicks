@@ -505,12 +505,12 @@ def run_pipeline():
             d["dk_odds_book"] = extras.get("dk_odds")
             d["pin_odds_book"] = extras.get("pin_odds")
             d["start_time"]   = extras.get("start_time", "")
-            # Flag bets already logged in today's backtest slips
-            bet_key = (
-                b.player_name.lower(),
-                b.prop_type.lower(),
-                b.side,
-            )
+            # Flag players already logged for this specific game
+            start_time = extras.get("start_time", "")
+            time_key = "no_time"
+            if start_time:
+                time_key = start_time[:16]
+            bet_key = (b.player_name.lower().strip(), time_key)
             d["in_backtest"] = bet_key in used_keys
             serialized_bets.append(d)
 
