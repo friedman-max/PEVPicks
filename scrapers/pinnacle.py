@@ -26,10 +26,11 @@ PINNACLE_HEADERS = {
 
 # Pinnacle league IDs per sport
 LEAGUE_CONFIG = {
-    "NBA": {"id": 487},
-    "MLB": {"id": 246},
-    "NHL": {"id": 1456},
-    "NCAAB": {"id": 493},
+    "NBA": {"id": "487"},
+    "MLB": {"id": "246"},
+    "NHL": {"id": "1456"},
+    "NCAAB": {"id": "493"},
+    "SOCCER": {"id": "1980,2663,2627,2196,2630,2462,214101"},
 }
 
 # Map Pinnacle prop-type labels → our normalized names
@@ -62,6 +63,11 @@ _PROP_TYPE_MAP = {
     "shots on goal":   "Shots on Goal",
     "saves":           "Saves",
     "power play points": "Power Play Points",
+    # Soccer
+    "shots":           "Shots",
+    "shots on target": "Shots On Target",
+    "passes":          "Passes Attempted",
+    "tackles":         "Tackles",
 }
 
 _DESC_RE = re.compile(r"^(.+?)\s*\(([^)]+)\)")
@@ -75,33 +81,29 @@ def _parse_description(desc: str) -> Tuple[Optional[str], Optional[str]]:
     m = _DESC_RE.match(desc)
     if m:
         return m.group(1).strip(), m.group(2).strip()
+    
+    if desc.endswith(" To Score"):
+        return desc[:-9].strip(), "goals"
+        
     return None, None
 
 
-async def _scrape_league(session: requests.AsyncSession, league: str) -> List[PinnacleProp]:
-    """Fetch matchups + markets for one Pinnacle league and return parsed props."""
-    config = LEAGUE_CONFIG.get(league.upper())
-    if not config:
-        return []
-
-    lid = config["id"]
-    base = "https://guest.api.arcadia.pinnacle.com/0.1"
-
-    # Fetch matchups and markets concurrently
+async def _scrape_league_id(session: requests.AsyncSession, base: str, league: str, lid: str) -> List[PinnacleProp]:
+    """Fetch matchups + markets for a specific Pinnacle league ID."""
     try:
         matchups_resp, markets_resp = await asyncio.gather(
             session.get(f"{base}/leagues/{lid}/matchups", headers=PINNACLE_HEADERS, timeout=20),
             session.get(f"{base}/leagues/{lid}/markets/straight", headers=PINNACLE_HEADERS, timeout=20),
         )
     except Exception as e:
-        logger.error("Pinnacle [%s] fetch error: %s", league, e)
+        logger.error("Pinnacle [%s/%s] fetch error: %s", league, lid, e)
         return []
 
     if matchups_resp.status_code != 200:
-        logger.error("Pinnacle [%s] matchups HTTP %d", league, matchups_resp.status_code)
+        logger.error("Pinnacle [%s/%s] matchups HTTP %d", league, lid, matchups_resp.status_code)
         return []
     if markets_resp.status_code != 200:
-        logger.error("Pinnacle [%s] markets HTTP %d", league, markets_resp.status_code)
+        logger.error("Pinnacle [%s/%s] markets HTTP %d", league, lid, markets_resp.status_code)
         return []
 
     matchups = matchups_resp.json()
@@ -150,8 +152,11 @@ async def _scrape_league(session: requests.AsyncSession, league: str) -> List[Pi
         mid = mkt.get("matchupId")
         if mid not in prop_lookup:
             continue
-        if mkt.get("type") != "total":
+            
+        mkt_type = mkt.get("type")
+        if mkt_type not in ["total", "moneyline"]:
             continue
+            
         if mkt.get("period") != 0:
             continue
 
@@ -159,16 +164,17 @@ async def _scrape_league(session: requests.AsyncSession, league: str) -> List[Pi
         prices = mkt.get("prices", [])
 
         over_odds = under_odds = None
-        line = None
+        line = 0.5 if mkt_type == "moneyline" else None
 
         for price in prices:
             pid = price.get("participantId")
             if pid == info["over_pid"]:
                 over_odds = price.get("price")
-                line = price.get("points")
+                if mkt_type == "total":
+                    line = price.get("points")
             elif pid == info["under_pid"]:
                 under_odds = price.get("price")
-                if line is None:
+                if mkt_type == "total" and line is None:
                     line = price.get("points")
 
         if line is None:
@@ -186,8 +192,27 @@ async def _scrape_league(session: requests.AsyncSession, league: str) -> List[Pi
             start_time=info.get("start_time", ""),
         ))
 
-    logger.info("Pinnacle [%s]: %d props captured", league, len(props))
     return props
+
+
+async def _scrape_league(session: requests.AsyncSession, league: str) -> List[PinnacleProp]:
+    """Fetch matchups + markets for one Pinnacle league and return parsed props."""
+    config = LEAGUE_CONFIG.get(league.upper())
+    if not config:
+        return []
+
+    league_ids = str(config["id"]).split(",")
+    base = "https://guest.api.arcadia.pinnacle.com/0.1"
+
+    tasks = [_scrape_league_id(session, base, league, lid) for lid in league_ids]
+    results = await asyncio.gather(*tasks)
+
+    all_props = []
+    for props in results:
+        all_props.extend(props)
+
+    logger.info("Pinnacle [%s]: %d props captured", league, len(all_props))
+    return all_props
 
 
 async def _scrape_all_leagues(active_leagues: dict = None) -> List[PinnacleProp]:
