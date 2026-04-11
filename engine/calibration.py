@@ -41,7 +41,7 @@ def _load_resolved_rows(csv_path: pathlib.Path | None = None) -> list[dict]:
 
     rows = []
     try:
-        with open(path, newline="", encoding="utf-8") as f:
+        with open(path, newline="", encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             for row in reader:
                 result_raw = row.get("result", "").strip().lower()
@@ -71,6 +71,11 @@ def _load_resolved_rows(csv_path: pathlib.Path | None = None) -> list[dict]:
 
     return rows
 
+# Filter historical CLV stats to start from the first verified CLV-tracked slip.
+# Older slips have missing or partial closing line data.
+START_SLIP_ID = "5D3D2A96"
+
+
 def _load_clv_rows(csv_path: pathlib.Path | None = None) -> list[dict]:
     """Read pending/resolved rows that have a closing_prob/clv_pct tracked."""
     path = csv_path or CSV_PATH
@@ -78,13 +83,26 @@ def _load_clv_rows(csv_path: pathlib.Path | None = None) -> list[dict]:
         return []
 
     rows = []
+    found_start = False
     try:
-        with open(path, newline="", encoding="utf-8") as f:
+        with open(path, newline="", encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             for row in reader:
+                # Skip rows until we reach the starting point for CLV tracking
+                if not found_start:
+                    if row.get("slip_id") == START_SLIP_ID:
+                        found_start = True
+                    else:
+                        continue
+
                 try:
-                    cp = float(row.get("closing_prob", ""))
-                    clv = float(row.get("clv_pct", ""))
+                    cp_str = row.get("closing_prob", "")
+                    clv_str = row.get("clv_pct", "")
+                    if not cp_str or not clv_str:
+                        continue
+
+                    cp = float(cp_str)
+                    clv = float(clv_str)
                     rows.append({"closing_prob": cp, "clv_pct": clv})
                 except ValueError:
                     continue
@@ -186,8 +204,10 @@ def evaluate_calibration(csv_path: pathlib.Path | None = None) -> dict:
     clv_plus_rate = None
     avg_clv_pct = None
     if n_clv > 0:
-        n_clv_plus = sum(1 for r in clv_rows if r["clv_pct"] > 0)
-        clv_plus_rate = n_clv_plus / n_clv
+        n_plus = sum(1 for r in clv_rows if r["clv_pct"] > 0)
+        n_minus = sum(1 for r in clv_rows if r["clv_pct"] < 0)
+        clv_den = n_plus + n_minus
+        clv_plus_rate = n_plus / clv_den if clv_den > 0 else None
         avg_clv_pct = sum(r["clv_pct"] for r in clv_rows) / n_clv
 
     return {
