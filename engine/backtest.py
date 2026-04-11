@@ -119,6 +119,59 @@ class BacktestLogger:
     def used_bet_keys(self) -> set[tuple[str, str]]:
         return set(self.used_bets)
 
+    def remove_slip(self, slip_id: str) -> int:
+        """
+        Remove all rows for a given slip_id from the CSV and un-mark
+        the corresponding player-game keys from used_bets.
+
+        Returns the number of rows removed.
+        """
+        if not self._csv_path.exists():
+            return 0
+
+        try:
+            with open(self._csv_path, "r", encoding="utf-8-sig") as f:
+                reader = csv.DictReader(f)
+                fieldnames = reader.fieldnames
+                all_rows = list(reader)
+        except Exception as exc:
+            logger.error("Backtest remove_slip: cannot read CSV: %s", exc)
+            return 0
+
+        keep_rows = []
+        removed_rows = []
+        for row in all_rows:
+            if row.get("slip_id") == slip_id:
+                removed_rows.append(row)
+            else:
+                keep_rows.append(row)
+
+        if not removed_rows:
+            logger.warning("Backtest remove_slip: slip_id %s not found", slip_id)
+            return 0
+
+        # Un-mark players from used_bets so they become available again
+        for row in removed_rows:
+            key = _make_key(row.get("player", ""), row.get("game_start", ""))
+            self.used_bets.discard(key)
+
+        # Atomically rewrite CSV
+        tmp = self._csv_path.with_suffix(".tmp")
+        try:
+            with open(tmp, "w", newline="", encoding="utf-8-sig") as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames or CSV_COLUMNS)
+                writer.writeheader()
+                writer.writerows(keep_rows)
+            tmp.replace(self._csv_path)
+        except Exception as exc:
+            logger.error("Backtest remove_slip: CSV rewrite failed: %s", exc)
+            if tmp.exists():
+                tmp.unlink()
+            return 0
+
+        logger.info("Backtest: removed slip %s (%d rows)", slip_id, len(removed_rows))
+        return len(removed_rows)
+
     def try_log_slip(self, bets: list[dict]) -> Optional[dict]:
         """Build and log the best available 6-leg power slip with unique players."""
         self._midnight_reset()

@@ -1538,7 +1538,7 @@ function renderBacktest() {
   renderPagination("bt-pagination", btState, totalItems, renderBacktest);
 
   if (totalItems === 0) {
-    tbody.innerHTML = `<tr><td colspan="19" class="empty-msg">No backtest data yet. Slips will appear here as they are logged.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="20" class="empty-msg">No backtest data yet. Slips will appear here as they are logged.</td></tr>`;
     return;
   }
 
@@ -1572,7 +1572,12 @@ function renderBacktest() {
       }
     }
 
+    const deleteBtn = isFirst
+      ? `<button class="btn-delete-slip" data-slip-id="${l.slip_id}" title="Remove this slip">🗑</button>`
+      : "";
+
     return `<tr class="${isFirst ? "slip-first" : ""}">
+      <td>${deleteBtn}</td>
       <td><code>${l.slip_id || ""}</code></td>
       <td>${ts}</td>
       <td>${l.slip_type || ""}</td>
@@ -1589,11 +1594,20 @@ function renderBacktest() {
       <td class="${clvCls}" style="font-weight:600;">${clvPctText}</td>
       <td class="ev-medium">${indEv}</td>
       <td>${l.urgency === "HIGH" ? '<span style="color:var(--yellow);font-weight:700;">HIGH</span>' : "NORMAL"}</td>
-      <td class="game-time">${gameTime}</td>
+      <td>${gameTime}</td>
       <td><span class="${resultCls}">${resultText.toUpperCase()}</span></td>
       <td>${l.stat_actual || "—"}</td>
     </tr>`;
   }).join("");
+
+  // Wire up delete buttons
+  tbody.querySelectorAll(".btn-delete-slip").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const slipId = btn.dataset.slipId;
+      deleteBacktestSlip(slipId);
+    });
+  });
 }
 
 // Filter events
@@ -1605,6 +1619,23 @@ $("bt-filter-league").addEventListener("change", () => {
   btState.page = 1;
   renderBacktest();
 });
+
+async function deleteBacktestSlip(slipId) {
+  if (!confirm(`Remove slip ${slipId}? This will delete all legs from the backtest CSV and free those players for future slips.`)) {
+    return;
+  }
+  try {
+    const resp = await fetch(`/api/backtest/slip/${slipId}`, { method: "DELETE" });
+    if (!resp.ok) {
+      const data = await resp.json();
+      alert("Failed to remove slip: " + (data.detail || "Unknown error"));
+      return;
+    }
+    await fetchBacktest();
+  } catch (e) {
+    alert("Error removing slip: " + e.message);
+  }
+}
 
 // Download CSV
 $("btn-bt-download").addEventListener("click", () => {

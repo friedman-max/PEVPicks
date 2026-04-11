@@ -1385,6 +1385,23 @@ def add_slip_to_backtest(req: BacktestAddSlipRequest):
     return {"slip": new_slip}
 
 
+@app.delete("/api/backtest/slip/{slip_id}")
+def remove_backtest_slip(slip_id: str):
+    """Remove a slip and all its legs from the backtest CSV."""
+    removed = _backtest.remove_slip(slip_id)
+    if removed == 0:
+        raise HTTPException(status_code=404, detail=f"Slip '{slip_id}' not found.")
+
+    # Clear latest_slip if it matches the deleted slip
+    with _lock:
+        latest = _state.get("latest_slip")
+        if latest and latest.get("slip_id") == slip_id:
+            _state["latest_slip"] = None
+
+    logger.info("Removed backtest slip %s (%d rows)", slip_id, removed)
+    return {"removed": removed, "slip_id": slip_id}
+
+
 @app.get("/api/backtest/download-csv")
 def download_backtest_csv():
     """Download the backtest CSV file directly."""
