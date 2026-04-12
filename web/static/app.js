@@ -1586,7 +1586,6 @@ function renderBacktest() {
       headerHtml = `<tr class="slip-header-row">
         <td colspan="12">
           <div class="slip-header-content">
-            <button class="btn-delete-slip" data-slip-id="${l.slip_id}" title="Remove this slip">🗑</button>
             <span class="slip-header-stat">
               <span class="slip-header-label">Slip</span>
               <span class="slip-header-id">${l.slip_id}</span>
@@ -1626,15 +1625,6 @@ function renderBacktest() {
       <td>${l.stat_actual || "—"}</td>
     </tr>`;
   }).join("");
-
-  // Wire up delete buttons
-  tbody.querySelectorAll(".btn-delete-slip").forEach(btn => {
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const slipId = btn.dataset.slipId;
-      deleteBacktestSlip(slipId);
-    });
-  });
 }
 
 // Filter events
@@ -1646,23 +1636,6 @@ $("bt-filter-league").addEventListener("change", () => {
   btState.page = 1;
   renderBacktest();
 });
-
-async function deleteBacktestSlip(slipId) {
-  if (!confirm(`Remove slip ${slipId}? This will delete all legs from the backtest CSV and free those players for future slips.`)) {
-    return;
-  }
-  try {
-    const resp = await fetch(`/api/backtest/slip/${slipId}`, { method: "DELETE" });
-    if (!resp.ok) {
-      const data = await resp.json();
-      alert("Failed to remove slip: " + (data.detail || "Unknown error"));
-      return;
-    }
-    await fetchBacktest();
-  } catch (e) {
-    alert("Error removing slip: " + e.message);
-  }
-}
 
 // Download CSV
 $("btn-bt-download").addEventListener("click", () => {
