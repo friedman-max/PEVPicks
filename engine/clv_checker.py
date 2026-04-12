@@ -34,7 +34,7 @@ POST_START_GRACE_MINUTES = 30
 # How long after game start (in hours) before we consider CLV as "missed" and
 # finalize with a fallback. This prevents rows from being stuck empty forever
 # when the app wasn't running during the tracking window.
-MISSED_CUTOFF_HOURS = 4
+MISSED_CUTOFF_HOURS = 1
 
 
 class CLVTracker:
@@ -240,7 +240,7 @@ class CLVTracker:
     def _read_csv(self) -> tuple[list[dict], list[str] | None]:
         """Read the backtest CSV. Returns (rows, fieldnames) or ([], None) on error."""
         try:
-            with open(self._csv_path, "r", encoding="utf-8") as f:
+            with open(self._csv_path, "r", encoding="utf-8-sig") as f:
                 rows = list(csv.DictReader(f))
         except Exception as exc:
             logger.error("CLVTracker: cannot read CSV: %s", exc)
@@ -255,7 +255,7 @@ class CLVTracker:
         """Atomically rewrite the CSV (write to .tmp then rename)."""
         tmp = csv_path.with_suffix(".tmp")
         try:
-            with open(tmp, "w", newline="", encoding="utf-8") as f:
+            with open(tmp, "w", newline="", encoding="utf-8-sig") as f:
                 w = csv.DictWriter(f, fieldnames=fieldnames)
                 w.writeheader()
                 w.writerows(rows)

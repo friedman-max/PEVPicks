@@ -560,8 +560,9 @@ def run_pipeline():
         def _update_clv_bg():
             try:
                 updated = _clv_tracker.update_closing_lines(matches)
-                if updated:
-                    logger.info("CLVTracker: %d rows updated in background", updated)
+                finalized = _clv_tracker.finalize_missed()
+                if updated or finalized:
+                    logger.info("CLVTracker: %d updated, %d finalized in background", updated, finalized)
             except Exception as clv_exc:
                 logger.warning("CLVTracker background error: %s", clv_exc)
 
@@ -1324,6 +1325,7 @@ def add_slip_to_backtest(req: BacktestAddSlipRequest):
 
         rows = []
         for i, b in enumerate(backtest_bets, start=1):
+            true_p = round(float(b.get("true_prob") or 0), 4)
             rows.append({
                 "slip_id":          slip_id,
                 "timestamp":        timestamp,
@@ -1336,9 +1338,11 @@ def add_slip_to_backtest(req: BacktestAddSlipRequest):
                 "prop":             b.get("prop_type", ""),
                 "line":             b.get("pp_line", ""),
                 "side":             b.get("side", ""),
-                "true_prob":        round(float(b.get("true_prob") or 0), 4),
+                "true_prob":        true_p,
                 "ind_ev_pct":       round(float(b.get("individual_ev_pct") or 0), 4),
                 "game_start":       b.get("start_time", ""),
+                "closing_prob":     true_p,
+                "clv_pct":          0.0,
                 "result":           "pending",
                 "stat_actual":      "",
             })
@@ -1370,6 +1374,8 @@ def add_slip_to_backtest(req: BacktestAddSlipRequest):
                     "true_prob":  r["true_prob"],
                     "ind_ev_pct": r["ind_ev_pct"],
                     "game_start": r["game_start"],
+                    "closing_prob": r["closing_prob"],
+                    "clv_pct":      r["clv_pct"],
                 }
                 for r in rows
             ],

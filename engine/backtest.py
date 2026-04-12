@@ -277,6 +277,7 @@ class BacktestLogger:
                 bet.get("start_time", "")
             )
             self.used_bets.add(p_key)
+            true_p = round(float(bet.get("true_prob") or 0), 4)
             rows.append({
                 "slip_id":          slip_id,
                 "timestamp":        timestamp,
@@ -289,11 +290,11 @@ class BacktestLogger:
                 "prop":             bet.get("prop_type", ""),
                 "line":             bet.get("pp_line", ""),
                 "side":             bet.get("side", ""),
-                "true_prob":        round(float(bet.get("true_prob") or 0), 4),
+                "true_prob":        true_p,
                 "ind_ev_pct":       round(_ev(bet), 4),
                 "game_start":       bet.get("start_time", ""),
-                "closing_prob":     "",
-                "clv_pct":          "",
+                "closing_prob":     true_p,
+                "clv_pct":          0.0,
                 "result":           "pending",
                 "stat_actual":      "",
             })
