@@ -30,6 +30,7 @@ from engine.matcher import match_props
 from engine.backtest import BacktestLogger
 from engine.results_checker import ESPNResultsChecker
 from engine.clv_checker import CLVTracker
+from engine.persistence import sync_state_to_supabase, load_state_from_supabase
 from engine.devig import (
     american_to_implied as _american_to_implied,
     devig_single_sided_scaled,
@@ -532,6 +533,19 @@ def run_pipeline():
             _state["_prev_pin_raw"] = pin_props
         logger.info("Pipeline complete: %d +EV bets found.", len(bets))
 
+        # ── Supabase Sync: Persist the new state for instant load on restart ──
+        def _sync_all():
+            sync_state_to_supabase("bets", serialized_bets)
+            sync_state_to_supabase("matches", serialized_matches)
+            sync_state_to_supabase("pp_lines", serialized_pp)
+            sync_state_to_supabase("fd_lines", serialized_fd)
+            sync_state_to_supabase("dk_lines", serialized_dk)
+            sync_state_to_supabase("pin_lines", serialized_pin)
+            if _state["last_refresh"]:
+                sync_state_to_supabase("last_refresh", _state["last_refresh"].isoformat())
+        
+        threading.Thread(target=_sync_all, daemon=True).start()
+
         # ── Backtest: try to log a new slip from the freshly computed bets ──
         if len(serialized_bets) >= 3:
             try:
@@ -633,6 +647,25 @@ def startup():
 
     # Run pipeline immediately on startup so data is ready
     threading.Thread(target=run_pipeline, daemon=True).start()
+
+    # ── Startup recovery: load cached state from Supabase ──
+    def _seed_state_from_db():
+        logger.info("Startup: Seeding state from Supabase cache...")
+        keys = ["bets", "matches", "pp_lines", "fd_lines", "dk_lines", "pin_lines", "last_refresh"]
+        for k in keys:
+            data, updated_at = load_state_from_supabase(k)
+            if data is not None:
+                with _lock:
+                    if k == "last_refresh":
+                        try:
+                            _state[k] = datetime.fromisoformat(data)
+                        except:
+                            _state[k] = None
+                    else:
+                        _state[k] = data
+        logger.info("Startup: Seeding complete.")
+
+    threading.Thread(target=_seed_state_from_db, daemon=True).start()
 
 
 @app.on_event("shutdown")
@@ -878,6 +911,7 @@ def _run_pp_scrape():
         with _lock:
             _state["pp_lines"] = serialized
             _state["_prev_pp_raw"] = pp_lines
+        sync_state_to_supabase("pp_lines", serialized)
         logger.info("PrizePicks-only scrape complete: %d lines.", len(serialized))
     except Exception as e:
         logger.exception("PrizePicks scrape error: %s", e)
@@ -961,6 +995,7 @@ def _run_fd_scrape():
         with _lock:
             _state["fd_lines"] = serialized
             _state["_prev_fd_raw"] = fd_props
+        sync_state_to_supabase("fd_lines", serialized)
         logger.info("FanDuel scrape complete: %d lines.", len(serialized))
     except Exception as e:
         logger.exception("FanDuel scrape error: %s", e)
@@ -1045,6 +1080,7 @@ def _run_dk_scrape():
         with _lock:
             _state["dk_lines"] = serialized
             _state["_prev_dk_raw"] = dk_props
+        sync_state_to_supabase("dk_lines", serialized)
         logger.info("DraftKings scrape complete: %d lines.", len(serialized))
     except Exception as e:
         logger.exception("DraftKings scrape error: %s", e)
@@ -1129,6 +1165,7 @@ def _run_pin_scrape():
         with _lock:
             _state["pin_lines"] = serialized
             _state["_prev_pin_raw"] = pin_props
+        sync_state_to_supabase("pin_lines", serialized)
         logger.info("Pinnacle scrape complete: %d lines.", len(serialized))
     except Exception as e:
         logger.exception("Pinnacle scrape error: %s", e)
