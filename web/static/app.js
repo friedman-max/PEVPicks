@@ -1622,7 +1622,7 @@ function renderBacktest() {
       <td class="ev-medium">${indEv}</td>
       <td>${gameTime}</td>
       <td><span class="${resultCls}">${resultText.toUpperCase()}</span></td>
-      <td>${l.stat_actual || "—"}</td>
+      <td>${(l.stat_actual !== null && l.stat_actual !== undefined && l.stat_actual !== "") ? l.stat_actual : "—"}</td>
     </tr>`;
   }).join("");
 }
