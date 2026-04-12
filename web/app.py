@@ -650,6 +650,7 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 @app.get("/health")
+@app.head("/health")
 def health():
     return {"status": "ok"}
 
