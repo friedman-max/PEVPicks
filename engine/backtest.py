@@ -40,13 +40,37 @@ def _normalize(s: str) -> str:
     s = unidecode.unidecode(s).lower().strip()
     return s
 
-def _make_key(player: str, start_time: str) -> tuple[str, str]:
-    """Build a unique signature for a player in a specific game."""
-    # Normalize start_time to YYYY-MM-DDTHH:MM to handle tiny variations in ISO format
+def make_bet_key(player: str, start_time: str) -> tuple[str, str]:
+    """Build a unique signature for a player in a specific game (UTC-normalized)."""
     time_key = "no_time"
     if start_time:
-        # Take first 16 chars: "2023-10-27T19:45"
-        time_key = start_time[:16]
+        try:
+            # Handle standard ISO formats (with or without offset)
+            # fromisoformat handles '2023-10-27T19:45:00-04:00' and '2023-10-27T23:45:00+00:00'
+            # We replace ' ' with 'T' for consistent ISO parsing
+            clean_ts = start_time.replace(" ", "T")
+            
+            # Python 3.11+ handles the 'Z' suffix, but for older versions we replace it
+            if clean_ts.endswith("Z"):
+                clean_ts = clean_ts[:-1] + "+00:00"
+                
+            dt = datetime.fromisoformat(clean_ts)
+            
+            # If naive, assume it's already UTC (common for scrapers) OR Eastern if we wanted to be specific,
+            # but usually scrapers without offsets are UTC or intended to be.
+            # Convert to UTC
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            else:
+                dt = dt.astimezone(timezone.utc)
+            
+            # Format back to a string key: YYYY-MM-DDTHH:MM
+            time_key = dt.strftime("%Y-%m-%dT%H:%M")
+        except Exception as e:
+            # Fallback for malformed strings: take first 10-16 chars if parsing fails
+            logger.warning("Backtest: _make_key failed to parse '%s': %s", start_time, e)
+            time_key = start_time[:16] if start_time else "no_time"
+
     return (_normalize(player), time_key)
 
 
@@ -134,7 +158,7 @@ class BacktestLogger:
 
     def sync_from_supabase(self) -> None:
         """
-        Pull the latest 100 legs from Supabase and rebuild backtest.csv.
+        Pull the latest 1000 legs from Supabase and rebuild backtest.csv.
         Crucial for ephemeral hosting (Render) where local files are wiped.
         """
         db = get_db()
@@ -143,9 +167,9 @@ class BacktestLogger:
 
         try:
             logger.info("Backtest: Syncing from Supabase to rebuild local CSV...")
-            # 1. Fetch latest 100 legs
+            # 1. Fetch latest 1000 legs (expanded window for better deduplication)
             # Use 'id' if serial, otherwise order by created_at or just get latest
-            res = db.table("legs").select("*").order("slip_id", desc=True).limit(100).execute()
+            res = db.table("legs").select("*").order("slip_id", desc=True).limit(1000).execute()
             legs = res.data
             if not legs:
                 return
@@ -213,7 +237,7 @@ class BacktestLogger:
                             is_recent = True
                             break
                     if is_recent:
-                        self.used_bets.add(_make_key(
+                        self.used_bets.add(make_bet_key(
                             row.get("player", ""),
                             row.get("game_start", "")
                         ))
@@ -271,7 +295,7 @@ class BacktestLogger:
 
         # Un-mark players from used_bets so they become available again
         for row in removed_rows:
-            key = _make_key(row.get("player", ""), row.get("game_start", ""))
+            key = make_bet_key(row.get("player", ""), row.get("game_start", ""))
             self.used_bets.discard(key)
 
         # Atomically rewrite CSV
@@ -314,7 +338,7 @@ class BacktestLogger:
         seen_in_this_slip = set()
         
         for bet in pool:
-            p_key = _make_key(
+            p_key = make_bet_key(
                 bet.get("player_name", ""),
                 bet.get("start_time", "")
             )
@@ -345,7 +369,7 @@ class BacktestLogger:
 
         rows = []
         for i, bet in enumerate(best_legs, start=1):
-            p_key = _make_key(
+            p_key = make_bet_key(
                 bet.get("player_name", ""),
                 bet.get("start_time", "")
             )

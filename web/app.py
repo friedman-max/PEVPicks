@@ -27,7 +27,7 @@ import statistics
 import config as cfg
 from engine.ev_calculator import BetResult, calculate_slip, evaluate_match
 from engine.matcher import match_props
-from engine.backtest import BacktestLogger
+from engine.backtest import BacktestLogger, make_bet_key
 from engine.results_checker import ESPNResultsChecker
 from engine.clv_checker import CLVTracker
 from engine.persistence import sync_state_to_supabase, load_state_from_supabase
@@ -508,10 +508,7 @@ def run_pipeline():
             d["start_time"]   = extras.get("start_time", "")
             # Flag players already logged for this specific game
             start_time = extras.get("start_time", "")
-            time_key = "no_time"
-            if start_time:
-                time_key = start_time[:16]
-            bet_key = (b.player_name.lower().strip(), time_key)
+            bet_key = make_bet_key(b.player_name, start_time)
             d["in_backtest"] = bet_key in used_keys
             serialized_bets.append(d)
 
