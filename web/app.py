@@ -78,7 +78,7 @@ _state = {
     "is_scraping_dk": False,
     "is_scraping_pin": False,
     "scrape_errors": {},        # league -> error str | None
-    "interval_min":  1,
+    "interval_min":  5,
     "min_ev_pct":    -10.0,
     "active_leagues": dict(cfg.ACTIVE_LEAGUES),
     # Raw prop objects from last successful scrape (for fallback)

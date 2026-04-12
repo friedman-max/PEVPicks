@@ -32,12 +32,7 @@ const state = {
 const $ = id => document.getElementById(id);
 const tbody           = $("bets-tbody");
 const totalBadge      = $("total-badge");
-const statusDot       = $("status-dot");
-const statusLabel     = $("status-label");
-const lastRefreshEl   = $("last-refresh");
-const nextRefreshEl   = $("next-refresh");
 const selectedCountEl = $("selected-count");
-const btnRefresh      = $("btn-refresh");
 const btnBuildSlip       = $("btn-build-slip");
 const btnAddToBacktest   = $("btn-add-to-backtest");
 const btnCalculate       = $("btn-calculate");
@@ -226,15 +221,15 @@ function renderTable() {
 
     return `<tr class="${rowClass}" data-id="${b.bet_id}">
       <td><input type="checkbox" class="row-chk" data-id="${b.bet_id}" ${checked} /></td>
-      <td>${b.player_name}${loggedBadge}</td>
-      <td>${b.league}</td>
-      <td>${b.prop_type}</td>
-      <td>${b.pp_line}${lineDiff}</td>
-      <td class="side-${b.side}">${b.side.toUpperCase()}</td>
-      <td>${fmt.trueOdds(b.true_odds)}</td>
-      <td class="${evClass(b.edge)}">${fmt.pct(b.edge)}</td>
-      <td class="${evClass(b.individual_ev_pct)}">${fmt.pct(b.individual_ev_pct)}</td>
-      <td style="color:var(--text-muted)">${bookOddsHtml}</td>
+      <td data-label="Player">${b.player_name}${loggedBadge}</td>
+      <td data-label="League">${b.league}</td>
+      <td data-label="Prop">${b.prop_type}</td>
+      <td data-label="Line">${b.pp_line}${lineDiff}</td>
+      <td data-label="Side" class="side-${b.side}">${b.side.toUpperCase()}</td>
+      <td data-label="True Odds">${fmt.trueOdds(b.true_odds)}</td>
+      <td data-label="Edge" class="${evClass(b.edge)}">${fmt.pct(b.edge)}</td>
+      <td data-label="Ind. EV%" class="${evClass(b.individual_ev_pct)}">${fmt.pct(b.individual_ev_pct)}</td>
+      <td data-label="Book Odds" style="color:var(--text-muted)">${bookOddsHtml}</td>
     </tr>`;
   }).join("");
 
@@ -495,16 +490,13 @@ async function fetchStatus() {
     const resp = await fetch("/api/status");
     const data = await resp.json();
 
-    // Update status dot + label
-    if (data.is_scraping) {
-      statusDot.className   = "status-dot scraping";
-      statusLabel.textContent = "Scraping…";
-      btnRefresh.disabled   = true;
-    } else {
-      statusDot.className   = "status-dot idle";
-      statusLabel.textContent = "Idle";
-      btnRefresh.disabled   = false;
+// Add Slip Panel drawer toggle for mobile
+$("slip-panel").querySelector("h2").addEventListener("click", () => {
+    if (window.innerWidth <= 900) {
+        $("slip-panel").classList.toggle("open");
     }
+});
+    // UI updates removed
 
     // Detect scraping just finished → fetch fresh bets
     if (state.isScrapingPrev && !data.is_scraping) {
@@ -514,78 +506,18 @@ async function fetchStatus() {
       await fetchFD();
       await fetchDK();
       await fetchPin();
+      await fetchBacktest();
+      await fetchCalibration();
     }
     state.isScrapingPrev = data.is_scraping;
 
-    lastRefreshEl.textContent = data.last_refresh
-      ? "Updated " + fmt.time(data.last_refresh)
-      : "Never refreshed";
-
-    if (data.next_refresh && !data.is_scraping) {
-      const secs = Math.max(0, Math.round((new Date(data.next_refresh) - Date.now()) / 1000));
-      const mm   = String(Math.floor(secs / 60)).padStart(2, "0");
-      const ss   = String(secs % 60).padStart(2, "0");
-      nextRefreshEl.textContent = `Next: ${mm}:${ss}`;
-    } else {
-      nextRefreshEl.textContent = "";
-    }
-
+    // UI updates removed
   } catch (e) {
-    statusDot.className = "status-dot error";
-    statusLabel.textContent = "Server error";
+    // Silent fail
   }
 }
 
-btnRefresh.addEventListener("click", async () => {
-  btnRefresh.disabled = true;
-  try {
-    await fetch("/api/refresh", { method: "POST" });
-    statusDot.className     = "status-dot scraping";
-    statusLabel.textContent = "Scraping…";
-  } catch (e) {
-    alert("Failed to start refresh: " + e.message);
-    btnRefresh.disabled = false;
-  }
-});
 
-// ── Settings modal ─────────────────────────────────────────────────────────
-$("btn-settings").addEventListener("click", async () => {
-  const resp = await fetch("/api/config");
-  const cfg  = await resp.json();
-  $("setting-interval").value = cfg.interval_min;
-  $("settings-modal").classList.remove("hidden");
-});
-
-["btn-close-settings", "btn-cancel-settings"].forEach(id => {
-  $(id).addEventListener("click", () => $("settings-modal").classList.add("hidden"));
-});
-
-$("btn-save-settings").addEventListener("click", async () => {
-  try {
-    const btn = $("btn-save-settings");
-    btn.disabled = true;
-    btn.textContent = "Saving...";
-    
-    const resp = await fetch("/api/config", {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({
-        interval_min:   parseInt($("setting-interval").value),
-        min_ev_pct:     -10.0
-      }),
-    });
-    
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    $("settings-modal").classList.add("hidden");
-    
-  } catch (e) {
-    alert("Error saving settings: " + e.message);
-  } finally {
-    const btn = $("btn-save-settings");
-    btn.disabled = false;
-    btn.textContent = "Save";
-  }
-});
 
 // ── Tab switching ─────────────────────────────────────────────────────────
 document.querySelectorAll(".tab").forEach(tab => {
@@ -751,17 +683,17 @@ function renderMatchedTable() {
     const sideClass = l.side === "over" ? "side-over" : "side-under";
     
     return `<tr>
-      <td>${l.player_name}</td>
-      <td><span class="league-tag league-${l.league}">${l.league}</span></td>
-      <td>${l.stat_type}</td>
-      <td class="line-value">${l.pp_line}${lineDiff}</td>
-      <td class="${sideClass}">${l.side.toUpperCase()}</td>
-      <td class="line-value">${fmt.trueOdds(l.true_odds)}</td>
-      <td class="line-value">${fmt.odds(l.best_odds)}</td>
-      <td class="line-value">${fmt.odds(l.fd_odds)}</td>
-      <td class="line-value">${fmt.odds(l.dk_odds)}</td>
-      <td class="line-value">${fmt.odds(l.pin_odds)}</td>
-      <td class="game-time">${gameTime}</td>
+      <td data-label="Player">${l.player_name}</td>
+      <td data-label="League"><span class="league-tag league-${l.league}">${l.league}</span></td>
+      <td data-label="Prop">${l.stat_type}</td>
+      <td data-label="Line" class="line-value">${l.pp_line}${lineDiff}</td>
+      <td data-label="Side" class="${sideClass}">${l.side.toUpperCase()}</td>
+      <td data-label="True Odds" class="line-value">${fmt.trueOdds(l.true_odds)}</td>
+      <td data-label="Best Odds" class="line-value">${fmt.odds(l.best_odds)}</td>
+      <td data-label="FD Odds" class="line-value">${fmt.odds(l.fd_odds)}</td>
+      <td data-label="DK Odds" class="line-value">${fmt.odds(l.dk_odds)}</td>
+      <td data-label="PIN Odds" class="line-value">${fmt.odds(l.pin_odds)}</td>
+      <td data-label="Game Time" class="game-time">${gameTime}</td>
     </tr>`;
   }).join("");
 }
@@ -909,9 +841,7 @@ function renderPPTable() {
   ppTotalBadge.textContent = `${totalItems} lines`;
 
   if (totalItems === 0) {
-    ppTbody.innerHTML = `<tr><td colspan="6" class="empty-msg">
-      ${ppState.allLines.length === 0 ? 'Click "Load PrizePicks Lines" to fetch data.' : "No lines match current filters."}
-    </td></tr>`;
+    ppTbody.innerHTML = `<tr><td colspan="6" class="empty-msg">No lines match current filters.</td></tr>`;
     return;
   }
 
@@ -923,48 +853,16 @@ function renderPPTable() {
         " " + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     }
     return `<tr>
-      <td>${l.player_name}</td>
-      <td><span class="league-tag league-${l.league}">${l.league}</span></td>
-      <td>${l.stat_type}</td>
-      <td class="line-value">${l.line_score}</td>
-      <td class="side-${l.side}">${l.side.toUpperCase()}</td>
-      <td class="game-time">${gameTime}</td>
+      <td data-label="Player">${l.player_name}</td>
+      <td data-label="League"><span class="league-tag league-${l.league}">${l.league}</span></td>
+      <td data-label="Prop">${l.stat_type}</td>
+      <td data-label="Line" class="line-value">${l.line_score}</td>
+      <td data-label="Side" class="side-${l.side}">${l.side.toUpperCase()}</td>
+      <td data-label="Game Time" class="game-time">${gameTime}</td>
     </tr>`;
   }).join("");
 }
 
-// Load button
-$("btn-load-pp").addEventListener("click", async () => {
-  const btn = $("btn-load-pp");
-  btn.disabled = true;
-  btn.textContent = "Loading...";
-  ppStatusLabel.textContent = "Fetching from PrizePicks...";
-
-  try {
-    // Trigger scrape
-    await fetch("/api/prizepicks/refresh", { method: "POST" });
-
-    // Poll until done
-    let done = false;
-    while (!done) {
-      await new Promise(r => setTimeout(r, 2000));
-      const resp = await fetch("/api/prizepicks");
-      const data = await resp.json();
-      if (!data.is_scraping) {
-        ppState.allLines = data.lines || [];
-        done = true;
-      }
-    }
-
-    ppStatusLabel.textContent = `Loaded at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
-    applyPPFilters();
-  } catch (e) {
-    ppStatusLabel.textContent = "Error: " + e.message;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Load PrizePicks Lines";
-  }
-});
 
 // ── FanDuel Lines ──────────────────────────────────────────────────────
 const fdState = {
@@ -1054,9 +952,7 @@ function renderFDTable() {
   fdTotalBadge.textContent = `${totalItems} lines`;
 
   if (totalItems === 0) {
-    fdTbody.innerHTML = `<tr><td colspan="8" class="empty-msg">
-      ${fdState.allLines.length === 0 ? 'Click "Load FanDuel Lines" to fetch data.' : "No lines match current filters."}
-    </td></tr>`;
+    fdTbody.innerHTML = `<tr><td colspan="8" class="empty-msg">No lines match current filters.</td></tr>`;
     return;
   }
 
@@ -1068,50 +964,18 @@ function renderFDTable() {
         " " + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     }
     return `<tr>
-      <td>${l.player_name}</td>
-      <td><span class="league-tag league-${l.league}">${l.league}</span></td>
-      <td>${l.stat_type}</td>
-      <td class="line-value">${l.line_score}</td>
-      <td class="side-${l.side}">${l.side.toUpperCase()}</td>
-      <td class="line-value">${fmt.trueOdds(l.true_odds)}</td>
-      <td class="line-value">${fmt.odds(l.line_odds)}</td>
-      <td class="game-time">${gameTime}</td>
+      <td data-label="Player">${l.player_name}</td>
+      <td data-label="League"><span class="league-tag league-${l.league}">${l.league}</span></td>
+      <td data-label="Prop">${l.stat_type}</td>
+      <td data-label="Line" class="line-value">${l.line_score}</td>
+      <td data-label="Side" class="side-${l.side}">${l.side.toUpperCase()}</td>
+      <td data-label="True Odds" class="line-value">${fmt.trueOdds(l.true_odds)}</td>
+      <td data-label="Book Odds" class="line-value">${fmt.odds(l.line_odds)}</td>
+      <td data-label="Game Time" class="game-time">${gameTime}</td>
     </tr>`;
   }).join("");
 }
 
-// Load button
-$("btn-load-fd").addEventListener("click", async () => {
-  const btn = $("btn-load-fd");
-  btn.disabled = true;
-  btn.textContent = "Loading...";
-  fdStatusLabel.textContent = "Fetching FanDuel...";
-
-  try {
-    // Trigger scrape
-    await fetch("/api/fanduel/refresh", { method: "POST" });
-
-    // Poll until done
-    let done = false;
-    while (!done) {
-      await new Promise(r => setTimeout(r, 2000));
-      const resp = await fetch("/api/fanduel");
-      const data = await resp.json();
-      if (!data.is_scraping) {
-        fdState.allLines = data.lines || [];
-        done = true;
-      }
-    }
-
-    fdStatusLabel.textContent = `Loaded at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
-    applyFDFilters();
-  } catch (e) {
-    fdStatusLabel.textContent = "Error: " + e.message;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Load FanDuel Lines";
-  }
-});
 
 // ── DraftKings Lines ──────────────────────────────────────────────────────
 const dkState = {
@@ -1201,9 +1065,7 @@ function renderDKTable() {
   dkTotalBadge.textContent = `${totalItems} lines`;
 
   if (totalItems === 0) {
-    dkTbody.innerHTML = `<tr><td colspan="8" class="empty-msg">
-      ${dkState.allLines.length === 0 ? 'Click "Load DraftKings Lines" to fetch data.' : "No lines match current filters."}
-    </td></tr>`;
+    dkTbody.innerHTML = `<tr><td colspan="8" class="empty-msg">No lines match current filters.</td></tr>`;
     return;
   }
 
@@ -1215,50 +1077,18 @@ function renderDKTable() {
         " " + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     }
     return `<tr>
-      <td>${l.player_name}</td>
-      <td><span class="league-tag league-${l.league}">${l.league}</span></td>
-      <td>${l.stat_type}</td>
-      <td class="line-value">${l.line_score}</td>
-      <td class="side-${l.side}">${l.side.toUpperCase()}</td>
-      <td class="line-value">${fmt.trueOdds(l.true_odds)}</td>
-      <td class="line-value">${fmt.odds(l.line_odds)}</td>
-      <td class="game-time">${gameTime}</td>
+      <td data-label="Player">${l.player_name}</td>
+      <td data-label="League"><span class="league-tag league-${l.league}">${l.league}</span></td>
+      <td data-label="Prop">${l.stat_type}</td>
+      <td data-label="Line" class="line-value">${l.line_score}</td>
+      <td data-label="Side" class="side-${l.side}">${l.side.toUpperCase()}</td>
+      <td data-label="True Odds" class="line-value">${fmt.trueOdds(l.true_odds)}</td>
+      <td data-label="Book Odds" class="line-value">${fmt.odds(l.line_odds)}</td>
+      <td data-label="Game Time" class="game-time">${gameTime}</td>
     </tr>`;
   }).join("");
 }
 
-// Load button
-$("btn-load-dk").addEventListener("click", async () => {
-  const btn = $("btn-load-dk");
-  btn.disabled = true;
-  btn.textContent = "Loading...";
-  dkStatusLabel.textContent = "Fetching DraftKings...";
-
-  try {
-    // Trigger scrape
-    await fetch("/api/draftkings/refresh", { method: "POST" });
-
-    // Poll until done
-    let done = false;
-    while (!done) {
-      await new Promise(r => setTimeout(r, 2000));
-      const resp = await fetch("/api/draftkings");
-      const data = await resp.json();
-      if (!data.is_scraping) {
-        dkState.allLines = data.lines || [];
-        done = true;
-      }
-    }
-
-    dkStatusLabel.textContent = `Loaded at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
-    applyDKFilters();
-  } catch (e) {
-    dkStatusLabel.textContent = "Error: " + e.message;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Load DraftKings Lines";
-  }
-});
 
 // ── Pinnacle Lines ──────────────────────────────────────────────────────
 const pinState = {
@@ -1348,9 +1178,7 @@ function renderPinTable() {
   pinTotalBadge.textContent = `${totalItems} lines`;
 
   if (totalItems === 0) {
-    pinTbody.innerHTML = `<tr><td colspan="8" class="empty-msg">
-      ${pinState.allLines.length === 0 ? 'Click "Load Pinnacle Lines" to fetch data.' : "No lines match current filters."}
-    </td></tr>`;
+    pinTbody.innerHTML = `<tr><td colspan="8" class="empty-msg">No lines match current filters.</td></tr>`;
     return;
   }
 
@@ -1362,50 +1190,18 @@ function renderPinTable() {
         " " + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     }
     return `<tr>
-      <td>${l.player_name}</td>
-      <td><span class="league-tag league-${l.league}">${l.league}</span></td>
-      <td>${l.stat_type}</td>
-      <td class="line-value">${l.line_score}</td>
-      <td class="side-${l.side}">${l.side.toUpperCase()}</td>
-      <td class="line-value">${fmt.trueOdds(l.true_odds)}</td>
-      <td class="line-value">${fmt.odds(l.line_odds)}</td>
-      <td class="game-time">${gameTime}</td>
+      <td data-label="Player">${l.player_name}</td>
+      <td data-label="League"><span class="league-tag league-${l.league}">${l.league}</span></td>
+      <td data-label="Prop">${l.stat_type}</td>
+      <td data-label="Line" class="line-value">${l.line_score}</td>
+      <td data-label="Side" class="side-${l.side}">${l.side.toUpperCase()}</td>
+      <td data-label="True Odds" class="line-value">${fmt.trueOdds(l.true_odds)}</td>
+      <td data-label="Book Odds" class="line-value">${fmt.odds(l.line_odds)}</td>
+      <td data-label="Game Time" class="game-time">${gameTime}</td>
     </tr>`;
   }).join("");
 }
 
-// Load button
-$("btn-load-pin").addEventListener("click", async () => {
-  const btn = $("btn-load-pin");
-  btn.disabled = true;
-  btn.textContent = "Loading...";
-  pinStatusLabel.textContent = "Fetching Pinnacle...";
-
-  try {
-    // Trigger scrape
-    await fetch("/api/pinnacle/refresh", { method: "POST" });
-
-    // Poll until done
-    let done = false;
-    while (!done) {
-      await new Promise(r => setTimeout(r, 2000));
-      const resp = await fetch("/api/pinnacle");
-      const data = await resp.json();
-      if (!data.is_scraping) {
-        pinState.allLines = data.lines || [];
-        done = true;
-      }
-    }
-
-    pinStatusLabel.textContent = `Loaded at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
-    applyPinFilters();
-  } catch (e) {
-    pinStatusLabel.textContent = "Error: " + e.message;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Load Pinnacle Lines";
-  }
-});
 
 // ── Backtest Dashboard ────────────────────────────────────────────────────
 
@@ -1474,11 +1270,6 @@ function renderBacktest() {
     : "—";
   const roiPositive = totalWagered > 0 && totalPayouts > totalWagered;
 
-  // Avg projected EV
-  const evVals = btSlips.map(s => parseFloat(s.proj_slip_ev_pct) || 0);
-  const avgEv = evVals.length > 0
-    ? ((evVals.reduce((a, b) => a + b, 0) / evVals.length) * 100).toFixed(1) + "%"
-    : "—";
 
 
 
@@ -1530,8 +1321,6 @@ function renderBacktest() {
 
   $("bt-roi").textContent = roi;
   $("bt-roi").className = "bt-card-value" + (roiPositive ? " positive" : totalWagered > 0 ? " negative" : "");
-  $("bt-avg-ev").textContent = avgEv;
-  $("bt-avg-ev").className = "bt-card-value" + (evVals.length > 0 && evVals.reduce((a, b) => a + b, 0) / evVals.length > 0 ? " positive" : "");
 
 
   // ── Table ──────────────────────────────────────────────────────────────
@@ -1611,18 +1400,18 @@ function renderBacktest() {
     }
 
     return headerHtml + `<tr>
-      <td><strong>${l.player || ""}</strong></td>
-      <td><span class="league-tag league-${(l.league || "").toUpperCase()}">${l.league || ""}</span></td>
-      <td>${l.prop || ""}</td>
-      <td class="line-value">${l.line || ""}</td>
-      <td class="${l.side === "over" ? "side-over" : "side-under"}">${(l.side || "").toUpperCase()}</td>
-      <td>${trueP}</td>
-      <td>${closeP}</td>
-      <td class="${clvCls}" style="font-weight:600;">${clvPctText}</td>
-      <td class="ev-medium">${indEv}</td>
-      <td>${gameTime}</td>
-      <td><span class="${resultCls}">${resultText.toUpperCase()}</span></td>
-      <td>${(l.stat_actual !== null && l.stat_actual !== undefined && l.stat_actual !== "") ? l.stat_actual : "—"}</td>
+      <td data-label="Player"><strong>${l.player || ""}</strong></td>
+      <td data-label="League"><span class="league-tag league-${(l.league || "").toUpperCase()}">${l.league || ""}</span></td>
+      <td data-label="Prop">${l.prop || ""}</td>
+      <td data-label="Line" class="line-value">${l.line || ""}</td>
+      <td data-label="Side" class="${l.side === "over" ? "side-over" : "side-under"}">${(l.side || "").toUpperCase()}</td>
+      <td data-label="True Prob">${trueP}</td>
+      <td data-label="Close Prob">${closeP}</td>
+      <td data-label="CLV%" class="${clvCls}" style="font-weight:600;">${clvPctText}</td>
+      <td data-label="Ind. EV%" class="ev-medium">${indEv}</td>
+      <td data-label="Game Time">${gameTime}</td>
+      <td data-label="Result"><span class="${resultCls}">${resultText.toUpperCase()}</span></td>
+      <td data-label="Actual">${(l.stat_actual !== null && l.stat_actual !== undefined && l.stat_actual !== "") ? l.stat_actual : "—"}</td>
     </tr>`;
   }).join("");
 }
@@ -1849,11 +1638,11 @@ function renderCalibration(data) {
     const alignLabel = diff > 0.02 ? "Under" : diff < -0.02 ? "Over" : "OK";
 
     return `<tr>
-      <td><div style="font-weight:700;">${b.bucket}</div></td>
-      <td style="font-family:var(--font-mono); opacity:0.8;">${predicted}</td>
-      <td style="font-family:var(--font-mono); font-weight:700;">${actual}</td>
-      <td style="opacity:0.7;">${b.count}</td>
-      <td>
+      <td data-label="Bucket"><div style="font-weight:700;">${b.bucket}</div></td>
+      <td data-label="Predicted" style="font-family:var(--font-mono); opacity:0.8;">${predicted}</td>
+      <td data-label="Actual" style="font-family:var(--font-mono); font-weight:700;">${actual}</td>
+      <td data-label="Count" style="opacity:0.7;">${b.count}</td>
+      <td data-label="Edge">
         <div style="display:flex; align-items:center; gap:6px;">
           <span class="cal-delta ${statusClass}">${diffSign}${diffPct}pp</span>
           <span class="cal-tag">${alignLabel}</span>
@@ -1884,7 +1673,6 @@ function renderCalibration(data) {
   }
 }
 
-$("btn-cal-refresh").addEventListener("click", fetchCalibration);
 
 // ── Init ───────────────────────────────────────────────────────────────────
 fetchStatus();
@@ -1894,6 +1682,8 @@ fetchPP();
 fetchFD();
 fetchDK();
 fetchPin();
+fetchBacktest();
+fetchCalibration();
 setInterval(fetchStatus, 10_000);
 setInterval(pollLatestSlip, 10_000);
 pollLatestSlip();  // check immediately on load

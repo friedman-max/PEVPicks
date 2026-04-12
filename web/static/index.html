@@ -3,9 +3,9 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>CoreProp</title>
-  <link rel="stylesheet" href="/static/style.css?v=7" />
+  <link rel="stylesheet" href="/static/style.css?v=101" />
 </head>
 
 <body>
@@ -18,16 +18,6 @@
       <span class="logo">CoreProp</span>
     </div>
     <div class="header-right">
-      <div class="status-block">
-        <span class="status-dot" id="status-dot"></span>
-        <span id="status-label">Idle</span>
-      </div>
-      <div class="refresh-info">
-        <span id="last-refresh">Never refreshed</span>
-        <span id="next-refresh"></span>
-      </div>
-      <button id="btn-refresh" class="btn btn-primary">Refresh Now</button>
-      <button id="btn-settings" class="btn btn-secondary">Settings</button>
     </div>
   </header>
 
@@ -119,10 +109,8 @@
         <input type="text" id="pp-filter-player" placeholder="e.g. LeBron" />
       </label>
       <button class="btn btn-secondary" id="btn-clear-pp-filters">Clear</button>
-      <button class="btn btn-primary" id="btn-load-pp">Load PrizePicks Lines</button>
       <span class="badge" id="pp-total-badge">0 lines</span>
       <div id="pp-pagination" class="pagination-controls"></div>
-      <span id="pp-status-label" style="color:var(--text-muted);font-size:12px;"></span>
     </div>
 
     <!-- ── Filters bar (FD tab) ── -->
@@ -144,10 +132,8 @@
         <input type="text" id="fd-filter-player" placeholder="e.g. LeBron" />
       </label>
       <button class="btn btn-secondary" id="btn-clear-fd-filters">Clear</button>
-      <button class="btn btn-primary" id="btn-load-fd">Load FanDuel Lines</button>
       <span class="badge" id="fd-total-badge">0 lines</span>
       <div id="fd-pagination" class="pagination-controls"></div>
-      <span id="fd-status-label" style="color:var(--text-muted);font-size:12px;"></span>
     </div>
 
     <!-- ── Filters bar (DK tab) ── -->
@@ -169,10 +155,8 @@
         <input type="text" id="dk-filter-player" placeholder="e.g. LeBron" />
       </label>
       <button class="btn btn-secondary" id="btn-clear-dk-filters">Clear</button>
-      <button class="btn btn-primary" id="btn-load-dk">Load DraftKings Lines</button>
       <span class="badge" id="dk-total-badge">0 lines</span>
       <div id="dk-pagination" class="pagination-controls"></div>
-      <span id="dk-status-label" style="color:var(--text-muted);font-size:12px;"></span>
     </div>
 
     <!-- ── Main layout (EV tab) ── -->
@@ -300,7 +284,7 @@
             </thead>
             <tbody id="pp-tbody">
               <tr>
-                <td colspan="6" class="empty-msg">Click "Load PrizePicks Lines" to fetch data.</td>
+                <td colspan="6" class="empty-msg">Waiting for data...</td>
               </tr>
             </tbody>
           </table>
@@ -327,7 +311,7 @@
             </thead>
             <tbody id="fd-tbody">
               <tr>
-                <td colspan="8" class="empty-msg">Click "Load FanDuel Lines" to fetch data.</td>
+                <td colspan="8" class="empty-msg">Waiting for data...</td>
               </tr>
             </tbody>
           </table>
@@ -354,7 +338,7 @@
             </thead>
             <tbody id="dk-tbody">
               <tr>
-                <td colspan="8" class="empty-msg">Click "Load DraftKings Lines" to fetch data.</td>
+                <td colspan="8" class="empty-msg">Waiting for data...</td>
               </tr>
             </tbody>
           </table>
@@ -381,10 +365,8 @@
         <input type="text" id="pin-filter-player" placeholder="e.g. LeBron" />
       </label>
       <button class="btn btn-secondary" id="btn-clear-pin-filters">Clear</button>
-      <button class="btn btn-primary" id="btn-load-pin">Load Pinnacle Lines</button>
       <span class="badge" id="pin-total-badge">0 lines</span>
       <div id="pin-pagination" class="pagination-controls"></div>
-      <span id="pin-status-label" style="color:var(--text-muted);font-size:12px;"></span>
     </div>
 
     <!-- ── Pinnacle Lines view ── -->
@@ -406,7 +388,7 @@
             </thead>
             <tbody id="pin-tbody">
               <tr>
-                <td colspan="8" class="empty-msg">Click "Load Pinnacle Lines" to fetch data.</td>
+                <td colspan="8" class="empty-msg">Waiting for data...</td>
               </tr>
             </tbody>
           </table>
@@ -469,10 +451,6 @@
         <div class="bt-card">
           <div class="bt-card-label">Actual ROI</div>
           <div class="bt-card-value" id="bt-roi">—</div>
-        </div>
-        <div class="bt-card">
-          <div class="bt-card-label">Avg Proj. EV</div>
-          <div class="bt-card-value" id="bt-avg-ev">—</div>
         </div>
 
       </div>
@@ -542,10 +520,6 @@
         </div>
       </div>
 
-      <!-- Actions -->
-      <div class="bt-actions">
-        <button class="btn btn-primary" id="btn-cal-refresh">Refresh Calibration</button>
-      </div>
 
 
       <!-- Main Content Container (Side-by-Side) -->
@@ -603,30 +577,6 @@
 
   </main>
 
-  <!-- ── Settings modal ── -->
-  <div class="modal-overlay hidden" id="settings-modal">
-    <div class="modal">
-      <div class="modal-header">
-        <h3>Settings</h3>
-        <button class="modal-close" id="btn-close-settings">&times;</button>
-      </div>
-      <div class="modal-body">
-        <label>Auto-refresh interval (minutes)
-          <select id="setting-interval">
-            <option value="1" selected>1</option>
-            <option value="5">5</option>
-            <option value="10">10</option>
-            <option value="15">15</option>
-            <option value="30">30</option>
-          </select>
-        </label>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-primary" id="btn-save-settings">Save</button>
-        <button class="btn btn-secondary" id="btn-cancel-settings">Cancel</button>
-      </div>
-    </div>
-  </div>
 
   <script src="/static/app.js?v=15"></script>
 </body>

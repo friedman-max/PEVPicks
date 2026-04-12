@@ -20,13 +20,27 @@
   --font:        'Inter', system-ui, -apple-system, sans-serif;
 }
 
-html, body { height: 100%; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.5; }
+html, body { 
+    height: 100%; 
+    display: flex; 
+    flex-direction: column; 
+    overflow: hidden; 
+    background: var(--bg); 
+    color: var(--text); 
+    font-family: var(--font); 
+    font-size: 14px; 
+    line-height: 1.5;
+    /* Prevent bouncy scrolling on mobile */
+    position: fixed;
+    width: 100%;
+}
 
 /* ── Header ── */
 header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px 20px; background: var(--surface); border-bottom: 1px solid var(--border);
   position: sticky; top: 0; z-index: 100;
+  flex-shrink: 0;
 }
 .header-left  { display: flex; align-items: center; gap: 12px; }
 .header-right { display: flex; align-items: center; gap: 14px; }
@@ -67,11 +81,17 @@ header {
 .tab-bar {
   display: flex; gap: 0; background: var(--surface); border-bottom: 1px solid var(--border);
   padding: 0 20px;
+  overflow-x: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+  flex-shrink: 0;
 }
+.tab-bar::-webkit-scrollbar { display: none; } /* Chrome/Safari */
 .tab {
   padding: 10px 20px; border: none; background: none; color: var(--text-muted);
   font-size: 13px; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;
   transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
 }
 .tab:hover { color: var(--text); }
 .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
@@ -95,8 +115,16 @@ header {
 
 /* ── Main layout ── */
 .main-layout {
-  display: grid; grid-template-columns: 1fr 300px;
+  display: grid; 
+  grid-template-columns: 1fr 300px;
   gap: 0; flex: 1; min-height: 0; overflow: hidden;
+}
+
+@media (max-width: 900px) {
+  .main-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
 }
 
 /* ── Table section ── */
@@ -439,4 +467,232 @@ tr.in-backtest.selected {
 }
 #cal-table td:last-child, #cal-table th:last-child {
   padding-right: 12px;
+}
+/* ── Mobile Responsive Overrides ── */
+/* ── Mobile Responsive Overrides ────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Global reset for mobile scrolling */
+  html, body {
+    overflow: hidden;
+    position: fixed;
+    height: 100%;
+    width: 100%;
+  }
+
+  header { 
+    padding: 10px 12px; 
+    gap: 8px;
+  }
+  .header-left { gap: 6px; }
+  .header-right { gap: 8px; }
+  .header-right .btn-primary,
+  .header-right .refresh-info,
+  #status-label { 
+    display: none !important; 
+  }
+  .logo { font-size: 16px; }
+
+  /* Navigation & Filters: Force Horizontal Scroll */
+  .tab-bar, .filters-bar:not(.hidden) {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 12px;
+    padding-bottom: 8px; /* Room for scroll if visible */
+    
+    /* Visual indicator that content continues off-screen */
+    mask-image: linear-gradient(to right, black 85%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
+  }
+  .tab-bar::-webkit-scrollbar, .filters-bar::-webkit-scrollbar { display: none; }
+  
+  .tab {
+    flex: 0 0 auto !important;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .filters-bar > * {
+    flex: 0 0 auto !important;
+  }
+  .filters-bar label {
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  /* Main Layout: Stack containers and enable internal scroll */
+  .main-layout:not(.hidden) {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .app-content {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* High Specificity Table-to-Cards Transformation */
+  .table-section .table-wrapper {
+    overflow-x: hidden !important;
+  }
+
+  #ev-view table, #matched-view table, #pp-view table, 
+  #fd-view table, #dk-view table, #pin-view table, #bt-table {
+    display: block !important;
+  }
+
+  #ev-view thead, #matched-view thead, #pp-view thead, 
+  #fd-view thead, #dk-view thead, #pin-view thead, #bt-table thead {
+    display: none !important;
+  }
+
+  #ev-view tbody, #matched-view tbody, #pp-view tbody, 
+  #fd-view tbody, #dk-view tbody, #pin-view tbody, #bt-tbody {
+    display: block !important;
+  }
+
+  #ev-view tr, #matched-view tr, #pp-view tr, 
+  #fd-view tr, #dk-view tr, #pin-view tr, #bt-tbody tr {
+    display: block !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 8px !important;
+    margin: 10px 12px !important;
+    padding: 10px !important;
+    background: var(--surface) !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
+  }
+
+  #ev-view td, #matched-view td, #pp-view td, 
+  #fd-view td, #dk-view td, #pin-view td, #bt-tbody td {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 6px 0 !important;
+    border: none !important;
+    border-bottom: 1px solid rgba(255,255,255,0.03) !important;
+    text-align: right !important;
+    white-space: normal !important;
+    min-height: 28px !important;
+  }
+
+  #ev-view td:last-child, #matched-view td:last-child, #bt-tbody td:last-child {
+    border-bottom: none !important;
+  }
+
+  #ev-view td::before, #matched-view td::before, #pp-view td::before,
+  #fd-view td::before, #dk-view td::before, #pin-view td::before, #bt-tbody td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    text-align: left;
+    margin-right: 15px;
+  }
+
+  /* Specific column adjustments */
+  .table-section {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+  }
+
+  td:has(input[type="checkbox"]) {
+    justify-content: flex-start !important;
+  }
+  td:has(input[type="checkbox"])::before { display: none !important; }
+
+  /* Summary Cards Mobile Grid: Ultra-Condensed */
+  .bt-summary {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important; /* 3 columns to save vertical space */
+    gap: 6px !important;
+    padding: 8px 10px !important;
+    background: var(--bg) !important;
+  }
+  .bt-card {
+    min-width: 0 !important;
+    padding: 6px 4px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    border-radius: 4px !important;
+  }
+  .bt-card-label { 
+    font-size: 8px !important; 
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    width: 100% !important;
+    text-align: center !important;
+  }
+  .bt-card-value { 
+    font-size: 14px !important; 
+    margin-top: 2px !important;
+  }
+
+  /* Specific fix for Analytics layout containers on mobile */
+  #cal-summary, #clv-summary {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+
+  /* Slip Panel Mobile Drawer: ABSOLUTE Bottom */
+  .slip-panel:not(.hidden) {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: 85vh !important;
+    z-index: 2000 !important;
+    background: var(--surface) !important;
+    border: none !important;
+    border-top: 2px solid var(--accent) !important;
+    border-radius: 20px 20px 0 0 !important;
+    padding: 0 16px 20px 16px !important;
+    transform: translateY(calc(100% - 50px)) !important;
+    transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1) !important;
+    box-shadow: 0 -10px 30px rgba(0,0,0,0.5) !important;
+  }
+  
+  .slip-panel.open {
+    transform: translateY(0) !important;
+  }
+  
+  .slip-panel h2 {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    padding: 12px 0 !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    margin-bottom: 5px !important;
+  }
+  
+  .slip-panel h2::before {
+    content: '';
+    width: 36px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-bottom: 8px;
+  }
+
+  .analytics-main-content {
+    flex-direction: column !important;
+    gap: 15px !important;
+    overflow-y: auto !important;
+  }
+  .cal-table-section, .clv-section { flex: none !important; width: 100% !important; }
 }
