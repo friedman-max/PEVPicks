@@ -177,9 +177,9 @@ class CLVTracker:
         changed = False
 
         for row in rows:
-            # Only target pending or already-resolved rows with empty closing_prob
-            if row.get("closing_prob"):
-                continue  # already has CLV data
+            # Only target pending or already-resolved rows with missing CLV data
+            if row.get("closing_prob") and row.get("clv_pct") not in (None, ""):
+                continue 
 
             game_start_str = row.get("game_start", "")
             if not game_start_str:
@@ -193,13 +193,24 @@ class CLVTracker:
                 continue
 
             # If the game started more than MISSED_CUTOFF_HOURS ago and we still
-            # have no closing_prob, the tracking window was missed entirely.
+            # have no/incomplete CLV data, finalize it.
             if (now_utc - gs) > cutoff:
                 orig_true_prob = float(row.get("true_prob", 0))
-                # Fallback: closing_prob = true_prob, clv_pct = 0
-                # This means "no line movement captured — CLV unknown"
-                row["closing_prob"] = round(orig_true_prob, 4)
-                row["clv_pct"] = 0.0
+                
+                # If we have a closing_prob but no clv_pct, just compute the diff
+                if row.get("closing_prob"):
+                    try:
+                        cp = float(row["closing_prob"])
+                        row["clv_pct"] = round(cp - orig_true_prob, 4)
+                    except ValueError:
+                        row["closing_prob"] = round(orig_true_prob, 4)
+                        row["clv_pct"] = 0.0
+                else:
+                    # Fallback: closing_prob = true_prob, clv_pct = 0
+                    # This means "no line movement captured — CLV unknown"
+                    row["closing_prob"] = round(orig_true_prob, 4)
+                    row["clv_pct"] = 0.0
+                
                 finalized += 1
                 changed = True
 

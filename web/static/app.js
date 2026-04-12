@@ -1558,10 +1558,10 @@ function renderBacktest() {
     const evPct = l.proj_slip_ev_pct != null ? (parseFloat(l.proj_slip_ev_pct) * 100).toFixed(1) + "%" : "";
     const indEv = l.ind_ev_pct != null ? (parseFloat(l.ind_ev_pct) * 100).toFixed(1) + "%" : "";
     const trueP = l.true_prob != null ? (parseFloat(l.true_prob) * 100).toFixed(1) + "%" : "";
-    const closeP = l.closing_prob ? (parseFloat(l.closing_prob) * 100).toFixed(1) + "%" : "—";
-    const clvPctVal = l.clv_pct ? parseFloat(l.clv_pct) : null;
-    const clvPctText = clvPctVal != null ? (clvPctVal > 0 ? "+" : "") + (clvPctVal * 100).toFixed(1) + "%" : "—";
-    const clvCls = clvPctVal != null ? (clvPctVal > 0 ? "ev-high" : clvPctVal < 0 ? "ev-low" : "") : "";
+    const closeP = (l.closing_prob !== undefined && l.closing_prob !== null && l.closing_prob !== "") ? (parseFloat(l.closing_prob) * 100).toFixed(1) + "%" : "—";
+    const clvPctVal = (l.clv_pct !== undefined && l.clv_pct !== null && l.clv_pct !== "") ? parseFloat(l.clv_pct) : null;
+    const clvPctText = clvPctVal !== null ? (clvPctVal > 0 ? "+" : "") + (clvPctVal * 100).toFixed(1) + "%" : "—";
+    const clvCls = clvPctVal !== null ? (clvPctVal > 0 ? "ev-high" : clvPctVal < 0 ? "ev-low" : "") : "";
 
     const resultCls = l.result === "hit" ? "result-hit" : l.result === "miss" ? "result-miss" : "result-pending";
     const resultText = l.result || "pending";
