@@ -12,138 +12,78 @@ audit the predictive validity of the devigging and consensus algorithms.
 """
 from __future__ import annotations
 
-import csv
 import math
 import logging
-import pathlib
 from typing import Optional
 from engine.database import get_db
 
 logger = logging.getLogger(__name__)
 
-DATA_DIR = pathlib.Path(__file__).parent.parent / "data"
-CSV_PATH = DATA_DIR / "backtest.csv"
-
 # Clamp probabilities away from 0 and 1 to avoid log(0) in log-loss
 _EPS = 1e-7
 
-
-def _load_resolved_rows(csv_path: pathlib.Path | None = None) -> list[dict]:
-    """
-    Read resolved rows from the database (favoured) or CSV.
-    """
-    db = get_db()
-    if db:
-        try:
-            res = db.table("legs").select("*").in_("result", ["won", "win", "hit", "1", "lost", "loss", "miss", "0"]).execute()
-            rows = []
-            for r in res.data:
-                outcome = 1 if str(r.get("result")).lower() in ("won", "win", "hit", "1") else 0
-                rows.append({
-                    "true_prob": r["true_prob"],
-                    "outcome":   outcome,
-                    "player":    r["player"],
-                    "prop":      r["prop"],
-                    "side":      r["side"],
-                    "league":    r["league"],
-                    "slip_id":   r["slip_id"],
-                })
-            if rows:
-                return rows
-        except Exception as e:
-            logger.warning("Calibration: Supabase load failed, falling back to CSV: %s", e)
-
-    path = csv_path or CSV_PATH
-    if not path.exists():
-        return []
-
-    rows = []
-    try:
-        with open(path, newline="", encoding="utf-8-sig") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                result_raw = row.get("result", "").strip().lower()
-                if result_raw not in ("won", "lost", "win", "loss", "hit", "miss", "1", "0"):
-                    continue 
-
-                outcome = 1 if result_raw in ("won", "win", "hit", "1") else 0
-                try:
-                    true_prob = float(row.get("true_prob", 0))
-                except (ValueError, TypeError):
-                    continue
-
-                if true_prob <= 0 or true_prob >= 1:
-                    continue
-
-                rows.append({
-                    "true_prob": true_prob,
-                    "outcome": outcome,
-                    "player": row.get("player", ""),
-                    "prop": row.get("prop", ""),
-                    "side": row.get("side", ""),
-                    "league": row.get("league", ""),
-                    "slip_id": row.get("slip_id", ""),
-                })
-    except Exception as exc:
-        logger.warning("Calibration: failed to read CSV: %s", exc)
-
-    return rows
-
-
+# Only include data starting from this slip ID for CLV tracking
 START_SLIP_ID = "5D3D2A96"
 
 
-def _load_clv_rows(csv_path: pathlib.Path | None = None) -> list[dict]:
-    """Read pending/resolved rows that have a closing_prob/clv_pct tracked."""
+def _load_resolved_rows() -> list[dict]:
+    """
+    Read resolved rows from the Supabase database.
+    """
     db = get_db()
-    if db:
-        try:
-            # Query from legs where slip_id >= START_SLIP_ID logic 
-            # (Note: Supabase >= on string IDs is alphabetical, so we better just fetch all and filter or use timestamp)
-            res = db.table("legs").select("closing_prob, clv_pct, slip_id").execute()
-            rows = []
-            found_start = False
-            # Sort data by slip_id or timestamp to replicate CSV order if needed
-            sorted_data = sorted(res.data, key=lambda x: x.get("slip_id", ""))
-            for r in sorted_data:
-                if not found_start:
-                    if r.get("slip_id") == START_SLIP_ID:
-                        found_start = True
-                    else:
-                        continue
-                if r.get("closing_prob") is not None and r.get("clv_pct") is not None:
-                    rows.append({"closing_prob": r["closing_prob"], "clv_pct": r["clv_pct"]})
-            if rows:
-                return rows
-        except Exception as e:
-            logger.warning("Calibration: Supabase CLV load failed: %s", e)
-
-    path = csv_path or CSV_PATH
-    if not path.exists():
+    if not db:
         return []
 
-    rows = []
-    found_start = False
     try:
-        with open(path, newline="", encoding="utf-8-sig") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                if not found_start:
-                    if row.get("slip_id") == START_SLIP_ID:
-                        found_start = True
-                    else:
-                        continue
-                try:
-                    cp_str = row.get("closing_prob", "")
-                    clv_str = row.get("clv_pct", "")
-                    if not cp_str or not clv_str:
-                        continue
-                    rows.append({"closing_prob": float(cp_str), "clv_pct": float(clv_str)})
-                except ValueError:
+        res = db.table("legs").select("*").in_("result", ["won", "win", "hit", "1", "lost", "loss", "miss", "0"]).execute()
+        rows = []
+        for r in res.data:
+            outcome = 1 if str(r.get("result")).lower() in ("won", "win", "hit", "1") else 0
+            try:
+                true_prob = float(r.get("true_prob", 0))
+            except (ValueError, TypeError):
+                continue
+            if true_prob <= 0 or true_prob >= 1:
+                continue
+            rows.append({
+                "true_prob": true_prob,
+                "outcome":   outcome,
+                "player":    r.get("player", ""),
+                "prop":      r.get("prop", ""),
+                "side":      r.get("side", ""),
+                "league":    r.get("league", ""),
+                "slip_id":   r.get("slip_id", ""),
+            })
+        return rows
+    except Exception as e:
+        logger.warning("Calibration: Supabase load failed: %s", e)
+        return []
+
+
+def _load_clv_rows() -> list[dict]:
+    """Read rows that have a closing_prob/clv_pct tracked, starting from START_SLIP_ID."""
+    db = get_db()
+    if not db:
+        return []
+
+    try:
+        res = db.table("legs").select("closing_prob, clv_pct, slip_id").execute()
+        rows = []
+        found_start = False
+        # Sort data by slip_id to replicate the original ordering
+        sorted_data = sorted(res.data, key=lambda x: x.get("slip_id", ""))
+        for r in sorted_data:
+            if not found_start:
+                if r.get("slip_id") == START_SLIP_ID:
+                    found_start = True
+                else:
                     continue
-    except Exception:
-        pass
-    return rows
+            if r.get("closing_prob") is not None and r.get("clv_pct") is not None:
+                rows.append({"closing_prob": r["closing_prob"], "clv_pct": r["clv_pct"]})
+        return rows
+    except Exception as e:
+        logger.warning("Calibration: Supabase CLV load failed: %s", e)
+        return []
 
 
 def brier_score(rows: list[dict]) -> Optional[float]:
@@ -180,7 +120,7 @@ def log_loss(rows: list[dict]) -> Optional[float]:
     return -total / n
 
 
-def evaluate_calibration(csv_path: pathlib.Path | None = None) -> dict:
+def evaluate_calibration() -> dict:
     """
     Compute calibration metrics from resolved backtest data.
 
@@ -194,7 +134,7 @@ def evaluate_calibration(csv_path: pathlib.Path | None = None) -> dict:
       - avg_predicted_prob: float | None
       - calibration_buckets: list of {bucket, predicted_avg, actual_avg, count}
     """
-    rows = _load_resolved_rows(csv_path)
+    rows = _load_resolved_rows()
     n = len(rows)
 
     if n == 0:
@@ -240,7 +180,7 @@ def evaluate_calibration(csv_path: pathlib.Path | None = None) -> dict:
         })
 
     # CLV
-    clv_rows = _load_clv_rows(csv_path)
+    clv_rows = _load_clv_rows()
     n_clv = len(clv_rows)
     clv_plus_rate = None
     avg_clv_pct = None

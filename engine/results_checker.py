@@ -1,13 +1,11 @@
 """
 ESPN unofficial API result checker for CoreProp backtests.
 
-Reads pending rows from data/backtest.csv, fetches ESPN box scores,
+Reads pending legs from Supabase, fetches ESPN box scores,
 and marks each bet as "hit" or "miss" with the actual stat value.
 Covers NBA, NCAAB, MLB, NHL.
 """
-import csv
 import logging
-import pathlib
 import unidecode
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -17,9 +15,6 @@ from rapidfuzz import fuzz
 from engine.database import get_db
 
 logger = logging.getLogger(__name__)
-
-DATA_DIR = pathlib.Path(__file__).parent.parent / "data"
-CSV_PATH  = DATA_DIR / "backtest.csv"
 
 # ESPN scoreboard (for game IDs by date)
 ESPN_SCOREBOARD = {
@@ -52,7 +47,7 @@ FUZZY_THRESHOLD = 80   # Strict threshold for name matching
 
 
 class ESPNResultsChecker:
-    """Checks ESPN box scores and back-fills result + stat_actual in the backtest CSV."""
+    """Checks ESPN box scores and back-fills result + stat_actual in Supabase."""
 
     def __init__(self):
         self._session = _requests.Session()
@@ -67,10 +62,10 @@ class ESPNResultsChecker:
     # Public API
     # ------------------------------------------------------------------
 
-    def check_pending_results(self, csv_path: pathlib.Path = CSV_PATH) -> int:
+    def check_pending_results(self) -> int:
         """
-        Read the backtest CSV, find rows where result == 'pending' and the
-        game has had time to finish, then fetch ESPN and update the rows.
+        Fetch pending legs from Supabase, check ESPN for results,
+        and update the rows directly in the database.
         Returns the number of rows updated.
         """
         # Always clear caches so we get fresh ESPN data (stale cache was
@@ -79,14 +74,16 @@ class ESPNResultsChecker:
         self._gamelog_cache.clear()
         self._event_cache.clear()
 
-        if not csv_path.exists():
+        db = get_db()
+        if not db:
+            logger.warning("ResultsChecker: no database connection")
             return 0
 
         try:
-            with open(csv_path, "r", encoding="utf-8-sig") as f:
-                rows = list(csv.DictReader(f))
+            res = db.table("legs").select("*").eq("result", "pending").execute()
+            rows = res.data or []
         except Exception as exc:
-            logger.error("ResultsChecker: cannot read CSV: %s", exc)
+            logger.error("ResultsChecker: cannot read pending legs from Supabase: %s", exc)
             return 0
 
         if not rows:
@@ -94,14 +91,10 @@ class ESPNResultsChecker:
 
         now_utc = datetime.now(timezone.utc)
         updated = 0
-        changed = False
 
         for row in rows:
-            if row.get("result") not in ("pending", ""):
-                continue
-
             game_start_str = row.get("game_start", "")
-            league = row.get("league", "").upper()
+            league = (row.get("league") or "").upper()
             if not game_start_str or league not in ESPN_SCOREBOARD:
                 continue
 
@@ -119,7 +112,6 @@ class ESPNResultsChecker:
             if now_utc < likely_end:
                 continue
 
-            date_str    = gs.strftime("%Y%m%d")
             player_name = row.get("player", "")
             prop_type   = row.get("prop", "")
             side        = row.get("side", "over")
@@ -150,27 +142,21 @@ class ESPNResultsChecker:
                 is_completed = self._is_game_over(league, gs)
 
                 if is_completed or hours_since_end >= 6:
-                    row["result"] = "dnp"
-                    row["stat_actual"] = ""
-                    updated += 1
-                    changed = True
-                    logger.info(
-                        "ResultsChecker: marking %s as DNP (game_completed=%s, "
-                        "hours_since_end=%.1f, no stats found for '%s')",
-                        player_name, is_completed, hours_since_end, prop_type,
-                    )
-                    # Supabase Sync for DNP
-                    db = get_db()
-                    if db:
-                        try:
-                            sid = row.get("slip_id")
-                            l_num = int(row.get("leg_num", 0))
-                            db.table("legs").update({
-                                "result":      "dnp",
-                                "stat_actual": None
-                            }).eq("slip_id", sid).eq("leg_num", l_num).execute()
-                        except Exception as db_exc:
-                            logger.error("ResultsChecker DB update failed: %s", db_exc)
+                    try:
+                        sid = row.get("slip_id")
+                        l_num = int(row.get("leg_num", 0))
+                        db.table("legs").update({
+                            "result":      "dnp",
+                            "stat_actual": None
+                        }).eq("slip_id", sid).eq("leg_num", l_num).execute()
+                        updated += 1
+                        logger.info(
+                            "ResultsChecker: marking %s as DNP (game_completed=%s, "
+                            "hours_since_end=%.1f, no stats found for '%s')",
+                            player_name, is_completed, hours_since_end, prop_type,
+                        )
+                    except Exception as db_exc:
+                        logger.error("ResultsChecker DB update failed: %s", db_exc)
                 else:
                     logger.debug(
                         "ResultsChecker: cannot compute '%s' for %s (game not yet flagged complete, %.1fh ago, will retry)",
@@ -182,30 +168,22 @@ class ESPNResultsChecker:
                 result = "push"
             else:
                 result = "hit" if (actual > line if side == "over" else actual < line) else "miss"
-            row["result"]      = result
-            row["stat_actual"] = actual
-            updated += 1
-            changed = True
 
-            # Supabase Sync
-            db = get_db()
-            if db:
-                try:
-                    sid = row.get("slip_id")
-                    l_num = int(row.get("leg_num", 0))
-                    db.table("legs").update({
-                        "result":      result,
-                        "stat_actual": actual
-                    }).eq("slip_id", sid).eq("leg_num", l_num).execute()
-                except Exception as db_exc:
-                    logger.error("ResultsChecker DB update failed: %s", db_exc)
+            try:
+                sid = row.get("slip_id")
+                l_num = int(row.get("leg_num", 0))
+                db.table("legs").update({
+                    "result":      result,
+                    "stat_actual": actual
+                }).eq("slip_id", sid).eq("leg_num", l_num).execute()
+                updated += 1
+            except Exception as db_exc:
+                logger.error("ResultsChecker DB update failed: %s", db_exc)
+
             logger.debug(
                 "ResultsChecker: %s %s %s %s %.1f  actual=%.1f  →  %s",
                 league, player_name, prop_type, side, line, actual, result,
             )
-
-        if changed:
-            self._write_csv(csv_path, rows)
 
         if updated:
             logger.info("ResultsChecker: updated %d pending rows", updated)
@@ -573,24 +551,6 @@ class ESPNResultsChecker:
                 
         self._gamelog_cache[cache_key] = best_stats
         return best_stats
-
-    @staticmethod
-    def _write_csv(csv_path: pathlib.Path, rows: list[dict]) -> None:
-        """Atomically rewrite the CSV (write to .tmp then rename)."""
-        if not rows:
-            return
-        fieldnames = list(rows[0].keys())
-        tmp = csv_path.with_suffix(".tmp")
-        try:
-            with open(tmp, "w", newline="", encoding="utf-8") as f:
-                w = csv.DictWriter(f, fieldnames=fieldnames)
-                w.writeheader()
-                w.writerows(rows)
-            tmp.replace(csv_path)
-        except Exception as exc:
-            logger.error("ResultsChecker: CSV write failed: %s", exc)
-            if tmp.exists():
-                tmp.unlink()
 
     def _is_game_over(self, league: str, game_start: datetime) -> bool:
         """Helper to determine if all matches starting around game_start are completed."""

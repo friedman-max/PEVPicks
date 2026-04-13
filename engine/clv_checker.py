@@ -1,7 +1,7 @@
 """
 CLV (Closing Line Value) Tracker.
 
-Periodically called to update the `closing_prob` in backtest.csv for pending bets.
+Periodically called to update the `closing_prob` in Supabase for pending bets.
 As lines move, this records the last seen VWAP consensus probability before the
 game starts and the line is pulled from the board.
 
@@ -14,9 +14,7 @@ Strategy:
     mark truly missed games (already finished, no odds available) so they don't
     remain stuck as empty forever.
 """
-import csv
 import logging
-import pathlib
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
@@ -24,9 +22,6 @@ from engine.consensus import compute_true_probability, books_from_match
 from engine.database import get_db
 
 logger = logging.getLogger(__name__)
-
-DATA_DIR = pathlib.Path(__file__).parent.parent / "data"
-CSV_PATH = DATA_DIR / "backtest.csv"
 
 # How long after game start (in minutes) we still attempt to update closing_prob.
 # Lines are typically pulled within ~30 min of game start.
@@ -39,12 +34,12 @@ MISSED_CUTOFF_HOURS = 1
 
 
 class CLVTracker:
-    def __init__(self, csv_path: pathlib.Path = CSV_PATH):
-        self._csv_path = csv_path
+    def __init__(self):
+        pass
 
     def update_closing_lines(self, matches: list[Any]) -> int:
         """
-        Updates pending backtest rows with the latest true probability.
+        Updates pending backtest legs in Supabase with the latest true probability.
 
         Unlike previous versions, this has NO pre-game time window restriction.
         Any pending bet with available current odds gets updated. This ensures
@@ -55,29 +50,28 @@ class CLVTracker:
         `matches` is the list of MatchResult objects from app.py.
         Returns the number of rows updated.
         """
-        if not self._csv_path.exists():
+        db = get_db()
+        if not db:
             return 0
 
-        # Build a lookup for current matches: (player_lower, prop_lower, side) -> true_prob
+        # Build a lookup for current matches: (player_lower, prop_lower, side, line) -> true_prob
         current_probs = self._build_current_probs(matches)
 
-        # Read CSV
-        rows, fieldnames = self._read_csv()
-        if not rows or not fieldnames:
+        # Fetch pending legs from Supabase
+        try:
+            res = db.table("legs").select("*").eq("result", "pending").execute()
+            rows = res.data or []
+        except Exception as exc:
+            logger.error("CLVTracker: cannot read pending legs from Supabase: %s", exc)
             return 0
 
-        if "closing_prob" not in fieldnames or "clv_pct" not in fieldnames:
-            logger.warning("CLVTracker: CSV missing closing_prob/clv_pct columns. Aborting.")
+        if not rows:
             return 0
 
         now_utc = datetime.now(timezone.utc)
         updated_count = 0
-        changed = False
 
         for row in rows:
-            if row.get("result") not in ("pending", ""):
-                continue  # already resolved
-
             game_start_str = row.get("game_start", "")
             if not game_start_str:
                 continue
@@ -96,9 +90,9 @@ class CLVTracker:
             if mins_to_start < -POST_START_GRACE_MINUTES:
                 continue
 
-            player = row.get("player", "").lower().strip()
-            prop = row.get("prop", "").lower().strip()
-            side = row.get("side", "").lower().strip()
+            player = (row.get("player") or "").lower().strip()
+            prop = (row.get("prop") or "").lower().strip()
+            side = (row.get("side") or "").lower().strip()
             try:
                 line = float(row.get("line", 0))
             except ValueError:
@@ -107,11 +101,14 @@ class CLVTracker:
             key = (player, prop, side, line)
             if key in current_probs:
                 new_cp_val = current_probs[key]
-                old_cp_str = row.get("closing_prob", "")
-                try:
-                    old_cp_val = float(old_cp_str) if old_cp_str else None
-                except ValueError:
-                    old_cp_val = None
+                old_cp_val = row.get("closing_prob")
+
+                # Convert old value for comparison
+                if old_cp_val is not None:
+                    try:
+                        old_cp_val = float(old_cp_val)
+                    except (ValueError, TypeError):
+                        old_cp_val = None
 
                 # Update if this is a new value or different from the old value.
                 if old_cp_val is None or abs(new_cp_val - old_cp_val) > 1e-4:
@@ -120,32 +117,23 @@ class CLVTracker:
                     # CLV edge: (Closing Prob - Original True Prob)
                     clv_pct = new_cp_val - orig_true_prob
 
-                    row["closing_prob"] = round(new_cp_val, 4)
-                    row["clv_pct"] = round(clv_pct, 4)
-                    updated_count += 1
-                    changed = True
-
-                    # Supabase Sync
-                    db = get_db()
-                    if db:
-                        try:
-                            # Match by slip_id and leg_num
-                            sid = row.get("slip_id")
-                            l_num = int(row.get("leg_num", 0))
-                            db.table("legs").update({
-                                "closing_prob": row["closing_prob"],
-                                "clv_pct":      row["clv_pct"]
-                            }).eq("slip_id", sid).eq("leg_num", l_num).execute()
-                        except Exception as db_exc:
-                            logger.error("CLVTracker DB update failed: %s", db_exc)
+                    try:
+                        sid = row.get("slip_id")
+                        l_num = int(row.get("leg_num", 0))
+                        db.table("legs").update({
+                            "closing_prob": round(new_cp_val, 4),
+                            "clv_pct":      round(clv_pct, 4)
+                        }).eq("slip_id", sid).eq("leg_num", l_num).execute()
+                        updated_count += 1
+                    except Exception as db_exc:
+                        logger.error("CLVTracker DB update failed: %s", db_exc)
 
                     logger.debug(
                         "CLVTracker: Update %s %s %s @%s -> %.4f", 
                         player, prop, side, line, new_cp_val
                     )
 
-        if changed:
-            self._write_csv(self._csv_path, rows, list(fieldnames))
+        if updated_count:
             logger.info("CLVTracker: updated %d pending bets", updated_count)
 
         return updated_count
@@ -161,24 +149,28 @@ class CLVTracker:
 
         Returns the number of rows finalized.
         """
-        if not self._csv_path.exists():
+        db = get_db()
+        if not db:
             return 0
 
-        rows, fieldnames = self._read_csv()
-        if not rows or not fieldnames:
+        try:
+            # Fetch all legs (pending or resolved) that might have missing CLV data
+            res = db.table("legs").select("*").execute()
+            rows = res.data or []
+        except Exception as exc:
+            logger.error("CLVTracker: cannot read legs from Supabase: %s", exc)
             return 0
 
-        if "closing_prob" not in fieldnames or "clv_pct" not in fieldnames:
+        if not rows:
             return 0
 
         now_utc = datetime.now(timezone.utc)
         cutoff = timedelta(hours=MISSED_CUTOFF_HOURS)
         finalized = 0
-        changed = False
 
         for row in rows:
-            # Only target pending or already-resolved rows with missing CLV data
-            if row.get("closing_prob") and row.get("clv_pct") not in (None, ""):
+            # Only target rows with missing CLV data
+            if row.get("closing_prob") is not None and row.get("clv_pct") is not None:
                 continue 
 
             game_start_str = row.get("game_start", "")
@@ -198,37 +190,32 @@ class CLVTracker:
                 orig_true_prob = float(row.get("true_prob", 0))
                 
                 # If we have a closing_prob but no clv_pct, just compute the diff
-                if row.get("closing_prob"):
+                if row.get("closing_prob") is not None:
                     try:
                         cp = float(row["closing_prob"])
-                        row["clv_pct"] = round(cp - orig_true_prob, 4)
-                    except ValueError:
-                        row["closing_prob"] = round(orig_true_prob, 4)
-                        row["clv_pct"] = 0.0
+                        clv_pct = round(cp - orig_true_prob, 4)
+                        closing_prob = cp
+                    except (ValueError, TypeError):
+                        closing_prob = round(orig_true_prob, 4)
+                        clv_pct = 0.0
                 else:
                     # Fallback: closing_prob = true_prob, clv_pct = 0
                     # This means "no line movement captured — CLV unknown"
-                    row["closing_prob"] = round(orig_true_prob, 4)
-                    row["clv_pct"] = 0.0
+                    closing_prob = round(orig_true_prob, 4)
+                    clv_pct = 0.0
                 
-                finalized += 1
-                changed = True
+                try:
+                    sid = row.get("slip_id")
+                    l_num = int(row.get("leg_num", 0))
+                    db.table("legs").update({
+                        "closing_prob": closing_prob,
+                        "clv_pct":      clv_pct
+                    }).eq("slip_id", sid).eq("leg_num", l_num).execute()
+                    finalized += 1
+                except Exception as db_exc:
+                    logger.error("CLVTracker DB finalization failed: %s", db_exc)
 
-                # Supabase Sync
-                db = get_db()
-                if db:
-                    try:
-                        sid = row.get("slip_id")
-                        l_num = int(row.get("leg_num", 0))
-                        db.table("legs").update({
-                            "closing_prob": row["closing_prob"],
-                            "clv_pct":      row["clv_pct"]
-                        }).eq("slip_id", sid).eq("leg_num", l_num).execute()
-                    except Exception as db_exc:
-                        logger.error("CLVTracker DB finalization failed: %s", db_exc)
-
-        if changed:
-            self._write_csv(self._csv_path, rows, list(fieldnames))
+        if finalized:
             logger.info(
                 "CLVTracker: finalized %d missed bets (closing_prob = true_prob)", finalized
             )
@@ -276,31 +263,3 @@ class CLVTracker:
                     current_probs[(player, prop, side, line)] = worst_case_prob
 
         return current_probs
-
-    def _read_csv(self) -> tuple[list[dict], list[str] | None]:
-        """Read the backtest CSV. Returns (rows, fieldnames) or ([], None) on error."""
-        try:
-            with open(self._csv_path, "r", encoding="utf-8-sig") as f:
-                rows = list(csv.DictReader(f))
-        except Exception as exc:
-            logger.error("CLVTracker: cannot read CSV: %s", exc)
-            return [], None
-
-        if not rows:
-            return [], None
-
-        return rows, list(rows[0].keys())
-
-    def _write_csv(self, csv_path: pathlib.Path, rows: list[dict], fieldnames: list[str]) -> None:
-        """Atomically rewrite the CSV (write to .tmp then rename)."""
-        tmp = csv_path.with_suffix(".tmp")
-        try:
-            with open(tmp, "w", newline="", encoding="utf-8-sig") as f:
-                w = csv.DictWriter(f, fieldnames=fieldnames)
-                w.writeheader()
-                w.writerows(rows)
-            tmp.replace(csv_path)
-        except Exception as exc:
-            logger.error("CLVTracker: CSV write failed: %s", exc)
-            if tmp.exists():
-                tmp.unlink()
