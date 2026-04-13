@@ -61,6 +61,7 @@ class ESPNResultsChecker:
         self._cache: dict[tuple, dict] = {}
         # (league_lower, player_name_lower) → stats_dict (closest to target time)
         self._gamelog_cache: dict[tuple, dict] = {}
+        self._event_cache: dict[tuple, list] = {}
 
     # ------------------------------------------------------------------
     # Public API
@@ -76,6 +77,7 @@ class ESPNResultsChecker:
         # the #1 cause of permanently-stuck 'pending' rows)
         self._cache.clear()
         self._gamelog_cache.clear()
+        self._event_cache.clear()
 
         if not csv_path.exists():
             return 0
@@ -143,20 +145,35 @@ class ESPNResultsChecker:
             if actual is None:
                 # If the game ended over 6 hours ago and we still can't find
                 # the player, they almost certainly didn't play (DNP/injury).
+                # Alternatively, if ESPN marks the matching games as completed.
                 hours_since_end = (now_utc - likely_end).total_seconds() / 3600
-                if hours_since_end >= 6:
+                is_completed = self._is_game_over(league, gs)
+
+                if is_completed or hours_since_end >= 6:
                     row["result"] = "dnp"
                     row["stat_actual"] = ""
                     updated += 1
                     changed = True
                     logger.info(
-                        "ResultsChecker: marking %s as DNP (game ended %.0fh ago, "
-                        "no stats found for '%s')",
-                        player_name, hours_since_end, prop_type,
+                        "ResultsChecker: marking %s as DNP (game_completed=%s, "
+                        "hours_since_end=%.1f, no stats found for '%s')",
+                        player_name, is_completed, hours_since_end, prop_type,
                     )
+                    # Supabase Sync for DNP
+                    db = get_db()
+                    if db:
+                        try:
+                            sid = row.get("slip_id")
+                            l_num = int(row.get("leg_num", 0))
+                            db.table("legs").update({
+                                "result":      "dnp",
+                                "stat_actual": None
+                            }).eq("slip_id", sid).eq("leg_num", l_num).execute()
+                        except Exception as db_exc:
+                            logger.error("ResultsChecker DB update failed: %s", db_exc)
                 else:
                     logger.debug(
-                        "ResultsChecker: cannot compute '%s' for %s (game ended %.1fh ago, will retry)",
+                        "ResultsChecker: cannot compute '%s' for %s (game not yet flagged complete, %.1fh ago, will retry)",
                         prop_type, player_name, hours_since_end,
                     )
                 continue
@@ -255,6 +272,7 @@ class ESPNResultsChecker:
             r = self._session.get(scoreboard_url, params={"dates": date_str}, timeout=15)
             r.raise_for_status()
             events = r.json().get("events", [])
+            self._event_cache[(league, date_str)] = events
         except Exception as exc:
             logger.warning(
                 "ResultsChecker: scoreboard error %s/%s: %s", league, date_str, exc
@@ -573,3 +591,32 @@ class ESPNResultsChecker:
             logger.error("ResultsChecker: CSV write failed: %s", exc)
             if tmp.exists():
                 tmp.unlink()
+
+    def _is_game_over(self, league: str, game_start: datetime) -> bool:
+        """Helper to determine if all matches starting around game_start are completed."""
+        date_utc = game_start.strftime("%Y%m%d")
+        date_prev = (game_start - timedelta(days=1)).strftime("%Y%m%d")
+        
+        events_to_check = []
+        for d_str in [date_prev, date_utc]:
+            events = self._event_cache.get((league, d_str), [])
+            for ev in events:
+                try:
+                    # '2023-10-27T19:45:00Z' format
+                    ev_dt = datetime.fromisoformat(ev["date"].replace("Z", "+00:00"))
+                    if ev_dt.tzinfo is None:
+                        ev_dt = ev_dt.replace(tzinfo=timezone.utc)
+                    # Check if within a 4-hour window of the target start time
+                    if abs((ev_dt - game_start).total_seconds()) < 4 * 3600:
+                        events_to_check.append(ev)
+                except Exception:
+                    pass
+                    
+        if not events_to_check:
+            return False
+            
+        for ev in events_to_check:
+            status = ev.get("status", {}).get("type", {})
+            if not status.get("completed", False):
+                return False
+        return True
