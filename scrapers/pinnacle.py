@@ -41,13 +41,28 @@ _PROP_TYPE_MAP = {
         "points":              "Points",
         "rebounds":            "Rebounds",
         "assists":             "Assists",
+        "steals":              "Steals",
+        "blocks":              "Blocked Shots",
+        "blocked shots":       "Blocked Shots",
+        "turnovers":           "Turnovers",
         "3 point fg":          "3-PT Made",
+        "threes made":         "3-PT Made",
+        "3-pt made":           "3-PT Made",
+        "3-pointers made":     "3-PT Made",
         "pts+rebs+asts":       "Pts+Rebs+Asts",
+        "pts & rebs & asts":   "Pts+Rebs+Asts",
         "pts+rebs":            "Pts+Rebs",
+        "pts & rebs":          "Pts+Rebs",
         "pts+asts":            "Pts+Asts",
+        "pts & asts":          "Pts+Asts",
         "rebs+asts":           "Rebs+Asts",
+        "rebs & asts":         "Rebs+Asts",
+        "blks+stls":           "Blks+Stls",
+        "blks & stls":         "Blks+Stls",
         "double+double":       "Double-Double",
+        "double-double":       "Double-Double",
         "triple+double":       "Triple-Double",
+        "triple-double":       "Triple-Double",
         "first basket scorer": "First Basket",
     },
     "NCAAB": {
@@ -55,7 +70,10 @@ _PROP_TYPE_MAP = {
         "rebounds":            "Rebounds",
         "assists":             "Assists",
         "3 point fg":          "3-PT Made",
+        "threes made":         "3-PT Made",
+        "3-pt made":           "3-PT Made",
         "pts+rebs+asts":       "Pts+Rebs+Asts",
+        "pts & rebs & asts":   "Pts+Rebs+Asts",
         "pts+rebs":            "Pts+Rebs",
         "pts+asts":            "Pts+Asts",
     },
@@ -91,20 +109,37 @@ _PROP_TYPE_MAP = {
 }
 
 _DESC_RE = re.compile(r"^(.+?)\s*\(([^)]+)\)")
+# New NBA-style format: "Player Name Total <Prop Type>" (no parens).
+# Pinnacle rolled this out for NBA in 2026; prop type is everything after " Total ".
+_TOTAL_RE = re.compile(r"^(.+?)\s+Total\s+(.+)$")
 
 
 def _parse_description(desc: str) -> Tuple[Optional[str], Optional[str]]:
     """
-    Parse 'Player Name (Prop Type)' → (player_name, raw_prop_type).
-    Also handles suffixes like '(must start)' that Pinnacle appends for MLB.
+    Parse Pinnacle player-prop descriptions into (player_name, raw_prop_type).
+
+    Handles all observed formats:
+      • 'Player Name (Prop Type)'                 (NHL, MLB, soccer)
+      • 'Player Name (Prop Type)(must start)'     (MLB pitchers)
+      • 'Player Name Total <Prop Type>'           (NBA new format, 2026+)
+      • 'Player Name To Score'                    (soccer anytime-goalscorer)
+    Returns (None, None) if the description doesn't match any known pattern
+    (e.g. futures like 'To Be Top Goalscorer').
     """
+    # 1) Classic parens format — prefer this since MLB/NHL still use it.
     m = _DESC_RE.match(desc)
     if m:
         return m.group(1).strip(), m.group(2).strip()
-    
+
+    # 2) Soccer "anytime goalscorer" shorthand.
     if desc.endswith(" To Score"):
         return desc[:-9].strip(), "goals"
-        
+
+    # 3) NBA's new "Player Name Total <X>" format.
+    m = _TOTAL_RE.match(desc)
+    if m:
+        return m.group(1).strip(), m.group(2).strip()
+
     return None, None
 
 
