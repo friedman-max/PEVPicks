@@ -152,6 +152,8 @@ def match_props(
                 elif score == best_score and score >= FUZZY_THRESHOLD and best is not None:
                     if c.line == pp.line_score and best.line != pp.line_score:
                         best = c
+            if best_score < FUZZY_THRESHOLD:
+                return None, 0.0
             return best, best_score
 
         best_fd, best_fd_score = _best_match(fd_candidates)

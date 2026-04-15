@@ -347,15 +347,16 @@ def run_pipeline():
         serialized_matches = []
         for m in matches:
             # At least one book must be present. We check line equality for the books that exist.
-            is_valid = True
+            # Nullify any books that don't match the PrizePicks line score exactly,
+            # but don't discard the whole match if at least one book matches.
             if m.fd and m.pp.line_score != m.fd.line:
-                is_valid = False
+                m.fd = None
             if m.dk and m.pp.line_score != m.dk.line:
-                is_valid = False
+                m.dk = None
             if m.pin and m.pp.line_score != m.pin.line:
-                is_valid = False
+                m.pin = None
 
-            if not is_valid:
+            if not m.fd and not m.dk and not m.pin:
                 continue
 
             base = {
