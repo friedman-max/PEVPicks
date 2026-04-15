@@ -26,7 +26,33 @@ const state = {
   isScrapingPrev: false,
   page:          1,
   pageSize:      100,
+  lastRefresh:   null,        // ISO string from server (for staleness display)
 };
+
+// ── localStorage cache ─────────────────────────────────────────────────────
+// Bump CACHE_VERSION whenever the shape of any cached dataset changes so old
+// blobs are ignored instead of crashing the renderer.
+const CACHE_VERSION = 1;
+const CACHE_KEY = "coreprop:cache:v" + CACHE_VERSION;
+
+function cacheLoad() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function cacheSave(patch) {
+  try {
+    const existing = cacheLoad();
+    const merged = { ...existing, ...patch, _saved_at: Date.now() };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(merged));
+  } catch (e) {
+    // Quota exceeded or storage disabled — not fatal.
+  }
+}
 
 // ── DOM refs ───────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -479,6 +505,8 @@ async function fetchBets() {
     const resp = await fetch("/api/bets");
     const data = await resp.json();
     state.allBets = data.bets || [];
+    if (data.last_refresh) state.lastRefresh = data.last_refresh;
+    cacheSave({ bets: state.allBets, last_refresh: state.lastRefresh });
     applyFilters();
   } catch (e) {
     console.error("Failed to fetch bets:", e);
@@ -498,14 +526,12 @@ $("slip-panel").querySelector("h2").addEventListener("click", () => {
 });
     // UI updates removed
 
-    // Detect scraping just finished → fetch fresh bets
+    // Detect scraping just finished → refresh every dataset in one shot.
     if (state.isScrapingPrev && !data.is_scraping) {
-      await fetchBets();
-      await fetchMatched();
-      await fetchPP();
-      await fetchFD();
-      await fetchDK();
-      await fetchPin();
+      const ok = await fetchBootstrap();
+      if (!ok) {
+        await Promise.all([fetchBets(), fetchMatched(), fetchPP(), fetchFD(), fetchDK(), fetchPin()]);
+      }
       await fetchBacktest();
       await fetchCalibration();
     }
@@ -703,6 +729,8 @@ async function fetchMatched() {
     const resp = await fetch("/api/matched");
     const data = await resp.json();
     matchedState.allLines = data.matches || [];
+    if (data.last_refresh) state.lastRefresh = data.last_refresh;
+    cacheSave({ matches: matchedState.allLines, last_refresh: state.lastRefresh });
     applyMatchedFilters();
   } catch (e) {
     console.error("Failed to fetch matched lines:", e);
@@ -714,6 +742,8 @@ async function fetchPP() {
     const resp = await fetch("/api/prizepicks");
     const data = await resp.json();
     ppState.allLines = data.lines || [];
+    if (data.last_refresh) state.lastRefresh = data.last_refresh;
+    cacheSave({ pp_lines: ppState.allLines, last_refresh: state.lastRefresh });
     applyPPFilters();
   } catch (e) {
     console.error("Failed to fetch PrizePicks lines:", e);
@@ -725,6 +755,8 @@ async function fetchFD() {
     const resp = await fetch("/api/fanduel");
     const data = await resp.json();
     fdState.allLines = data.lines || [];
+    if (data.last_refresh) state.lastRefresh = data.last_refresh;
+    cacheSave({ fd_lines: fdState.allLines, last_refresh: state.lastRefresh });
     applyFDFilters();
   } catch (e) {
     console.error("Failed to fetch FanDuel lines:", e);
@@ -736,6 +768,8 @@ async function fetchDK() {
     const resp = await fetch("/api/draftkings");
     const data = await resp.json();
     dkState.allLines = data.lines || [];
+    if (data.last_refresh) state.lastRefresh = data.last_refresh;
+    cacheSave({ dk_lines: dkState.allLines, last_refresh: state.lastRefresh });
     applyDKFilters();
   } catch (e) {
     console.error("Failed to fetch DraftKings lines:", e);
@@ -747,10 +781,88 @@ async function fetchPin() {
     const resp = await fetch("/api/pinnacle");
     const data = await resp.json();
     pinState.allLines = data.lines || [];
+    if (data.last_refresh) state.lastRefresh = data.last_refresh;
+    cacheSave({ pin_lines: pinState.allLines, last_refresh: state.lastRefresh });
     applyPinFilters();
   } catch (e) {
     console.error("Failed to fetch Pinnacle lines:", e);
   }
+}
+
+// ── Bootstrap: single-request path for initial load / refresh ─────────────
+async function fetchBootstrap() {
+  try {
+    const resp = await fetch("/api/bootstrap");
+    if (!resp.ok) throw new Error("bootstrap HTTP " + resp.status);
+    const data = await resp.json();
+
+    state.allBets           = data.bets      || [];
+    matchedState.allLines   = data.matches   || [];
+    ppState.allLines        = data.pp_lines  || [];
+    fdState.allLines        = data.fd_lines  || [];
+    dkState.allLines        = data.dk_lines  || [];
+    pinState.allLines       = data.pin_lines || [];
+    if (data.last_refresh) state.lastRefresh = data.last_refresh;
+
+    cacheSave({
+      bets:       state.allBets,
+      matches:    matchedState.allLines,
+      pp_lines:   ppState.allLines,
+      fd_lines:   fdState.allLines,
+      dk_lines:   dkState.allLines,
+      pin_lines:  pinState.allLines,
+      last_refresh: state.lastRefresh,
+    });
+
+    applyFilters();
+    applyMatchedFilters();
+    applyPPFilters();
+    applyFDFilters();
+    applyDKFilters();
+    applyPinFilters();
+    return true;
+  } catch (e) {
+    console.error("Bootstrap fetch failed, falling back to per-endpoint:", e);
+    return false;
+  }
+}
+
+// ── Initial render from localStorage (paints before network returns) ──────
+function hydrateFromCache() {
+  const cache = cacheLoad();
+  let hadAny = false;
+  if (Array.isArray(cache.bets) && cache.bets.length) {
+    state.allBets = cache.bets;
+    hadAny = true;
+    applyFilters();
+  }
+  if (Array.isArray(cache.matches) && cache.matches.length) {
+    matchedState.allLines = cache.matches;
+    hadAny = true;
+    applyMatchedFilters();
+  }
+  if (Array.isArray(cache.pp_lines) && cache.pp_lines.length) {
+    ppState.allLines = cache.pp_lines;
+    hadAny = true;
+    applyPPFilters();
+  }
+  if (Array.isArray(cache.fd_lines) && cache.fd_lines.length) {
+    fdState.allLines = cache.fd_lines;
+    hadAny = true;
+    applyFDFilters();
+  }
+  if (Array.isArray(cache.dk_lines) && cache.dk_lines.length) {
+    dkState.allLines = cache.dk_lines;
+    hadAny = true;
+    applyDKFilters();
+  }
+  if (Array.isArray(cache.pin_lines) && cache.pin_lines.length) {
+    pinState.allLines = cache.pin_lines;
+    hadAny = true;
+    applyPinFilters();
+  }
+  if (cache.last_refresh) state.lastRefresh = cache.last_refresh;
+  return hadAny;
 }
 
 // ── PrizePicks Lines ──────────────────────────────────────────────────────
@@ -1675,13 +1787,28 @@ function renderCalibration(data) {
 
 
 // ── Init ───────────────────────────────────────────────────────────────────
+// 1) Paint cached data first — zero-latency on refresh / revisit.
+hydrateFromCache();
+
+// 2) Kick off bootstrap + secondary fetches in parallel so the UI replaces
+//    the cache with live data as soon as the network comes back. If the
+//    bootstrap endpoint is somehow unavailable, fall back to the old
+//    per-endpoint path so nothing is lost.
+(async () => {
+  const ok = await fetchBootstrap();
+  if (!ok) {
+    await Promise.all([
+      fetchBets(),
+      fetchMatched(),
+      fetchPP(),
+      fetchFD(),
+      fetchDK(),
+      fetchPin(),
+    ]);
+  }
+})();
+
 fetchStatus();
-fetchBets();
-fetchMatched();
-fetchPP();
-fetchFD();
-fetchDK();
-fetchPin();
 fetchBacktest();
 fetchCalibration();
 setInterval(fetchStatus, 10_000);

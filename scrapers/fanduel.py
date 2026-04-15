@@ -35,24 +35,37 @@ def _normalize_prop_type(raw: str, league: str = "") -> Optional[str]:
     # 1. Direct lookup in league-aware PROP_TYPE_MAP
     res = PROP_TYPE_MAP.get(league.upper(), {}).get(raw)
     if res: return res
-    
+
     # Check normalized string too
     res = PROP_TYPE_MAP.get(league.upper(), {}).get(raw_norm)
     if res: return res
 
-    # 2. League-Specific substring matching (Handling FanDuel's verbose market names)
+    # Reject split-period markets up front (1st quarter/half/period, innings, first pitch, etc.)
+    _PERIOD_TOKENS = (
+        "1st quarter", "2nd quarter", "3rd quarter", "4th quarter",
+        "1st qtr", "2nd qtr", "3rd qtr", "4th qtr",
+        "1st half", "2nd half", "first half", "second half",
+        "1st period", "2nd period", "3rd period",
+        "1q ", "2q ", "3q ", "4q ",
+        " inning", "first pitch",
+    )
+    if any(t in raw_norm for t in _PERIOD_TOKENS):
+        return None
+
+    # 2. League-Specific substring matching (handles FanDuel's verbose market names)
     lkey = league.upper()
-    
+
     if lkey == "SOCCER":
         if "shots on target" in raw_norm or "shots on goal" in raw_norm: return "Shots On Target"
+        if "total shots" in raw_norm or raw_norm.endswith(" - shots") or raw_norm.endswith(" shots"): return "Shots"
         if "shots" in raw_norm: return "Shots"
-        if "goals" in raw_norm or "to score" in raw_norm or "goal-scorer" in raw_norm: return "Goals"
-        if "passes" in raw_norm: return "Passes Attempted"
-        if "tackles" in raw_norm: return "Tackles"
-        if "crosses" in raw_norm: return "Crosses"
-        if "clearances" in raw_norm: return "Clearances"
-        if "assists" in raw_norm: return "Assists"
-        if "saves" in raw_norm: return "Goalie Saves"
+        if raw_norm.endswith(" - passes") or "passes completed" in raw_norm or "passes attempted" in raw_norm or "passes" in raw_norm: return "Passes Attempted"
+        if raw_norm.endswith(" - tackles") or "tackles" in raw_norm: return "Tackles"
+        if raw_norm.endswith(" - crosses") or "crosses" in raw_norm: return "Crosses"
+        if raw_norm.endswith(" - clearances") or "clearances" in raw_norm: return "Clearances"
+        if raw_norm.endswith(" - assists") or " assists" in raw_norm: return "Assists"
+        if raw_norm.endswith(" - saves") or "goalie saves" in raw_norm or "goalkeeper saves" in raw_norm or "saves" in raw_norm: return "Goalie Saves"
+        if "goals" in raw_norm or "to score" in raw_norm or "goal-scorer" in raw_norm or "goalscorer" in raw_norm: return "Goals"
 
     elif lkey in ("NBA", "NCAAB"):
         if "made 3 point field goals" in raw_norm or "made threes" in raw_norm or " threes" in raw_norm: return "3-PT Made"
@@ -62,25 +75,48 @@ def _normalize_prop_type(raw: str, league: str = "") -> Optional[str]:
         if "rebounds + assists" in raw_norm or "reb + ast" in raw_norm: return "Rebs+Asts"
         if "blocks + steals" in raw_norm or "steals + blocks" in raw_norm: return "Blks+Stls"
         if "total points" in raw_norm or raw_norm.endswith(" - points") or raw_norm.endswith(" points"):
-            if any(x in raw_norm for x in ["1st", "2nd", "3rd", "4th", "quarter", "1q", "2q", "3q", "4q", "half"]): return None
             return "Points"
         if "total rebounds" in raw_norm or raw_norm.endswith(" - rebounds") or raw_norm.endswith(" rebounds"): return "Rebounds"
         if "total assists" in raw_norm or raw_norm.endswith(" - assists") or raw_norm.endswith(" assists"): return "Assists"
-        if "blocked shots" in raw_norm or raw_norm == "blocks" or raw_norm.endswith(" - blocks"): return "Blocked Shots"
+        if "blocked shots" in raw_norm or raw_norm == "blocks" or raw_norm.endswith(" - blocks") or raw_norm.endswith(" blocks"): return "Blocked Shots"
+        if raw_norm.endswith(" - steals") or raw_norm.endswith(" steals") or raw_norm == "steals": return "Steals"
+        if raw_norm.endswith(" - turnovers") or raw_norm.endswith(" turnovers"): return "Turnovers"
+        if "fantasy score" in raw_norm or "fantasy points" in raw_norm: return "Fantasy Score"
 
     elif lkey == "MLB":
+        # Pitcher props (suffix-based, pitcher is assumed)
         if "total strikeouts" in raw_norm or "strikeouts thrown" in raw_norm: return "Pitcher Strikeouts"
-        if "outs recorded" in raw_norm or "pitching outs" in raw_norm: return "Pitching Outs"
+        if raw_norm.endswith(" - strikeouts") or raw_norm.endswith(" - alt strikeouts") or raw_norm.endswith(" - pitcher strikeouts"): return "Pitcher Strikeouts"
+        if "outs recorded" in raw_norm or "pitching outs" in raw_norm or raw_norm.endswith(" - outs recorded") or raw_norm.endswith(" - pitcher outs"): return "Pitching Outs"
+        if raw_norm.endswith(" - earned runs") or raw_norm.endswith(" - alt earned runs") or "earned runs allowed" in raw_norm: return "Earned Runs Allowed"
+        if raw_norm.endswith(" - hits allowed") or raw_norm.endswith(" - alt hits allowed") or "hits allowed" in raw_norm: return "Hits Allowed"
+        if raw_norm.endswith(" - walks issued") or raw_norm.endswith(" - alt walks issued") or "walks issued" in raw_norm or "walks allowed" in raw_norm or raw_norm.endswith(" - pitcher walks"): return "Pitcher Walks"
+
+        # Batter props
         if "total bases" in raw_norm and "record" not in raw_norm: return "Total Bases"
-        if raw_norm.endswith(" - hits") or raw_norm == "hits": return "Hits"
-        if raw_norm.endswith(" - runs") or raw_norm == "runs" or raw_norm == "batting runs": return "Runs"
-        if raw_norm.endswith(" - rbis") or raw_norm == "rbis": return "RBIs"
+        if raw_norm.endswith(" - total bases") or raw_norm.endswith(" - alt total bases"): return "Total Bases"
+        if raw_norm.endswith(" - hits") or raw_norm.endswith(" - alt hits") or raw_norm == "hits": return "Hits"
+        if raw_norm.endswith(" - runs") or raw_norm.endswith(" - alt runs") or raw_norm.endswith(" - runs scored") or raw_norm == "runs" or raw_norm == "batting runs": return "Runs"
+        if raw_norm.endswith(" - rbis") or raw_norm.endswith(" - alt rbis") or raw_norm == "rbis": return "RBIs"
+        if raw_norm.endswith(" - home runs") or raw_norm.endswith(" - alt home runs"): return "Home Runs"
+        if raw_norm.endswith(" - stolen bases"): return "Stolen Bases"
+        if raw_norm.endswith(" - singles"): return "Singles"
+        if raw_norm.endswith(" - doubles"): return "Doubles"
+        if raw_norm.endswith(" - triples"): return "Triples"
+        if raw_norm.endswith(" - walks"): return "Walks"
+        if "hits + runs + rbis" in raw_norm or "hits+runs+rbis" in raw_norm: return "Hits+Runs+RBIs"
 
     elif lkey == "NHL":
-        if "shots on goal" in raw_norm or "total shots" in raw_norm or "shots" in raw_norm: return "Shots on Goal"
-        if "total saves" in raw_norm or "saves" in raw_norm: return "Saves"
-        if "total goals" in raw_norm or "goal" in raw_norm: return "Goals"
-        if "total assists" in raw_norm or "assist" in raw_norm: return "Assists"
+        # Player-prefixed suffix form first, then general substring
+        if raw_norm.endswith(" - shots on goal") or "shots on goal" in raw_norm or raw_norm.endswith(" shots on goal"): return "Shots on Goal"
+        if raw_norm.endswith(" - total shots") or "total shots" in raw_norm: return "Shots on Goal"
+        if raw_norm.endswith(" - saves") or "total saves" in raw_norm or raw_norm.endswith(" saves"): return "Saves"
+        if raw_norm.endswith(" - power play points") or "power play points" in raw_norm: return "Power Play Points"
+        if raw_norm.endswith(" - points") or raw_norm.endswith(" points"): return "Points"
+        if raw_norm.endswith(" - assists") or "total assists" in raw_norm or raw_norm.endswith(" assists"): return "Assists"
+        if raw_norm.endswith(" - goals") or "total goals" in raw_norm or raw_norm.endswith(" goals"): return "Goals"
+        if raw_norm.endswith(" - blocked shots") or "blocked shots" in raw_norm: return "Blocked Shots"
+        if raw_norm.endswith(" - hits"): return "Hits"
 
     # Global/Generic fallbacks (use with caution)
     if "double double" in raw_norm: return "Double-Double"
@@ -111,20 +147,63 @@ _GAME_LEVEL_TYPES = {
     "MATCH_RESULT", "BOTH_TEAMS_TO_SCORE", "DRAW_NO_BET",
 }
 
-# ── Multi-runner "To Record X+" markets (MLB, NBA, NHL props) ──
+# ── Multi-runner "milestone" markets (e.g. "To Score 30+ Points") ──
+# Primary: "[Player] To [Record|Score|Hit|Get|Make] [N+] [stat]"
 _MULTI_RUNNER_RE = re.compile(
-    r"^(?:to record|player to record|player|to hit)\s+"
-    r"(?:a |an )?(\d+\+\s*)?(.+)$",
+    r"^(?:(?:a\s+|the\s+)?player\s+)?"
+    r"to\s+(?:record|hit|score|get|achieve|reach|make|notch)\s+"
+    r"(?:a\s+|an\s+)?(\d+\+\s*)?(.+?)$",
     re.IGNORECASE,
 )
+# Secondary: "N+ Stat" (e.g. "1+ Made Threes", "10+ Made Threes")
+_MILESTONE_NUM_FIRST_RE = re.compile(r"^(\d+)\+\s+(.+)$", re.IGNORECASE)
+# Tertiary: "Stat N+" (digit at end)
+_MILESTONE_NUM_LAST_RE = re.compile(r"^(.+?)\s+(\d+)\+$", re.IGNORECASE)
 
-# Market name fragment → PrizePicks stat type
+# Market stat → PrizePicks stat type
 _MULTI_RUNNER_MAP = {
-    # -- MLB Batter milestones --
+    # NBA combos (check longest keys first via sorted-by-length partial match)
+    "pts + reb + ast":    "Pts+Rebs+Asts",
+    "pts+reb+ast":        "Pts+Rebs+Asts",
+    "pts + reb":          "Pts+Rebs",
+    "pts+reb":            "Pts+Rebs",
+    "pts + ast":          "Pts+Asts",
+    "pts+ast":            "Pts+Asts",
+    "reb + ast":          "Rebs+Asts",
+    "reb+ast":            "Rebs+Asts",
+    "double double":      "Double-Double",
+    "triple double":      "Triple-Double",
+
+    # NBA individual
+    "point":              "Points",
+    "points":             "Points",
+    "rebound":            "Rebounds",
+    "rebounds":           "Rebounds",
+    "assist":             "Assists",
+    "assists":            "Assists",
+    "made three":         "3-PT Made",
+    "made threes":        "3-PT Made",
+    "three":              "3-PT Made",
+    "threes":             "3-PT Made",
+    "three point field goals": "3-PT Made",
+    "steal":              "Steals",
+    "steals":             "Steals",
+    "block":              "Blocked Shots",
+    "blocks":             "Blocked Shots",
+    "blocked shot":       "Blocked Shots",
+    "blocked shots":      "Blocked Shots",
+    "turnover":           "Turnovers",
+    "turnovers":          "Turnovers",
+    "first basket":       "First Basket",
+
+    # MLB batter
     "hit":                "Hits",
     "hits":               "Hits",
     "single":             "Singles",
+    "singles":            "Singles",
+    "double":             "Doubles",
     "doubles":            "Doubles",
+    "triple":             "Triples",
     "triples":            "Triples",
     "home run":           "Home Runs",
     "home runs":          "Home Runs",
@@ -132,77 +211,117 @@ _MULTI_RUNNER_MAP = {
     "rbis":               "RBIs",
     "run":                "Runs",
     "runs":               "Runs",
+    "run scored":         "Runs",
+    "runs scored":        "Runs",
+    "total base":         "Total Bases",
     "total bases":        "Total Bases",
     "stolen base":        "Stolen Bases",
     "stolen bases":       "Stolen Bases",
     "hits + runs + rbis": "Hits+Runs+RBIs",
+    "hits+runs+rbis":     "Hits+Runs+RBIs",
+    "walk":               "Walks",
     "walks":              "Walks",
+    "strikeout":          "Hitter Strikeouts",
     "strikeouts":         "Hitter Strikeouts",
-    
-    # -- NBA milestones --
-    "points":             "Points",
-    "rebounds":           "Rebounds",
-    "assists":            "Assists",
-    "made threes":        "3-PT Made",
-    "three point field goals": "3-PT Made",
-    "threes":             "3-PT Made",
-    "steals":             "Steals",
-    "blocks":             "Blocked Shots",
-    "blocked shots":      "Blocked Shots",
-    
-    # -- NHL milestones --
+    "extra base hit":     "Extra Base Hits",
+    "extra base hits":    "Extra Base Hits",
+
+    # NHL
+    "shot on goal":       "Shots on Goal",
     "shots on goal":      "Shots on Goal",
+    "shot":               "Shots on Goal",
     "shots":              "Shots on Goal",
+    "save":               "Saves",
     "saves":              "Saves",
-    
-    # -- Soccer milestones --
+    "power play point":   "Power Play Points",
+    "power play points":  "Power Play Points",
+    "goal":               "Goals",
+    "goals":              "Goals",
+    "anytime goalscorer": "Goals",
+    "goalscorer":         "Goals",
+    "goal scorer":        "Goals",
+
+    # Soccer
     "shots on target":    "Shots On Target",
+    "shot on target":     "Shots On Target",
     "sot":                "Shots On Target",
     "total shots":        "Shots",
+    "total shot":         "Shots",
+    "goalie save":        "Goalie Saves",
     "goalie saves":       "Goalie Saves",
     "goalkeeper saves":   "Goalie Saves",
-    
-    # -- General --
-    "goals":              "Goals",
+    "pass":               "Passes Attempted",
+    "passes":             "Passes Attempted",
+    "tackle":             "Tackles",
+    "tackles":            "Tackles",
+    "cross":              "Crosses",
+    "crosses":            "Crosses",
+    "clearance":          "Clearances",
+    "clearances":         "Clearances",
+
+    # Generic
     "points-assists":     "Pts+Asts",
-    "points":             "Points",
-    "double double":      "Double-Double",
-    "first basket":       "First Basket",
 }
 
+# Detects whether the suffix after "Player - " looks like a milestone.
+_MILESTONE_SUFFIX_RE = re.compile(
+    r"^(?:to\s+(?:score|record|hit|get|make|achieve|reach)|\d+\+\s)",
+    re.IGNORECASE,
+)
+
+def _split_player_milestone(mkt_name: str) -> tuple[Optional[str], str]:
+    """If mkt_name is "Player Name - <milestone>", return (player, milestone);
+    otherwise (None, mkt_name)."""
+    if " - " not in mkt_name:
+        return (None, mkt_name)
+    player, suffix = mkt_name.split(" - ", 1)
+    suffix = suffix.strip()
+    if _MILESTONE_SUFFIX_RE.match(suffix):
+        return (player.strip(), suffix)
+    return (None, mkt_name)
+
 def _parse_multi_runner_market(mkt_name: str, league: str = "") -> Optional[tuple[str, float]]:
-    """
-    Parse a multi-runner milestone market name.
-    """
-    m = _MULTI_RUNNER_RE.match(mkt_name.strip())
-    if not m:
-        # Fallback: "[Stat] X+" or "X+ [Stat]"
-        m2 = re.match(r"^(.+?)\s+(\d+\+)$", mkt_name.strip(), re.IGNORECASE)
-        if m2:
-             stat_part = m2.group(1).strip()
-             threshold_str = m2.group(2).rstrip("+")
-        else:
-             return None
-    else:
+    """Parse a multi-runner milestone market name into (stat, line)."""
+    s = mkt_name.strip()
+    # Strip optional "Player Name - " prefix if suffix looks milestone-y
+    _, s = _split_player_milestone(s)
+
+    m = _MULTI_RUNNER_RE.match(s)
+    if m:
         threshold_str = (m.group(1) or "").strip().rstrip("+").strip()
-        stat_part = m.group(2).strip().lower()
+        stat_part = m.group(2).strip()
+    else:
+        m2 = _MILESTONE_NUM_FIRST_RE.match(s)
+        if m2:
+            threshold_str = m2.group(1)
+            stat_part = m2.group(2).strip()
+        else:
+            m3 = _MILESTONE_NUM_LAST_RE.match(s)
+            if m3:
+                stat_part = m3.group(1).strip()
+                threshold_str = m3.group(2)
+            else:
+                # Binary soccer props (no threshold)
+                low = s.lower()
+                if low in ("anytime goalscorer", "anytime goal scorer",
+                           "goalscorer", "goal scorer", "player to score",
+                           "to score", "to score a goal"):
+                    return ("Goals", 0.5)
+                return None
 
     threshold = int(threshold_str) if threshold_str else 1
     stat_raw = stat_part.lower()
     stat_norm = stat_raw.rstrip("s")
 
-    # Try mapping
     pp_stat = _MULTI_RUNNER_MAP.get(stat_raw) or _MULTI_RUNNER_MAP.get(stat_norm)
     if not pp_stat:
-        # Partial match - sort by length descending to match most specific string first
-        # (e.g. "Shots on Target" before "Shots")
         sorted_keys = sorted(_MULTI_RUNNER_MAP.keys(), key=len, reverse=True)
         for key in sorted_keys:
             if key in stat_raw:
                 pp_stat = _MULTI_RUNNER_MAP[key]
                 break
-    
-    # League override for multi-runner
+
+    # Soccer overrides: "Shots" means open shots, not on-goal; "Saves" means goalie saves
     if league == "SOCCER" and pp_stat == "Shots on Goal":
         pp_stat = "Shots"
     if league == "SOCCER" and pp_stat == "Saves":
@@ -211,8 +330,7 @@ def _parse_multi_runner_market(mkt_name: str, league: str = "") -> Optional[tupl
     if not pp_stat:
         return None
 
-    line = threshold - 0.5
-    return (pp_stat, line)
+    return (pp_stat, threshold - 0.5)
 
 def _extract_props_from_json(data: dict, league: str) -> list[FanDuelProp]:
     """Parse FanDuel API JSON response."""
@@ -244,20 +362,25 @@ def _extract_props_from_json(data: dict, league: str) -> list[FanDuelProp]:
             if any(x in mkt_lower for x in [
                 "1st period", "2nd period", "3rd period",
                 "1st quarter", "2nd quarter", "3rd quarter", "4th quarter",
+                "1st qtr", "2nd qtr", "3rd qtr", "4th qtr",
                 "1st half", "2nd half",
-                "inning", "first pitch",
+                " inning", "first pitch",
                 "game specials", "team total",
                 "puck line", "run line", "spread betting",
                 "will there be", "moneyline",
-                "any time goal scorer", "anytime goal scorer",
                 "first goal scorer", "last goal scorer",
+                "correct score", "odd / even", "odd/even",
+                "both teams to score",
             ]):
                 continue
 
             # ── Multi-runner / Milestone markets ──
             multi = _parse_multi_runner_market(mkt_name, league)
-            is_alt = " - alt" in mkt_name.lower() or "alternative" in mkt_name.lower() 
-            
+            is_alt = " - alt" in mkt_name.lower() or "alternative" in mkt_name.lower()
+
+            # Detect player-prefixed milestones: "Adem Bona - To Score 10+ Points"
+            player_prefix, _milestone_suffix = _split_player_milestone(mkt_name)
+
             if multi or is_alt:
                 runners = mkt.get("runners", [])
                 for runner in runners:
@@ -267,16 +390,22 @@ def _extract_props_from_json(data: dict, league: str) -> list[FanDuelProp]:
 
                     if multi:
                         pp_stat, line = multi
-                        player_name = runner_raw
+                        if player_prefix:
+                            # Player fixed in market name; runners are Yes/No / Over/Under — keep only positive side
+                            if runner_raw.lower() in ("no", "under"):
+                                continue
+                            player_name = player_prefix
+                        else:
+                            player_name = runner_raw
                     else:
                         m_th = re.search(r"(\d+)\+", runner_raw)
                         if not m_th: continue
                         threshold = int(m_th.group(1))
                         line = threshold - 0.5
-                        
+
                         pp_stat = _normalize_prop_type(mkt_name, league)
                         if not pp_stat: continue
-                        
+
                         player_name = runner_raw.split(" - ")[0].strip()
                         if player_name.lower() in ["over", "under"]:
                              player_name = mkt_name.split(" - ")[0].strip()
@@ -287,7 +416,7 @@ def _extract_props_from_json(data: dict, league: str) -> list[FanDuelProp]:
                         or _parse_american(runner.get("currentPrice"))
                     )
                     if american is None: continue
-                    
+
                     props.append(FanDuelProp(
                         league=league,
                         player_name=player_name,
@@ -415,28 +544,44 @@ LEAGUE_TABS = {
         "player-threes", "player-props", "player-combos",
         "player-defense", "alternative-handicaps",
         "player-performance-doubles", "first-basket",
+        "player-steals", "player-blocks", "player-turnovers",
+        "player-scoring-combos", "player-rebounds-assists",
+        "player-points-rebounds", "player-points-assists",
+        "player-steals-blocks", "player-double-double",
+        "player-triple-double", "player-fantasy-score",
     ],
     "NCAAB": [
         "player-points", "player-rebounds", "player-assists",
         "player-threes", "player-props", "player-combos",
+        "player-defense",
     ],
     "NHL": [
         "shots", "goalies", "goals", "points-assists",
         "player-props", "alternative-handicaps",
-        "power-play-points",
+        "power-play-points", "player-shots", "player-saves",
+        "player-goals", "player-assists", "player-points",
+        "goalscorer", "goal-scorer",
     ],
     "MLB": [
-        "pitcher-props", "batter-props", "player-props", 
-        "home-runs", "strikeouts", "hits", "runs", "rbis", 
-        "total-bases", "stolen-bases", "outs-recorded", 
-        "earned-runs-allowed", "earned-runs", "walks-allowed", 
-        "walks-issued", "walks", "pitcher-strikeouts", 
+        "pitcher-props", "batter-props", "player-props",
+        "home-runs", "strikeouts", "hits", "runs", "rbis",
+        "total-bases", "stolen-bases", "outs-recorded",
+        "earned-runs-allowed", "earned-runs", "walks-allowed",
+        "walks-issued", "walks", "pitcher-strikeouts",
         "hits-+-runs-+-rbis", "hits-runs-rbis", "to-record-a-hit",
         "hits-allowed", "singles", "doubles", "triples",
-        "alternative-run-lines",
+        "alternative-run-lines", "extra-base-hits",
+        "batter-home-runs", "batter-hits", "batter-runs",
+        "batter-rbis", "batter-total-bases", "batter-strikeouts",
+        "pitcher-outs", "pitcher-hits-allowed", "pitcher-walks",
+        "pitcher-earned-runs",
     ],
     "SOCCER": [
-        "player-props", "goalscorer", "shots", "cards", "assists", "passes"
+        "player-props", "goalscorer", "shots", "cards", "assists", "passes",
+        "shots-on-target", "tackles", "crosses", "clearances", "saves",
+        "player-shots", "player-goals", "player-assists",
+        "player-shots-on-target", "player-passes", "player-tackles",
+        "player-crosses", "player-saves", "to-score", "first-goalscorer",
     ],
 }
 

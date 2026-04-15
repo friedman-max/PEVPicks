@@ -3,8 +3,10 @@ Backtest and slip logger for CoreProp.
 
 Automatically documents the best +EV slip combinations as they appear
 throughout the day. Logs to Supabase with one row per leg.
-Tracks which players have been used to avoid repeats in the same betting day.
-Resets daily at midnight.
+
+Dedup is enforced per (player, game_start) across a rolling 48h window
+sourced from Supabase — a player in a given game can appear in at most
+one slip during that window. Same player in a different game is fine.
 """
 import logging
 import uuid
@@ -20,6 +22,11 @@ logger = logging.getLogger(__name__)
 
 # Hard floor: legs with individual EV below this are never included
 MIN_LEG_EV_PCT = -0.01   # -1%
+
+# How far back we scan for duplicate slips and used-player keys.
+# 48 h covers every intra-day restart plus the midnight rollover.
+_DEDUP_WINDOW_HOURS = 48
+
 
 def _normalize(s: str) -> str:
     """Standardize strings: unidecode, lowercase, and strip whitespace."""
@@ -66,12 +73,20 @@ class BacktestLogger:
     """
     Builds and logs the best available +EV slips to Supabase.
 
+    Dedup invariant (enforced end-to-end):
+      Once a (player, game_start) pair appears in any slip within the last
+      _DEDUP_WINDOW_HOURS, that pair cannot appear in any future slip —
+      whether auto-generated or manually added — until the window passes.
+      The same player in a DIFFERENT game (different start_time) is allowed.
+
     Selection logic:
-      - Filter out already-used PLAYERS (Hard Deduplication)
+      - Resync used_bets from Supabase on every call
+      - Filter out legs whose (player, start_time) is in used_bets
       - Hard floor: individual_ev_pct >= -1%
       - Sort greedily by individual EV descending
-      - Pick top 6 legs (must be 6 unique players)
-      - Write to Supabase; lock players for the day
+      - Pick top 6 legs
+      - Final authoritative DB check for player conflicts before insert
+      - Write to Supabase; lock (player, start_time) keys for the window
     """
 
     def __init__(self):
@@ -79,44 +94,118 @@ class BacktestLogger:
         self.last_reset_date: date = date.today()
         self._rebuild_used_bets()
 
-    def _rebuild_used_bets(self) -> None:
-        """Query Supabase for recent legs (last 48h) and repopulate used_bets."""
+    def _fetch_recent_slips_with_legs(self) -> list[dict]:
+        """
+        Return all slips from the last _DEDUP_WINDOW_HOURS with their legs
+        attached. Filters by a UTC timestamp range so we never miss slips
+        created in the first few hours of a UTC day when the local date
+        hasn't ticked over yet (this was the source of the 2026-04-12 / 13 /
+        14 duplicate slips — see commit log).
+        """
         db = get_db()
         if not db:
-            return
+            return []
 
-        today = date.today()
-        yesterday = today - timedelta(days=1)
-        target_dates = [today.isoformat(), yesterday.isoformat()]
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=_DEDUP_WINDOW_HOURS)
+        cutoff_iso = cutoff.isoformat()
 
         try:
-            # Fetch recent slips by timestamp
-            res = db.table("slips").select("id, timestamp").order("timestamp", desc=True).limit(200).execute()
-            if not res.data:
-                return
+            slips_res = (
+                db.table("slips")
+                .select("id, timestamp")
+                .gte("timestamp", cutoff_iso)
+                .order("timestamp", desc=True)
+                .limit(500)
+                .execute()
+            )
+            slips = slips_res.data or []
+            if not slips:
+                return []
 
-            recent_sids = []
-            for s in res.data:
-                ts = s.get("timestamp", "")
-                if any(ts.startswith(d) for d in target_dates):
-                    recent_sids.append(s["id"])
+            sids = [s["id"] for s in slips]
+            legs_res = (
+                db.table("legs")
+                .select("slip_id, player, game_start, prop, line, side")
+                .in_("slip_id", sids)
+                .execute()
+            )
+            legs_by_slip: dict[str, list[dict]] = {}
+            for leg in (legs_res.data or []):
+                legs_by_slip.setdefault(leg["slip_id"], []).append(leg)
 
-            if not recent_sids:
-                return
-
-            # Fetch legs for those slips
-            legs_res = db.table("legs").select("player, game_start").in_("slip_id", recent_sids).execute()
-            for leg in legs_res.data:
-                self.used_bets.add(make_bet_key(
-                    leg.get("player", ""),
-                    leg.get("game_start", "") or ""
-                ))
-
-            if self.used_bets:
-                logger.debug("Backtest: rebuilt %d used-player-game keys from Supabase", len(self.used_bets))
-
+            out = []
+            for s in slips:
+                out.append({
+                    "id": s["id"],
+                    "timestamp": s.get("timestamp", ""),
+                    "legs": legs_by_slip.get(s["id"], []),
+                })
+            return out
         except Exception as exc:
-            logger.warning("Backtest: could not rebuild used_bets from Supabase: %s", exc)
+            # ERROR (not warning): a failed rebuild silently disables dedup,
+            # which is exactly how we produced duplicate slips in the first
+            # place. Surface it so monitoring notices.
+            logger.error("Backtest: could not fetch recent slips from Supabase: %s", exc)
+            return []
+
+    def _load_used_keys_from_db(self) -> set[tuple[str, str]]:
+        """
+        Return the authoritative set of (player, time_key) pairs that
+        appear as legs in any slip logged in the last _DEDUP_WINDOW_HOURS.
+        Supabase is the source of truth for this — the in-memory
+        `used_bets` is a cache of this same set.
+        """
+        used: set[tuple[str, str]] = set()
+        for slip in self._fetch_recent_slips_with_legs():
+            for leg in slip["legs"]:
+                used.add(make_bet_key(
+                    leg.get("player", "") or "",
+                    leg.get("game_start", "") or "",
+                ))
+        return used
+
+    def _rebuild_used_bets(self) -> None:
+        """
+        Replace used_bets with the authoritative set from Supabase.
+
+        Replacement (not union): local entries for slips that never made
+        it into Supabase should not keep blocking those players. The DB
+        is the only record anyone else can see, so in-memory state that
+        disagrees with the DB is wrong by definition.
+        """
+        fresh = self._load_used_keys_from_db()
+        prev = len(self.used_bets)
+        self.used_bets = fresh
+        if fresh or prev:
+            logger.info(
+                "Backtest: rebuilt used-player-game keys from last %dh of Supabase: %d (was %d)",
+                _DEDUP_WINDOW_HOURS, len(fresh), prev,
+            )
+
+    def find_conflicting_legs(self, bets: list[dict]) -> list[dict]:
+        """
+        Return the subset of `bets` whose (player, start_time) pair is
+        already used in a slip in the last _DEDUP_WINDOW_HOURS. An empty
+        list means the caller is safe to insert.
+
+        This is the primary dedup guard — any non-empty return must block
+        the insert, even if only one leg conflicts. The caller is
+        responsible for rejecting the slip.
+
+        `bets` uses the in-memory leg shape (player_name, start_time).
+        """
+        if not bets:
+            return []
+        used = self._load_used_keys_from_db()
+        conflicts = []
+        for bet in bets:
+            key = make_bet_key(
+                bet.get("player_name", "") or "",
+                bet.get("start_time", "") or "",
+            )
+            if key in used:
+                conflicts.append(bet)
+        return conflicts
 
     def _midnight_reset(self) -> None:
         today = date.today()
@@ -138,6 +227,11 @@ class BacktestLogger:
     def try_log_slip(self, bets: list[dict]) -> Optional[dict]:
         """Build and log the best available 6-leg power slip with unique players."""
         self._midnight_reset()
+        # Resync used_bets from Supabase so greedy selection filters
+        # correctly on the first pass — even if another process logged
+        # slips, or our own used_bets was cleared at midnight while slips
+        # from the prior UTC day still sit in the 48h window.
+        self._rebuild_used_bets()
 
         def _ev(b: dict) -> float:
             return float(b.get("individual_ev_pct") or 0.0)
@@ -172,6 +266,24 @@ class BacktestLogger:
 
         best_ev = power_slip_ev(true_probs)
         if best_ev is None or best_ev <= 0:
+            return None
+
+        # Final authoritative DB check. Catches the race where another
+        # process inserted a conflicting leg between our rebuild above
+        # and this moment. Any overlap — even one leg — rejects the slip.
+        conflicts = self.find_conflicting_legs(best_legs)
+        if conflicts:
+            logger.warning(
+                "Backtest: rejected slip — %d leg(s) conflict with existing slips: %s",
+                len(conflicts),
+                [(c.get("player_name"), c.get("start_time")) for c in conflicts],
+            )
+            # Update in-memory set so the next attempt selects around them.
+            for c in conflicts:
+                self.used_bets.add(make_bet_key(
+                    c.get("player_name", "") or "",
+                    c.get("start_time", "") or "",
+                ))
             return None
 
         slip_id = str(uuid.uuid4())[:8].upper()

@@ -619,6 +619,13 @@ def _reschedule(interval_min: int):
 
 @app.on_event("startup")
 def startup():
+    # ── Seed state from Supabase SYNCHRONOUSLY first ──
+    # This must happen before the pipeline starts so the fresh scrape can't
+    # be overwritten by a late-arriving stale seed. It also guarantees any
+    # request that hits /api/bets, /api/bootstrap etc. during warm-up gets
+    # the most recent persisted snapshot instead of empty arrays.
+    _seed_state_from_db_sync()
+
     scheduler.start()
     _reschedule(_state["interval_min"])
     # Midnight reset: clear used-bets pool every day at 00:00
@@ -644,24 +651,38 @@ def startup():
     # Run pipeline immediately on startup so data is ready
     threading.Thread(target=run_pipeline, daemon=True).start()
 
-    # ── Startup recovery: load cached state from Supabase ──
-    def _seed_state_from_db():
-        logger.info("Startup: Seeding state from Supabase cache...")
-        keys = ["bets", "matches", "pp_lines", "fd_lines", "dk_lines", "pin_lines", "last_refresh"]
-        for k in keys:
-            data, updated_at = load_state_from_supabase(k)
-            if data is not None:
-                with _lock:
-                    if k == "last_refresh":
-                        try:
-                            _state[k] = datetime.fromisoformat(data)
-                        except:
-                            _state[k] = None
-                    else:
-                        _state[k] = data
-        logger.info("Startup: Seeding complete.")
 
-    threading.Thread(target=_seed_state_from_db, daemon=True).start()
+def _seed_state_from_db_sync():
+    """
+    Load the last persisted snapshot from Supabase into in-memory state.
+    Only seeds keys that are still empty — never clobbers a freshly scraped
+    value (in case the pipeline finishes first on warm restart).
+    """
+    logger.info("Startup: Seeding state from Supabase cache...")
+    keys = ["bets", "matches", "pp_lines", "fd_lines", "dk_lines", "pin_lines", "last_refresh"]
+    for k in keys:
+        try:
+            data, updated_at = load_state_from_supabase(k)
+        except Exception as exc:
+            logger.warning("Seed: failed to load '%s': %s", k, exc)
+            continue
+        if data is None:
+            continue
+        with _lock:
+            current = _state.get(k)
+            # Skip if a fresher value is already present.
+            if k == "last_refresh":
+                if current is not None:
+                    continue
+                try:
+                    _state[k] = datetime.fromisoformat(data)
+                except Exception:
+                    _state[k] = None
+            else:
+                if current:  # non-empty list already — keep it
+                    continue
+                _state[k] = data
+    logger.info("Startup: Seeding complete.")
 
 
 @app.on_event("shutdown")
@@ -693,6 +714,16 @@ def root():
 # API routes
 # ---------------------------------------------------------------------------
 
+def _last_refresh_iso():
+    """Return last_refresh as ISO string or None (callers already hold no lock)."""
+    ts = _state.get("last_refresh")
+    if isinstance(ts, datetime):
+        return ts.isoformat()
+    if isinstance(ts, str):
+        return ts
+    return None
+
+
 @app.get("/api/bets")
 def get_bets():
     with _lock:
@@ -700,6 +731,7 @@ def get_bets():
             "bets":         _state["bets"],
             "total":        len(_state["bets"]),
             "is_scraping":  _state["is_scraping"],
+            "last_refresh": _last_refresh_iso(),
         }
 
 
@@ -710,6 +742,29 @@ def get_matched():
             "matches":      _state.get("matches", []),
             "total":        len(_state.get("matches", [])),
             "is_scraping":  _state["is_scraping"],
+            "last_refresh": _last_refresh_iso(),
+        }
+
+
+@app.get("/api/bootstrap")
+def get_bootstrap():
+    """
+    Single-shot payload containing every dataset the UI needs on first load.
+    The frontend uses this to avoid firing 6+ parallel requests on every
+    page refresh — combined with localStorage caching, this makes the
+    initial paint effectively instant.
+    """
+    with _lock:
+        return {
+            "bets":          _state["bets"],
+            "matches":       _state.get("matches", []),
+            "pp_lines":      _state.get("pp_lines", []),
+            "fd_lines":      _state.get("fd_lines", []),
+            "dk_lines":      _state.get("dk_lines", []),
+            "pin_lines":     _state.get("pin_lines", []),
+            "is_scraping":   _state["is_scraping"],
+            "last_refresh":  _last_refresh_iso(),
+            "interval_min":  _state["interval_min"],
         }
 
 
@@ -855,6 +910,7 @@ def get_prizepicks():
             "lines": _state["pp_lines"],
             "total": len(_state["pp_lines"]),
             "is_scraping": _state["is_scraping_pp"],
+            "last_refresh": _last_refresh_iso(),
         }
 
 
@@ -926,6 +982,7 @@ def get_fanduel():
             "lines": _state["fd_lines"],
             "total": len(_state["fd_lines"]),
             "is_scraping": _state["is_scraping_fd"],
+            "last_refresh": _last_refresh_iso(),
         }
 
 
@@ -1011,6 +1068,7 @@ def get_draftkings():
             "lines": _state["dk_lines"],
             "total": len(_state["dk_lines"]),
             "is_scraping": _state["is_scraping_dk"],
+            "last_refresh": _last_refresh_iso(),
         }
 
 
@@ -1096,6 +1154,7 @@ def get_pinnacle():
             "lines": _state["pin_lines"],
             "total": len(_state["pin_lines"]),
             "is_scraping": _state["is_scraping_pin"],
+            "last_refresh": _last_refresh_iso(),
         }
 
 
@@ -1306,12 +1365,66 @@ def add_slip_to_backtest(req: BacktestAddSlipRequest):
     if missing:
         raise HTTPException(status_code=404, detail=f"Bet IDs not found: {missing}")
 
-    # Force the slip through — bypass the "enough bets" / dedup gate by
-    # calling try_log_slip with only these bets (already in correct format)
+    # Within-slip dedup: a single slip cannot contain two legs on the
+    # same (player, start_time) — e.g. selecting both "Player A points
+    # over" and "Player A assists over" for the same game.
+    seen_keys: set[tuple[str, str]] = set()
+    dup_within: list[str] = []
+    for b in backtest_bets:
+        k = make_bet_key(b.get("player_name", ""), b.get("start_time", ""))
+        if k in seen_keys:
+            dup_within.append(b.get("player_name", "") or "?")
+        seen_keys.add(k)
+    if dup_within:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "A slip cannot contain multiple legs on the same player+game: "
+                + ", ".join(dup_within)
+            ),
+        )
+
+    # Cross-slip dedup: any (player, start_time) already used in another
+    # slip within the last 48h blocks this whole slip. Same player in a
+    # different game (different start_time) is fine.
+    conflicts = _backtest.find_conflicting_legs(backtest_bets)
+    if conflicts:
+        detail_parts = [
+            f"{c.get('player_name', '')} @ {c.get('start_time', '')}"
+            for c in conflicts
+        ]
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"{len(conflicts)} leg(s) already used in another slip "
+                f"within the last 48 hours: " + ", ".join(detail_parts)
+            ),
+        )
+
+    # Force the slip through — bypass the "enough bets" / EV gate by
+    # calling try_log_slip with only these bets (already in correct format).
     new_slip = _backtest.try_log_slip(backtest_bets)
     if new_slip is None:
         # try_log_slip may reject due to EV or already-used bets;
-        # for manual adds we force-log it anyway
+        # for manual adds we force-log it anyway.
+        #
+        # Re-check for player conflicts one more time: if another process
+        # inserted a conflicting leg between our top-of-endpoint check and
+        # now, we want to surface that rather than silently force-insert.
+        late_conflicts = _backtest.find_conflicting_legs(backtest_bets)
+        if late_conflicts:
+            detail_parts = [
+                f"{c.get('player_name', '')} @ {c.get('start_time', '')}"
+                for c in late_conflicts
+            ]
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"{len(late_conflicts)} leg(s) already used in another slip "
+                    f"within the last 48 hours: " + ", ".join(detail_parts)
+                ),
+            )
+
         import uuid
         from datetime import datetime as _dt
         from engine.database import get_db
