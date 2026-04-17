@@ -187,6 +187,13 @@ class ESPNResultsChecker:
 
         if updated:
             logger.info("ResultsChecker: updated %d pending rows", updated)
+
+        # Release boxscore/gamelog caches now that the run is done. These can
+        # grow to a few MB per league-day and have no value across runs
+        # (the next run re-clears them anyway).
+        self._cache.clear()
+        self._gamelog_cache.clear()
+        self._event_cache.clear()
         return updated
 
     # ------------------------------------------------------------------

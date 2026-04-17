@@ -16,7 +16,7 @@ from config import FUZZY_THRESHOLD
 # Data models
 # ---------------------------------------------------------------------------
 
-@dataclass
+@dataclass(slots=True)
 class FanDuelProp:
     league: str
     player_name: str
@@ -28,7 +28,7 @@ class FanDuelProp:
     start_time: str = ""
 
 
-@dataclass
+@dataclass(slots=True)
 class PrizePickLine:
     league: str
     player_name: str
@@ -39,7 +39,7 @@ class PrizePickLine:
     side: str = "both"   # "both", "over", or "under"
 
 
-@dataclass
+@dataclass(slots=True)
 class MatchedProp:
     pp: PrizePickLine
     name_score: float    # fuzzy similarity 0-100

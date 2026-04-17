@@ -4,20 +4,35 @@ services:
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn web.app:app -k uvicorn.workers.UvicornWorker --workers 1 --threads 4 --timeout 180 --max-requests 300 --max-requests-jitter 50 --bind 0.0.0.0:$PORT
+    # --threads 2: fewer worker threads means fewer concurrent request bodies
+    #   / response buffers in RAM. Four threads served no real purpose given
+    #   a single Uvicorn worker with mostly-async IO.
+    # --max-requests 150: recycle the worker twice as often. Each restart
+    #   returns accumulated heap fragmentation to the OS.
+    startCommand: gunicorn web.app:app -k uvicorn.workers.UvicornWorker --workers 1 --threads 2 --timeout 180 --max-requests 150 --max-requests-jitter 25 --bind 0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
       # Cap glibc malloc arenas. Default on multi-core Linux is 8 * nCPU,
       # which causes severe RSS fragmentation in Python web workers.
-      # Setting this to 2 typically reduces resident memory by 30-50%.
+      # 1 arena is safe on a single-worker deploy and gives the tightest RSS.
       - key: MALLOC_ARENA_MAX
-        value: "2"
+        value: "1"
+      # Return memory to the OS as soon as a free block of >=128KB appears
+      # at the top of the heap, instead of waiting for the default 128MB
+      # threshold (which the free tier can't afford).
+      - key: MALLOC_TRIM_THRESHOLD_
+        value: "131072"
+      - key: MALLOC_MMAP_THRESHOLD_
+        value: "131072"
       # Disable Python's memory pool allocator so freed memory is returned
       # to the OS immediately instead of being held by pymalloc arenas.
       - key: PYTHONMALLOC
         value: malloc
       - key: PYTHONUNBUFFERED
+        value: "1"
+      # Strip asserts to shrink the bytecode cache (docstrings kept).
+      - key: PYTHONOPTIMIZE
         value: "1"
       - key: HOST
         value: 0.0.0.0

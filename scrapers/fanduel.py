@@ -619,32 +619,40 @@ async def _scrape_league(client: httpx.AsyncClient, league: str) -> list[FanDuel
         "player-assists", "player-threes",
     ])
     
-    sem = asyncio.Semaphore(5)
-    
+    # Lower concurrency cuts peak memory — each in-flight request holds a
+    # response JSON (tens of KB each) in RAM until parsed. 2 gives us enough
+    # throughput for the free tier without stacking up response buffers.
+    sem = asyncio.Semaphore(2)
+
     async def _safe_fetch(eid: str, tab: str):
         async with sem:
             return await _fetch_event_tab(client, league, eid, tab)
 
     logger.info("FanDuel [%s]: fetching %d tabs for %d events (Phase 2)", league, len(TABS), len(event_ids))
-    tasks = []
-    for eid in event_ids:
-        for tab in TABS:
-            tasks.append(_safe_fetch(eid, tab))
+    tasks = [
+        asyncio.create_task(_safe_fetch(eid, tab))
+        for eid in event_ids
+        for tab in TABS
+    ]
 
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-    for res in results:
-        if isinstance(res, list):
-            all_props.extend(res)
-             
-    # Deduplicate by (player_name, prop_type, line)
-    seen = set()
+    # Deduplicate as we stream — avoids holding N intermediate lists and the
+    # final `all_props` concatenation at the same time.
+    seen: set = set()
     unique: list[FanDuelProp] = []
-    for p in all_props:
-        key = (p.player_name, p.prop_type, p.line)
-        if key not in seen:
+    for coro in asyncio.as_completed(tasks):
+        try:
+            res = await coro
+        except Exception:
+            continue
+        if not isinstance(res, list):
+            continue
+        for p in res:
+            key = (p.player_name, p.prop_type, p.line)
+            if key in seen:
+                continue
             seen.add(key)
             unique.append(p)
-            
+
     logger.info("FanDuel [%s]: %d unique props captured", league, len(unique))
     return unique
 

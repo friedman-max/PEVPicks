@@ -66,7 +66,7 @@ _MIN_MARKET_WIDTH = 1.0  # 1% overround
 # Book data container
 # ---------------------------------------------------------------------------
 
-@dataclass
+@dataclass(slots=True)
 class BookOdds:
     """Odds from a single sportsbook for one prop."""
     book_name: str          # "fanduel", "draftkings", "pinnacle"
@@ -211,8 +211,9 @@ def compute_true_probability(
     if not has_any_direct:
         return None, None, {"n_books": 0, "devig_method": "no_direct_odds"}
 
-    # Collect per-book data
-    entries = []  # list of (book_name, power_prob, worst_prob, weight, width, odds)
+    # Collect per-book data as tuples: (power_prob, worst_prob, weight, width, odds)
+    # Tuples are ~3x smaller than equivalent dicts and avoid per-match key overhead.
+    entries: list[tuple] = []
     for book in books:
         power_prob = _devig_book(book, side)
         worst_prob = _devig_book_worst_case(book, side)
@@ -224,15 +225,7 @@ def compute_true_probability(
         weight = _get_sharpness_weight(book.book_name)
         width = _get_market_width(book)
 
-        entries.append({
-            "book": book.book_name,
-            "power_prob": power_prob,
-            "worst_prob": worst_prob,
-            "weight": weight,
-            "width": width,
-            "odds": odds,
-            "both_sided": book.both_sided,
-        })
+        entries.append((power_prob, worst_prob, weight, width, odds))
 
     if not entries:
         return None, None, {"n_books": 0, "devig_method": "none"}
@@ -243,23 +236,16 @@ def compute_true_probability(
     # Single-source fallback
     # ------------------------------------------------------------------
     if n_books == 1:
-        entry = entries[0]
-        prob = entry["worst_prob"] or entry["power_prob"]
+        power_prob, worst_prob, _weight, _width, odds = entries[0]
+        prob = worst_prob or power_prob
 
         # Apply the scaled single-source uncertainty discount
-        discounted = apply_single_source_discount(prob, entry["odds"])
+        discounted = apply_single_source_discount(prob, odds)
 
         return (
-            discounted,           # consensus = discounted worst case
-            discounted,           # worst case = same (only one source)
-            {
-                "n_books": 1,
-                "devig_method": "single_source_scaled",
-                "source_book": entry["book"],
-                "raw_prob": prob,
-                "discount_applied": round(prob - discounted, 6),
-                "both_sided": entry["both_sided"],
-            },
+            discounted,
+            discounted,
+            {"n_books": 1, "devig_method": "single_source_scaled"},
         )
 
     # ------------------------------------------------------------------
@@ -270,39 +256,29 @@ def compute_true_probability(
 
     weighted_sum = 0.0
     weight_denom = 0.0
+    worst_case_prob: Optional[float] = None
 
-    for entry in entries:
-        inv_width = 1.0 / entry["width"]
-        effective_weight = entry["weight"] * inv_width
+    for power_prob, worst_prob, weight, width, _odds in entries:
+        inv_width = 1.0 / width
+        effective_weight = weight * inv_width
 
-        weighted_sum += entry["power_prob"] * effective_weight
+        weighted_sum += power_prob * effective_weight
         weight_denom += effective_weight
+
+        if worst_prob is not None and (worst_case_prob is None or worst_prob < worst_case_prob):
+            worst_case_prob = worst_prob
 
     consensus_prob = weighted_sum / weight_denom if weight_denom > 0 else None
 
-    # Worst-case: minimum across all books' worst-case devigged values
-    worst_case_prob = min(e["worst_prob"] for e in entries if e["worst_prob"] is not None)
-
     # The final worst-case should not exceed the consensus
     # (if consensus is lower due to weighting, use that)
-    if consensus_prob is not None and worst_case_prob > consensus_prob:
+    if consensus_prob is not None and worst_case_prob is not None and worst_case_prob > consensus_prob:
         worst_case_prob = consensus_prob
 
-    metadata = {
-        "n_books": n_books,
-        "devig_method": "power_vwap",
-        "per_book": [
-            {
-                "book": e["book"],
-                "power_prob": round(e["power_prob"], 6),
-                "worst_prob": round(e["worst_prob"], 6),
-                "weight": e["weight"],
-                "width_pct": round(e["width"], 2),
-                "both_sided": e["both_sided"],
-            }
-            for e in entries
-        ],
-    }
+    # Metadata kept minimal — callers (pipeline, clv_checker) only read the
+    # two probabilities. Building a per_book list per match allocated tens of
+    # thousands of short-lived dicts on every scrape cycle.
+    metadata = {"n_books": n_books, "devig_method": "power_vwap"}
 
     return consensus_prob, worst_case_prob, metadata
 

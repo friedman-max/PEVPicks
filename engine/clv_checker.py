@@ -41,21 +41,25 @@ class CLVTracker:
         """
         Updates pending backtest legs in Supabase with the latest true probability.
 
-        Unlike previous versions, this has NO pre-game time window restriction.
-        Any pending bet with available current odds gets updated. This ensures
-        that even if the app was down for a while, the most recent odds are
-        always captured, and the last update before lines disappear becomes
-        the closing line.
+        `matches` is the list of MatchResult objects from app.py. Most callers
+        should prefer `update_closing_lines_from_probs` with a precomputed dict
+        so that the heavy MatchedProp list can be freed earlier.
+        """
+        current_probs = self._build_current_probs(matches)
+        return self.update_closing_lines_from_probs(current_probs)
 
-        `matches` is the list of MatchResult objects from app.py.
-        Returns the number of rows updated.
+    def update_closing_lines_from_probs(
+        self, current_probs: dict[tuple[str, str, str, float], float]
+    ) -> int:
+        """
+        Same as `update_closing_lines` but takes the precomputed
+        (player, prop, side, line) -> worst_case_prob dict directly.
+        Used by the main pipeline to avoid retaining `matches` until the
+        background thread finishes.
         """
         db = get_db()
         if not db:
             return 0
-
-        # Build a lookup for current matches: (player_lower, prop_lower, side, line) -> true_prob
-        current_probs = self._build_current_probs(matches)
 
         # Fetch pending legs from Supabase
         try:

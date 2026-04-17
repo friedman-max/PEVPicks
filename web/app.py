@@ -62,10 +62,6 @@ _backtest         = BacktestLogger()
 _results_checker  = ESPNResultsChecker()
 _clv_tracker      = CLVTracker()
 
-# If a scraper returns 0 results but previous had at least this many,
-# reuse the previous data instead of wiping the state.
-_MIN_LINES_FOR_FALLBACK = 5
-
 # ---------------------------------------------------------------------------
 # In-memory state
 # ---------------------------------------------------------------------------
@@ -91,11 +87,6 @@ _state = {
     "interval_min":  5,
     "min_ev_pct":    -10.0,
     "active_leagues": dict(cfg.ACTIVE_LEAGUES),
-    # Raw prop objects from last successful scrape (for fallback)
-    "_prev_pp_raw":  [],        # list[PrizePickLine]
-    "_prev_fd_raw":  [],        # list[FanDuelProp]
-    "_prev_dk_raw":  [],        # list[FanDuelProp]
-    "_prev_pin_raw": [],        # list[FanDuelProp]
     # Backtest: latest logged slip (for frontend notification)
     "latest_slip":   None,
 }
@@ -224,42 +215,36 @@ def run_pipeline():
 def _run_pipeline_body():
     errors = {}
     try:
-        # Read runtime league config. Reuse (don't copy) previous raw lists
-        # for fallback — copying doubles peak RSS during the scrape.
         with _lock:
             leagues = dict(_state["active_leagues"])
-            prev_pp_raw = _state["_prev_pp_raw"]
-            prev_fd_raw = _state["_prev_fd_raw"]
-            prev_dk_raw = _state["_prev_dk_raw"]
-            prev_pin_raw = _state["_prev_pin_raw"]
 
         logger.info("Pipeline: scraping PrizePicks...")
         pp_lines = scrape_prizepicks(active_leagues=leagues)
-        if len(pp_lines) == 0 and len(prev_pp_raw) >= _MIN_LINES_FOR_FALLBACK:
-            logger.warning("PrizePicks returned 0 lines, reusing %d cached lines", len(prev_pp_raw))
-            pp_lines = prev_pp_raw
-            errors["prizepicks"] = "Empty response — using cached data"
+        if len(pp_lines) == 0:
+            errors["prizepicks"] = "Empty response"
 
         logger.info("Pipeline: scraping FanDuel...")
         fd_props = scrape_fanduel(active_leagues=leagues)
-        if len(fd_props) == 0 and len(prev_fd_raw) >= _MIN_LINES_FOR_FALLBACK:
-            logger.warning("FanDuel returned 0 props, reusing %d cached props", len(prev_fd_raw))
-            fd_props = prev_fd_raw
-            errors["fanduel"] = "Empty response — using cached data"
+        if len(fd_props) == 0:
+            errors["fanduel"] = "Empty response"
 
         logger.info("Pipeline: scraping DraftKings...")
         dk_props = scrape_draftkings(active_leagues=leagues)
-        if len(dk_props) == 0 and len(prev_dk_raw) >= _MIN_LINES_FOR_FALLBACK:
-            logger.warning("DraftKings returned 0 props, reusing %d cached props", len(prev_dk_raw))
-            dk_props = prev_dk_raw
-            errors["draftkings"] = "Empty response — using cached data"
+        if len(dk_props) == 0:
+            errors["draftkings"] = "Empty response"
 
         logger.info("Pipeline: scraping Pinnacle...")
         pin_props = scrape_pinnacle(active_leagues=leagues)
-        if len(pin_props) == 0 and len(prev_pin_raw) >= _MIN_LINES_FOR_FALLBACK:
-            logger.warning("Pinnacle returned 0 props, reusing %d cached props", len(prev_pin_raw))
-            pin_props = prev_pin_raw
-            errors["pinnacle"] = "Empty response — using cached data"
+        if len(pin_props) == 0:
+            errors["pinnacle"] = "Empty response"
+
+        # If every source failed, skip the state update entirely so the UI
+        # keeps the last good snapshot (avoids clearing screens on a bad cycle).
+        if not pp_lines and not fd_props and not dk_props and not pin_props:
+            logger.warning("Pipeline: all scrapers returned 0 — preserving previous state.")
+            with _lock:
+                _state["scrape_errors"] = errors
+            return
 
         serialized_pp = []
         for l in pp_lines:
@@ -509,6 +494,21 @@ def _run_pipeline_body():
             d["in_backtest"] = bet_key in used_keys
             serialized_bets.append(d)
 
+        # Free intermediate mapping before we hand off to Supabase + background
+        # workers. On a full scrape this dict contains one entry per bet and
+        # holds references the GC would otherwise retain until cycle end.
+        bet_book_odds.clear()
+        del bet_book_odds
+
+        # Precompute what CLV actually needs from `matches` so we can drop the
+        # heavy MatchedProp list (and its transitive references to every raw
+        # FanDuel/DK/Pinnacle prop) before launching the background threads.
+        try:
+            clv_current_probs = _clv_tracker._build_current_probs(matches)
+        except Exception as clv_pre_exc:
+            logger.warning("CLV precompute error: %s", clv_pre_exc)
+            clv_current_probs = {}
+
         with _lock:
             _state["bets"]         = serialized_bets
             _state["bet_map"]      = {b.bet_id: b for b in bets}
@@ -520,11 +520,6 @@ def _run_pipeline_body():
             _state["last_refresh"] = datetime.now()
             _state["next_refresh"] = datetime.now() + timedelta(minutes=_state["interval_min"])
             _state["scrape_errors"] = errors
-            # Persist raw objects for fallback on next cycle
-            _state["_prev_pp_raw"]  = pp_lines
-            _state["_prev_fd_raw"]  = fd_props
-            _state["_prev_dk_raw"]  = dk_props
-            _state["_prev_pin_raw"] = pin_props
         logger.info("Pipeline complete: %d +EV bets found.", len(bets))
 
         # ── Supabase Sync: Persist the new state for instant load on restart ──
@@ -546,9 +541,11 @@ def _run_pipeline_body():
         _auto_create_backtest_slip(serialized_bets)
 
         # ── CLV Tracker: update closing lines for pending bets non-blocking ──
-        def _update_clv_bg():
+        # Pass the precomputed probs dict only — not the full matches list —
+        # so matches can be freed as soon as this scope exits.
+        def _update_clv_bg(current_probs=clv_current_probs):
             try:
-                updated = _clv_tracker.update_closing_lines(matches)
+                updated = _clv_tracker.update_closing_lines_from_probs(current_probs)
                 finalized = _clv_tracker.finalize_missed()
                 if updated or finalized:
                     logger.info("CLVTracker: %d updated, %d finalized in background", updated, finalized)
@@ -948,13 +945,12 @@ def _run_pp_scrape():
     try:
         with _lock:
             leagues = dict(_state["active_leagues"])
-            prev_pp_raw = list(_state["_prev_pp_raw"])
 
         logger.info("PrizePicks-only scrape starting...")
         pp_lines = scrape_prizepicks(active_leagues=leagues)
-        if len(pp_lines) == 0 and len(prev_pp_raw) >= _MIN_LINES_FOR_FALLBACK:
-            logger.warning("PrizePicks returned 0 lines, reusing %d cached lines", len(prev_pp_raw))
-            pp_lines = prev_pp_raw
+        if len(pp_lines) == 0:
+            logger.warning("PrizePicks returned 0 lines — keeping previous serialized state")
+            return
         serialized = []
         for l in pp_lines:
             if l.side == "both":
@@ -978,7 +974,6 @@ def _run_pp_scrape():
                 })
         with _lock:
             _state["pp_lines"] = serialized
-            _state["_prev_pp_raw"] = pp_lines
         sync_state_to_supabase("pp_lines", serialized)
         logger.info("PrizePicks-only scrape complete: %d lines.", len(serialized))
     except Exception as e:
@@ -1020,13 +1015,12 @@ def _run_fd_scrape():
     try:
         with _lock:
             leagues = dict(_state["active_leagues"])
-            prev_fd_raw = list(_state["_prev_fd_raw"])
 
         logger.info("FanDuel scrape starting...")
         fd_props = scrape_fanduel(active_leagues=leagues)
-        if len(fd_props) == 0 and len(prev_fd_raw) >= _MIN_LINES_FOR_FALLBACK:
-            logger.warning("FanDuel returned 0 props, reusing %d cached props", len(prev_fd_raw))
-            fd_props = prev_fd_raw
+        if len(fd_props) == 0:
+            logger.warning("FanDuel returned 0 props — keeping previous serialized state")
+            return
         from engine.devig import devig_power, devig_single_sided, prob_to_american
         serialized = []
         for p in fd_props:
@@ -1063,7 +1057,6 @@ def _run_fd_scrape():
                 })
         with _lock:
             _state["fd_lines"] = serialized
-            _state["_prev_fd_raw"] = fd_props
         sync_state_to_supabase("fd_lines", serialized)
         logger.info("FanDuel scrape complete: %d lines.", len(serialized))
     except Exception as e:
@@ -1106,13 +1099,12 @@ def _run_dk_scrape():
     try:
         with _lock:
             leagues = dict(_state["active_leagues"])
-            prev_dk_raw = list(_state["_prev_dk_raw"])
 
         logger.info("DraftKings scrape starting...")
         dk_props = scrape_draftkings(active_leagues=leagues)
-        if len(dk_props) == 0 and len(prev_dk_raw) >= _MIN_LINES_FOR_FALLBACK:
-            logger.warning("DraftKings returned 0 props, reusing %d cached props", len(prev_dk_raw))
-            dk_props = prev_dk_raw
+        if len(dk_props) == 0:
+            logger.warning("DraftKings returned 0 props — keeping previous serialized state")
+            return
         from engine.devig import devig_power, devig_single_sided, prob_to_american
         serialized = []
         for p in dk_props:
@@ -1149,7 +1141,6 @@ def _run_dk_scrape():
                 })
         with _lock:
             _state["dk_lines"] = serialized
-            _state["_prev_dk_raw"] = dk_props
         sync_state_to_supabase("dk_lines", serialized)
         logger.info("DraftKings scrape complete: %d lines.", len(serialized))
     except Exception as e:
@@ -1192,13 +1183,12 @@ def _run_pin_scrape():
     try:
         with _lock:
             leagues = dict(_state["active_leagues"])
-            prev_pin_raw = list(_state["_prev_pin_raw"])
 
         logger.info("Pinnacle scrape starting...")
         pin_props = scrape_pinnacle(active_leagues=leagues)
-        if len(pin_props) == 0 and len(prev_pin_raw) >= _MIN_LINES_FOR_FALLBACK:
-            logger.warning("Pinnacle returned 0 props, reusing %d cached props", len(prev_pin_raw))
-            pin_props = prev_pin_raw
+        if len(pin_props) == 0:
+            logger.warning("Pinnacle returned 0 props — keeping previous serialized state")
+            return
         from engine.devig import devig_power, devig_single_sided, prob_to_american
         serialized = []
         for p in pin_props:
@@ -1235,7 +1225,6 @@ def _run_pin_scrape():
                 })
         with _lock:
             _state["pin_lines"] = serialized
-            _state["_prev_pin_raw"] = pin_props
         sync_state_to_supabase("pin_lines", serialized)
         logger.info("Pinnacle scrape complete: %d lines.", len(serialized))
     except Exception as e:
