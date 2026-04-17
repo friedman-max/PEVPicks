@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: coreprop
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn web.app:app -k uvicorn.workers.UvicornWorker --workers 1 --threads 4 --timeout 180 --max-requests 300 --max-requests-jitter 50 --bind 0.0.0.0:$PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      # Cap glibc malloc arenas. Default on multi-core Linux is 8 * nCPU,
+      # which causes severe RSS fragmentation in Python web workers.
+      # Setting this to 2 typically reduces resident memory by 30-50%.
+      - key: MALLOC_ARENA_MAX
+        value: "2"
+      # Disable Python's memory pool allocator so freed memory is returned
+      # to the OS immediately instead of being held by pymalloc arenas.
+      - key: PYTHONMALLOC
+        value: malloc
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: HOST
+        value: 0.0.0.0

@@ -8,10 +8,22 @@ Endpoints:
   GET  /api/config      - Current runtime config
   POST /api/config      - Update config (interval, min_ev, leagues)
 """
+import gc
 import logging
+import sys
 import threading
 from datetime import datetime, timedelta
 from typing import Optional
+
+# Aggressive GC thresholds — scrape cycles create lots of short-lived objects.
+# Lower thresholds trigger collection earlier, keeping RSS closer to working-set
+# size on the 512MB Render free tier.
+gc.set_threshold(500, 5, 5)
+
+
+def _intern(s):
+    """Intern strings so repeated league/stat_type/side values share storage."""
+    return sys.intern(s) if isinstance(s, str) else s
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -191,21 +203,35 @@ def _auto_create_backtest_slip(serialized_bets: list) -> Optional[dict]:
 
 
 def run_pipeline():
+    """Public pipeline entry. Delegates to _run_pipeline_body so that all
+    large per-cycle locals (tens of thousands of dicts) go out of scope and
+    can be reclaimed before we force a GC."""
     with _lock:
         if _state["is_scraping"]:
             logger.info("Scrape already in progress, skipping.")
             return
         _state["is_scraping"] = True
-        errors = {}
-
     try:
-        # Read runtime league config and snapshot previous raw data for fallback
+        _run_pipeline_body()
+    finally:
+        with _lock:
+            _state["is_scraping"] = False
+        # Large locals from _run_pipeline_body are now unreachable. Force a
+        # full GC so the memory is released to the OS (critical on 512MB tier).
+        gc.collect()
+
+
+def _run_pipeline_body():
+    errors = {}
+    try:
+        # Read runtime league config. Reuse (don't copy) previous raw lists
+        # for fallback — copying doubles peak RSS during the scrape.
         with _lock:
             leagues = dict(_state["active_leagues"])
-            prev_pp_raw = list(_state["_prev_pp_raw"])
-            prev_fd_raw = list(_state["_prev_fd_raw"])
-            prev_dk_raw = list(_state["_prev_dk_raw"])
-            prev_pin_raw = list(_state["_prev_pin_raw"])
+            prev_pp_raw = _state["_prev_pp_raw"]
+            prev_fd_raw = _state["_prev_fd_raw"]
+            prev_dk_raw = _state["_prev_dk_raw"]
+            prev_pin_raw = _state["_prev_pin_raw"]
 
         logger.info("Pipeline: scraping PrizePicks...")
         pp_lines = scrape_prizepicks(active_leagues=leagues)
@@ -237,11 +263,13 @@ def run_pipeline():
 
         serialized_pp = []
         for l in pp_lines:
+            lg = _intern(l.league)
+            st = _intern(l.stat_type)
             if l.side == "both":
                 common = {
-                    "league": l.league,
+                    "league": lg,
                     "player_name": l.player_name,
-                    "stat_type": l.stat_type,
+                    "stat_type": st,
                     "line_score": l.line_score,
                     "start_time": l.start_time,
                 }
@@ -249,116 +277,51 @@ def run_pipeline():
                 serialized_pp.append({**common, "side": "under"})
             else:
                 serialized_pp.append({
-                    "league": l.league,
+                    "league": lg,
                     "player_name": l.player_name,
-                    "stat_type": l.stat_type,
+                    "stat_type": st,
                     "line_score": l.line_score,
-                    "side": l.side,
+                    "side": _intern(l.side),
                     "start_time": l.start_time,
                 })
 
         from engine.devig import devig_power, devig_single_sided, prob_to_american
-        serialized_fd = []
-        for p in fd_props:
-            true_over, true_under = None, None
-            if p.both_sided and p.over_odds is not None and p.under_odds is not None:
-                true_over, true_under = devig_power(p.over_odds, p.under_odds)
-            else:
+
+        def _serialize_book(props):
+            out = []
+            _OVER = sys.intern("over")
+            _UNDER = sys.intern("under")
+            for p in props:
+                true_over, true_under = None, None
+                if p.both_sided and p.over_odds is not None and p.under_odds is not None:
+                    true_over, true_under = devig_power(p.over_odds, p.under_odds)
+                else:
+                    if p.over_odds is not None:
+                        true_over = devig_single_sided(p.over_odds)
+                    if p.under_odds is not None:
+                        true_under = devig_single_sided(p.under_odds)
+                lg = _intern(p.league)
+                st = _intern(p.prop_type)
+                start = getattr(p, "start_time", None)
                 if p.over_odds is not None:
-                    true_over = devig_single_sided(p.over_odds)
+                    out.append({
+                        "league": lg, "player_name": p.player_name, "stat_type": st,
+                        "line_score": p.line, "side": _OVER, "line_odds": p.over_odds,
+                        "true_odds": prob_to_american(true_over) if true_over else None,
+                        "start_time": start,
+                    })
                 if p.under_odds is not None:
-                    true_under = devig_single_sided(p.under_odds)
+                    out.append({
+                        "league": lg, "player_name": p.player_name, "stat_type": st,
+                        "line_score": p.line, "side": _UNDER, "line_odds": p.under_odds,
+                        "true_odds": prob_to_american(true_under) if true_under else None,
+                        "start_time": start,
+                    })
+            return out
 
-            if p.over_odds is not None:
-                serialized_fd.append({
-                    "league": p.league,
-                    "player_name": p.player_name,
-                    "stat_type": p.prop_type,
-                    "line_score": p.line,
-                    "side": "over",
-                    "line_odds": p.over_odds,
-                    "true_odds": prob_to_american(true_over) if true_over else None,
-                    "start_time": getattr(p, "start_time", None),
-                })
-            if p.under_odds is not None:
-                serialized_fd.append({
-                    "league": p.league,
-                    "player_name": p.player_name,
-                    "stat_type": p.prop_type,
-                    "line_score": p.line,
-                    "side": "under",
-                    "line_odds": p.under_odds,
-                    "true_odds": prob_to_american(true_under) if true_under else None,
-                    "start_time": getattr(p, "start_time", None),
-                })
-
-        serialized_dk = []
-        for p in dk_props:
-            true_over, true_under = None, None
-            if p.both_sided and p.over_odds is not None and p.under_odds is not None:
-                true_over, true_under = devig_power(p.over_odds, p.under_odds)
-            else:
-                if p.over_odds is not None:
-                    true_over = devig_single_sided(p.over_odds)
-                if p.under_odds is not None:
-                    true_under = devig_single_sided(p.under_odds)
-
-            if p.over_odds is not None:
-                serialized_dk.append({
-                    "league": p.league,
-                    "player_name": p.player_name,
-                    "stat_type": p.prop_type,
-                    "line_score": p.line,
-                    "side": "over",
-                    "line_odds": p.over_odds,
-                    "true_odds": prob_to_american(true_over) if true_over else None,
-                    "start_time": getattr(p, "start_time", None),
-                })
-            if p.under_odds is not None:
-                serialized_dk.append({
-                    "league": p.league,
-                    "player_name": p.player_name,
-                    "stat_type": p.prop_type,
-                    "line_score": p.line,
-                    "side": "under",
-                    "line_odds": p.under_odds,
-                    "true_odds": prob_to_american(true_under) if true_under else None,
-                    "start_time": getattr(p, "start_time", None),
-                })
-
-        serialized_pin = []
-        for p in pin_props:
-            true_over, true_under = None, None
-            if p.both_sided and p.over_odds is not None and p.under_odds is not None:
-                true_over, true_under = devig_power(p.over_odds, p.under_odds)
-            else:
-                if p.over_odds is not None:
-                    true_over = devig_single_sided(p.over_odds)
-                if p.under_odds is not None:
-                    true_under = devig_single_sided(p.under_odds)
-
-            if p.over_odds is not None:
-                serialized_pin.append({
-                    "league": p.league,
-                    "player_name": p.player_name,
-                    "stat_type": p.prop_type,
-                    "line_score": p.line,
-                    "side": "over",
-                    "line_odds": p.over_odds,
-                    "true_odds": prob_to_american(true_over) if true_over else None,
-                    "start_time": getattr(p, "start_time", None),
-                })
-            if p.under_odds is not None:
-                serialized_pin.append({
-                    "league": p.league,
-                    "player_name": p.player_name,
-                    "stat_type": p.prop_type,
-                    "line_score": p.line,
-                    "side": "under",
-                    "line_odds": p.under_odds,
-                    "true_odds": prob_to_american(true_under) if true_under else None,
-                    "start_time": getattr(p, "start_time", None),
-                })
+        serialized_fd = _serialize_book(fd_props)
+        serialized_dk = _serialize_book(dk_props)
+        serialized_pin = _serialize_book(pin_props)
 
         logger.info("Pipeline: matching %d PP lines vs %d FD, %d DK, %d Pinnacle props...", len(pp_lines), len(fd_props), len(dk_props), len(pin_props))
         matches = match_props(fd_props, dk_props, pp_lines, pin_props)
@@ -610,9 +573,6 @@ def run_pipeline():
         errors["pipeline"] = str(e)
         with _lock:
             _state["scrape_errors"] = errors
-    finally:
-        with _lock:
-            _state["is_scraping"] = False
 
 
 def _reschedule(interval_min: int):
