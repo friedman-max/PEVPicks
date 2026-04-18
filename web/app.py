@@ -714,6 +714,12 @@ def root():
 # API routes
 # ---------------------------------------------------------------------------
 
+@app.get("/api/auth/me")
+def get_auth_me(user: dict = Depends(get_current_user)):
+    """Return current verified user metadata."""
+    return user
+
+
 def _last_refresh_iso():
     """Return last_refresh as ISO string or None (callers already hold no lock)."""
     ts = _state.get("last_refresh")
@@ -868,7 +874,7 @@ class SlipRequest(BaseModel):
 
 
 @app.post("/api/slip")
-def build_slip(req: SlipRequest, user: dict = Depends(get_current_user)):
+def build_slip(req: SlipRequest, user: Optional[dict] = Depends(get_current_user_optional)):
     if not req.bet_ids:
         raise HTTPException(status_code=400, detail="No bet IDs provided.")
     if len(req.bet_ids) < 2 or len(req.bet_ids) > 6:
@@ -894,7 +900,7 @@ def build_slip(req: SlipRequest, user: dict = Depends(get_current_user)):
 
 
 @app.post("/api/slip/auto")
-def auto_build_slip(req: SlipRequest, user: dict = Depends(get_current_user)):
+def auto_build_slip(req: SlipRequest, user: Optional[dict] = Depends(get_current_user_optional)):
     if not req.bet_ids:
         raise HTTPException(status_code=400, detail="No bet IDs provided.")
     if len(req.bet_ids) < 2:
@@ -904,12 +910,20 @@ def auto_build_slip(req: SlipRequest, user: dict = Depends(get_current_user)):
         bet_map = _state["bet_map"]
 
     selected = []
-    for bid in req.bet_ids[:6]:
+    seen = set()
+    for bid in req.bet_ids:
         if bid in bet_map:
-            selected.append(bet_map[bid])
+            bet = bet_map[bid]
+            key = make_bet_key(bet.player_name, bet.start_time)
+            if key in seen:
+                continue
+            selected.append(bet)
+            seen.add(key)
+            if len(selected) == 6:
+                break
             
     if len(selected) < 2:
-        raise HTTPException(status_code=400, detail="Not enough valid bets found.")
+        raise HTTPException(status_code=400, detail="Not enough unique bets found.")
 
     best_ev = -float('inf')
     best_k = 0

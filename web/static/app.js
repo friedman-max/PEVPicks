@@ -50,6 +50,14 @@ async function initAuth() {
             await sbClient.auth.signOut();
         });
 
+        document.getElementById('btn-close-auth').addEventListener('click', () => {
+            document.getElementById('auth-overlay').style.display = 'none';
+        });
+
+        document.getElementById('btn-nav-login').addEventListener('click', () => {
+            document.getElementById('auth-overlay').style.display = 'flex';
+        });
+
     } catch (e) {
         console.error('Auth init failed', e);
         document.getElementById('auth-overlay').style.display = 'flex';
@@ -65,25 +73,41 @@ async function initAuth() {
 let isDataLoaded = false;
 function handleSessionUpdate(session) {
     if (!session) {
-        document.getElementById('auth-overlay').style.display = 'flex';
-        document.getElementById('user-menu').style.display = 'none';
+        document.getElementById('auth-overlay').style.display = 'none';
+        document.getElementById('user-menu').style.display = 'flex';
+        document.getElementById('user-email').style.display = 'none';
+        document.getElementById('btn-logout').style.display = 'none';
+        document.getElementById('btn-nav-login').style.display = 'inline-block';
+        
         hideLoadingOverlay();
-        // Hide tables
-        document.querySelectorAll('.app-content').forEach(e => e.style.display = 'none');
-        isDataLoaded = false;
+        // Show tables
+        document.querySelectorAll('.app-content').forEach(e => e.style.display = 'block');
+        
+        if (!isDataLoaded) {
+            showLoadingOverlay("Loading latest lines…");
+            isDataLoaded = true;
+            const safetyTimer = setTimeout(hideLoadingOverlay, 20000);
+            fetchBootstrap()
+                .catch(err => console.error("Bootstrap failed:", err))
+                .finally(() => {
+                    clearTimeout(safetyTimer);
+                    hideLoadingOverlay();
+                });
+        }
     } else {
         document.getElementById('auth-overlay').style.display = 'none';
         document.getElementById('user-menu').style.display = 'flex';
+        document.getElementById('user-email').style.display = 'inline';
         document.getElementById('user-email').textContent = session.user.email;
+        document.getElementById('btn-logout').style.display = 'inline-block';
+        document.getElementById('btn-nav-login').style.display = 'none';
         
         // Show tables
         document.querySelectorAll('.app-content').forEach(e => e.style.display = 'block');
         
-        // Kick off fetch after login if not already loaded
         if (!isDataLoaded) {
             showLoadingOverlay("Loading latest lines…");
             isDataLoaded = true;
-            // Safety: always hide overlay no matter what happens.
             const safetyTimer = setTimeout(hideLoadingOverlay, 20000);
             fetchBootstrap()
                 .catch(err => console.error("Bootstrap failed:", err))
@@ -92,6 +116,9 @@ function handleSessionUpdate(session) {
                     hideLoadingOverlay();
                     Promise.all([fetchBacktest(), fetchCalibration()]).catch(() => {});
                 });
+        } else {
+            // Already loaded public data, but now user logged in. Let's fetch the gated data.
+            Promise.all([fetchBacktest(), fetchCalibration()]).catch(() => {});
         }
     }
 }
@@ -425,6 +452,11 @@ btnAddToBacktest.addEventListener("click", async () => {
   const betMap = Object.fromEntries(state.allBets.map(b => [b.bet_id, b]));
   const selected = [...state.selected].map(id => betMap[id]).filter(Boolean);
   if (selected.length < 2 || selected.length > 6) return;
+  
+  if (!currentSession) {
+    document.getElementById('auth-overlay').style.display = 'flex';
+    return;
+  }
 
   btnAddToBacktest.disabled = true;
   btnAddToBacktest.textContent = "Logging...";
@@ -646,6 +678,12 @@ document.querySelectorAll(".tab").forEach(tab => {
 
     const target = tab.dataset.tab;
     
+    // Auth guard for Backtest and Analytics tabs
+    if ((target === "backtest" || target === "analytics") && !currentSession) {
+      document.getElementById('auth-overlay').style.display = 'flex';
+      return; 
+    }
+
     // Hide all
     $("ev-view").classList.add("hidden");
     $("ev-filters").classList.add("hidden");

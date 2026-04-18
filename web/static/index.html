@@ -24,7 +24,8 @@
 
   <!-- ── Auth overlay ── -->
   <div id="auth-overlay" style="display: none; position: fixed; inset: 0; align-items: center; justify-content: center; z-index: 2000; background: rgba(0,0,0,0.85);">
-    <div style="width: 100%; max-width: 400px; padding: 2rem; background: var(--bg-2); border-radius: 8px; text-align: center; border: 1px solid var(--border); box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+    <div style="width: 100%; max-width: 400px; padding: 2rem; background: var(--bg-2); border-radius: 8px; text-align: center; border: 1px solid var(--border); box-shadow: 0 10px 25px rgba(0,0,0,0.5); position: relative;">
+      <button id="btn-close-auth" style="position: absolute; top: 10px; right: 15px; background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer;">&times;</button>
       <img src="/static/logo_full.png" alt="CoreProp Logo" style="height: 48px; margin-bottom: 1.5rem;" />
       <h2 style="margin-bottom: 1.5rem;">Login to CoreProp</h2>
       <input type="email" id="auth-email" placeholder="Email" class="glass-input" style="width: 100%; box-sizing: border-box; margin-bottom: 1rem;" />
@@ -51,6 +52,7 @@
     <div id="user-menu" style="display: none; align-items: center; gap: 10px; padding: 0 15px; color: var(--text-muted); font-size: 0.9rem;">
       <span id="user-email"></span>
       <button id="btn-logout" class="btn btn-secondary btn-sm">Logout</button>
+      <button id="btn-nav-login" class="btn btn-primary btn-sm" style="display: none;">Login</button>
     </div>
   </div>
 

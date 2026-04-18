@@ -28,7 +28,7 @@ class BetResult:
         "pp_line", "fd_line", "side",
         "true_prob", "true_odds", "edge", "individual_ev_pct",
         "over_odds", "under_odds", "both_sided",
-        "pp_player_id",
+        "pp_player_id", "start_time",
     )
 
     def __init__(
@@ -45,6 +45,7 @@ class BetResult:
         under_odds: Optional[int],
         both_sided: bool,
         pp_player_id: str,
+        start_time: str = "",
     ):
         self.bet_id = bet_id
         self.player_name = player_name
@@ -58,6 +59,7 @@ class BetResult:
         self.under_odds = under_odds
         self.both_sided = both_sided
         self.pp_player_id = pp_player_id
+        self.start_time = start_time
         self.true_odds = prob_to_american(true_prob)
 
         self.edge = round(true_prob - OPTIMAL_BREAK_EVEN, 6)
@@ -79,6 +81,7 @@ class BetResult:
             "over_odds":         self.over_odds,
             "under_odds":        self.under_odds,
             "both_sided":        self.both_sided,
+            "start_time":        self.start_time,
         }
 
 
@@ -122,6 +125,7 @@ def _evaluate_same_line(match: MatchedProp) -> list[BetResult]:
             under_odds=fd.under_odds,
             both_sided=fd.both_sided,
             pp_player_id=pp.player_id,
+            start_time=getattr(pp, "start_time", ""),
         )
         results.append(result)
 
@@ -189,6 +193,7 @@ def evaluate_match(match: MatchedProp, min_ev_pct: float = 0.01) -> list[BetResu
             under_odds=best_book.under_odds,
             both_sided=best_book.both_sided,
             pp_player_id=pp.player_id,
+            start_time=getattr(pp, "start_time", ""),
         )
         candidates = [result]
 
@@ -213,6 +218,7 @@ def evaluate_match(match: MatchedProp, min_ev_pct: float = 0.01) -> list[BetResu
             under_odds=best_book.under_odds,
             both_sided=best_book.both_sided,
             pp_player_id=pp.player_id,
+            start_time=getattr(pp, "start_time", ""),
         )
         candidates = [result]
 

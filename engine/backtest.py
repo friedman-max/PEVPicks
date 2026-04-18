@@ -59,12 +59,12 @@ def make_bet_key(player: str, start_time: str) -> tuple[str, str]:
             else:
                 dt = dt.astimezone(timezone.utc)
             
-            # Format back to a string key: YYYY-MM-DDTHH:MM
-            time_key = dt.strftime("%Y-%m-%dT%H:%M")
+            # Use YYYY-MM-DD instead of full minute precision to prevent time-shifting dupes
+            time_key = dt.strftime("%Y-%m-%d")
         except Exception as e:
-            # Fallback for malformed strings: take first 10-16 chars if parsing fails
+            # Fallback for malformed strings: take first 10 chars (YYYY-MM-DD) if parsing fails
             logger.warning("Backtest: _make_key failed to parse '%s': %s", start_time, e)
-            time_key = start_time[:16] if start_time else "no_time"
+            time_key = start_time[:10] if start_time else "no_time"
 
     return (_normalize(player), time_key)
 
