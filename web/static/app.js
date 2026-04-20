@@ -1,3 +1,215 @@
+
+// The Supabase CDN exposes a global `supabase` (the module namespace) on
+// `window`. Using the same name as a `let` would throw SyntaxError and abort
+// the script entirely — so our authenticated client is named `sbClient`.
+let sbClient = null;
+let currentSession = null;
+
+async function initAuth() {
+    try {
+        // Use server-injected config (no network round-trip)
+        const config = window.__COREPROP_CONFIG;
+        if (!config) {
+            // Fallback for direct file access / dev
+            const res = await fetch('/api/ui-config');
+            const fallback = await res.json();
+            sbClient = window.supabase.createClient(fallback.supabase_url, fallback.supabase_anon_key);
+        } else {
+            sbClient = window.supabase.createClient(config.supabase_url, config.supabase_anon_key);
+        }
+
+        const { data: { session } } = await sbClient.auth.getSession();
+        currentSession = session;
+        handleSessionUpdate(session);
+
+        sbClient.auth.onAuthStateChange((_event, session) => {
+            currentSession = session;
+            handleSessionUpdate(session);
+        });
+
+        // ── Auth tab switching ──
+        document.getElementById('auth-tab-login').addEventListener('click', () => {
+            document.getElementById('auth-tab-login').classList.add('active');
+            document.getElementById('auth-tab-signup').classList.remove('active');
+            document.getElementById('auth-form-login').style.display = 'flex';
+            document.getElementById('auth-form-signup').style.display = 'none';
+            document.getElementById('auth-error').textContent = '';
+        });
+        document.getElementById('auth-tab-signup').addEventListener('click', () => {
+            document.getElementById('auth-tab-signup').classList.add('active');
+            document.getElementById('auth-tab-login').classList.remove('active');
+            document.getElementById('auth-form-signup').style.display = 'flex';
+            document.getElementById('auth-form-login').style.display = 'none';
+            document.getElementById('auth-error').textContent = '';
+        });
+
+        // ── Login handler ──
+        document.getElementById('btn-login').addEventListener('click', async () => {
+            const email = document.getElementById('login-email').value.trim();
+            const password = document.getElementById('login-password').value;
+            const errorEl = document.getElementById('auth-error');
+            if (!email || !password) { errorEl.textContent = 'Please fill in all fields.'; return; }
+            errorEl.textContent = 'Logging in…';
+
+            const { error } = await sbClient.auth.signInWithPassword({ email, password });
+            if (error) {
+                errorEl.textContent = error.message;
+            } else {
+                errorEl.textContent = '';
+            }
+        });
+
+        // ── Signup username check (debounced) ──
+        let usernameTimer = null;
+        let usernameAvailable = false;
+        const usernameInput = document.getElementById('signup-username');
+        const usernameStatus = document.getElementById('username-status');
+
+        usernameInput.addEventListener('input', () => {
+            clearTimeout(usernameTimer);
+            usernameAvailable = false;
+            const val = usernameInput.value.trim();
+            if (val.length < 2) {
+                usernameStatus.textContent = val.length > 0 ? 'Min 2 characters' : '';
+                usernameStatus.className = 'username-status taken';
+                return;
+            }
+            usernameStatus.textContent = 'Checking…';
+            usernameStatus.className = 'username-status checking';
+            usernameTimer = setTimeout(async () => {
+                try {
+                    const r = await fetch(`/api/auth/check-username?username=${encodeURIComponent(val)}`);
+                    const d = await r.json();
+                    if (!r.ok) {
+                        usernameStatus.textContent = d.detail || 'Invalid username';
+                        usernameStatus.className = 'username-status taken';
+                    } else if (d.available) {
+                        usernameAvailable = true;
+                        usernameStatus.textContent = '✓ Available';
+                        usernameStatus.className = 'username-status available';
+                    } else {
+                        usernameStatus.textContent = '✗ Already taken';
+                        usernameStatus.className = 'username-status taken';
+                    }
+                } catch {
+                    usernameStatus.textContent = 'Could not check';
+                    usernameStatus.className = 'username-status taken';
+                }
+            }, 400);
+        });
+
+        // ── Signup handler ──
+        document.getElementById('btn-signup').addEventListener('click', async () => {
+            const username = usernameInput.value.trim();
+            const email = document.getElementById('signup-email').value.trim();
+            const password = document.getElementById('signup-password').value;
+            const errorEl = document.getElementById('auth-error');
+
+            if (!username || !email || !password) { errorEl.textContent = 'Please fill in all fields.'; return; }
+            if (username.length < 2) { errorEl.textContent = 'Username must be at least 2 characters.'; return; }
+            if (!usernameAvailable) { errorEl.textContent = 'Please choose an available username.'; return; }
+            if (password.length < 6) { errorEl.textContent = 'Password must be at least 6 characters.'; return; }
+
+            errorEl.textContent = 'Creating account…';
+            const { error } = await sbClient.auth.signUp({
+                email,
+                password,
+                options: { data: { username } }
+            });
+            if (error) {
+                errorEl.textContent = error.message;
+            } else {
+                errorEl.textContent = '';
+            }
+        });
+
+        // ── Close modal ──
+        document.getElementById('btn-close-auth').addEventListener('click', () => {
+            document.getElementById('auth-overlay').style.display = 'none';
+        });
+
+        // ── Nav login button ──
+        document.getElementById('btn-nav-login').addEventListener('click', () => {
+            document.getElementById('auth-overlay').style.display = 'flex';
+        });
+
+        // ── Logout ──
+        document.getElementById('btn-logout').addEventListener('click', async () => {
+            await sbClient.auth.signOut();
+            document.getElementById('user-dropdown').classList.remove('open');
+        });
+
+        // ── Avatar dropdown toggle ──
+        document.getElementById('user-avatar').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const dropdown = document.getElementById('user-dropdown');
+            const rect = e.currentTarget.getBoundingClientRect();
+            
+            dropdown.style.position = 'fixed';
+            dropdown.style.top = (rect.bottom + 8) + 'px';
+            dropdown.style.right = (window.innerWidth - rect.right) + 'px';
+            
+            dropdown.classList.toggle('open');
+        });
+        document.addEventListener('click', () => {
+            const dropdown = document.getElementById('user-dropdown');
+            if (dropdown) dropdown.classList.remove('open');
+        });
+
+    } catch (e) {
+        console.error('Auth init failed', e);
+        hideLoadingOverlay();
+    }
+}
+
+let isDataLoaded = false;
+
+/**
+ * handleSessionUpdate — UI-ONLY. Updates avatar, skeleton, overlay.
+ * All data loading is handled by the DOMContentLoaded orchestrator.
+ */
+function handleSessionUpdate(session) {
+    const overlay = document.getElementById('auth-overlay');
+    const btnLogin = document.getElementById('btn-nav-login');
+    const avatarWrap = document.getElementById('user-avatar-wrap');
+    const avatar = document.getElementById('user-avatar');
+    const displayName = document.getElementById('user-display-name');
+    const emailEl = document.getElementById('user-email');
+    
+    // Hide the skeleton placeholder now that auth has resolved
+    const skeleton = document.getElementById('user-skeleton');
+    if (skeleton) skeleton.style.display = 'none';
+
+    if (!session) {
+        overlay.style.display = 'none';
+        btnLogin.style.display = 'inline-block';
+        avatarWrap.style.display = 'none';
+    } else {
+        overlay.style.display = 'none';
+        btnLogin.style.display = 'none';
+        avatarWrap.style.display = 'flex';
+
+        const meta = session.user.user_metadata || {};
+        const username = meta.username || session.user.email.split('@')[0];
+        const initial = username.charAt(0).toUpperCase();
+
+        avatar.textContent = initial;
+        displayName.textContent = username;
+        emailEl.textContent = session.user.email;
+    }
+
+    document.querySelectorAll('.app-content').forEach(e => e.style.display = 'flex');
+}
+
+async function apiFetch(url, options = {}) {
+    if (!options.headers) options.headers = {};
+    if (currentSession) {
+        options.headers['Authorization'] = `Bearer ${currentSession.access_token}`;
+    }
+    const res = await fetch(url, options);
+    return res;
+}
+
 /**
  * PrizePicks +EV Finder — Frontend
  *
@@ -29,24 +241,61 @@ const state = {
   lastRefresh:   null,        // ISO string from server (for staleness display)
 };
 
-// ── NO localStorage cache ──────────────────────────────────────────────────
-// We deliberately do NOT cache datasets in the browser. Every page open
-// fetches the latest data from the backend (which is seeded from Supabase
-// on startup and kept current by the auto-refresh scheduler). This
-// guarantees users see fresh lines on open instead of stale cached blobs
-// from a prior session.
-//
-// Clean up any cache leftovers from previous versions so legacy data
-// can't bleed into the new no-cache flow.
-try {
-  for (let i = localStorage.length - 1; i >= 0; i--) {
-    const k = localStorage.key(i);
-    if (k && k.startsWith("coreprop:cache:")) localStorage.removeItem(k);
-  }
-} catch (e) { /* storage disabled — ignore */ }
+// ── localStorage Cache ─────────────────────────────────────────────────────
+const CACHE_KEY = "coreprop_bootstrap_cache";
+const CACHE_FRESH_SECONDS = 60; // Skip background fetch if cache is younger than this
 
-function cacheLoad() { return {}; }
-function cacheSave(_patch) { /* no-op by design */ }
+/**
+ * Save the entire bootstrap payload to localStorage for instant-load on refresh.
+ */
+function saveToCache(data) {
+  try {
+    const payload = {
+      timestamp: Date.now(),
+      data: data
+    };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+  } catch (e) {
+    console.warn("localStorage save failed:", e);
+  }
+}
+
+/**
+ * Hydrate the application state from localStorage if available.
+ * Returns { success: boolean, ageSeconds: number | null }
+ */
+function hydrateFromCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return { success: false, ageSeconds: null };
+    const { timestamp, data } = JSON.parse(raw);
+    if (!data) return { success: false, ageSeconds: null };
+
+    const ageSeconds = timestamp ? (Date.now() - timestamp) / 1000 : null;
+
+    // Populate all sub-states
+    state.allBets          = data.bets      || [];
+    matchedState.allLines  = data.matches   || [];
+    ppState.allLines       = data.pp_lines  || [];
+    fdState.allLines       = data.fd_lines  || [];
+    dkState.allLines       = data.dk_lines  || [];
+    pinState.allLines      = data.pin_lines || [];
+    if (data.last_refresh) state.lastRefresh = data.last_refresh;
+
+    // Trigger initial renders
+    applyFilters();
+    applyMatchedFilters();
+    applyPPFilters();
+    applyFDFilters();
+    applyDKFilters();
+    applyPinFilters();
+    
+    return { success: true, ageSeconds };
+  } catch (e) {
+    console.warn("localStorage hydration failed:", e);
+    return { success: false, ageSeconds: null };
+  }
+}
 
 // ── DOM refs ───────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -318,12 +567,17 @@ btnAddToBacktest.addEventListener("click", async () => {
   const betMap = Object.fromEntries(state.allBets.map(b => [b.bet_id, b]));
   const selected = [...state.selected].map(id => betMap[id]).filter(Boolean);
   if (selected.length < 2 || selected.length > 6) return;
+  
+  if (!currentSession) {
+    document.getElementById('auth-overlay').style.display = 'flex';
+    return;
+  }
 
   btnAddToBacktest.disabled = true;
   btnAddToBacktest.textContent = "Logging...";
 
   try {
-    const resp = await fetch("/api/backtest/add-slip", {
+    const resp = await apiFetch("/api/backtest/add-slip", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ bet_ids: selected.map(b => b.bet_id) }),
@@ -397,7 +651,7 @@ btnCalculate.addEventListener("click", async () => {
   btnCalculate.textContent = "Calculating…";
 
   try {
-    const resp = await fetch("/api/slip", {
+    const resp = await apiFetch("/api/slip", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({ bet_ids: betIds, bankroll }),
@@ -442,7 +696,7 @@ btnAutoBuild.addEventListener("click", async () => {
   btnAutoBuild.textContent = "Auto-Building...";
   
   try {
-    const resp = await fetch("/api/slip/auto", {
+    const resp = await apiFetch("/api/slip/auto", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({ bet_ids: betIds, bankroll }),
@@ -496,7 +750,7 @@ function renderSlipResults(data) {
 // ── API calls ──────────────────────────────────────────────────────────────
 async function fetchBets() {
   try {
-    const resp = await fetch("/api/bets");
+    const resp = await apiFetch("/api/bets");
     const data = await resp.json();
     state.allBets = data.bets || [];
     if (data.last_refresh) state.lastRefresh = data.last_refresh;
@@ -508,15 +762,8 @@ async function fetchBets() {
 
 async function fetchStatus() {
   try {
-    const resp = await fetch("/api/status");
+    const resp = await apiFetch("/api/status");
     const data = await resp.json();
-
-// Add Slip Panel drawer toggle for mobile
-$("slip-panel").querySelector("h2").addEventListener("click", () => {
-    if (window.innerWidth <= 900) {
-        $("slip-panel").classList.toggle("open");
-    }
-});
     // UI updates removed
 
     // Detect scraping just finished → refresh every dataset in one shot.
@@ -546,6 +793,12 @@ document.querySelectorAll(".tab").forEach(tab => {
 
     const target = tab.dataset.tab;
     
+    // Auth guard for Backtest and Analytics tabs
+    if ((target === "backtest" || target === "analytics") && !currentSession) {
+      document.getElementById('auth-overlay').style.display = 'flex';
+      return; 
+    }
+
     // Hide all
     $("ev-view").classList.add("hidden");
     $("ev-filters").classList.add("hidden");
@@ -562,6 +815,7 @@ document.querySelectorAll(".tab").forEach(tab => {
     $("backtest-view").classList.add("hidden");
     $("backtest-filters").classList.add("hidden");
     $("analytics-view").classList.add("hidden");
+    $("observatory-view").classList.add("hidden");
 
     if (target === "ev") {
       $("ev-view").classList.remove("hidden");
@@ -594,9 +848,91 @@ document.querySelectorAll(".tab").forEach(tab => {
     } else if (target === "analytics") {
       $("analytics-view").classList.remove("hidden");
       fetchCalibration();
+    } else if (target === "observatory") {
+      $("observatory-view").classList.remove("hidden");
+      refreshObservatory();
     }
   });
 });
+
+async function refreshObservatory() {
+  // Fetch calibration multipliers (from local file — always works)
+  try {
+    const calResp = await apiFetch("/api/observatory/multipliers");
+    if (calResp.ok) {
+      const multipliers = await calResp.json();
+      renderObservatoryMultipliers(multipliers);
+    }
+  } catch (e) {
+    console.warn("Calibration fetch failed:", e);
+  }
+
+  // Fetch observatory feed (requires market_observatory table)
+  try {
+    const obsResp = await apiFetch("/api/observatory");
+    if (obsResp.ok) {
+      const observations = await obsResp.json();
+      renderObservatoryFeed(observations);
+    }
+  } catch (e) {
+    console.warn("Observatory fetch failed:", e);
+  }
+}
+
+function renderObservatoryMultipliers(multipliers) {
+  const tbody = $("obs-multiplier-tbody");
+  if (!tbody) return;
+  
+  // Convert object to array and sort by best performance (highest multiplier)
+  const sorted = Object.entries(multipliers)
+    .map(([key, value]) => ({ key, value }))
+    .sort((a, b) => b.value - a.value);
+    
+  if (sorted.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="3" class="empty-msg">Waiting for next daily calibration (min 30 observations per prop)...</td></tr>`;
+    return;
+  }
+  
+  tbody.innerHTML = sorted.map(m => {
+    const [league, prop] = m.key.split("|");
+    const val = m.value;
+    const strengthClass = val >= 1 ? "ev-high" : (val > 0.8 ? "ev-mid" : "ev-low");
+    const strengthPct = Math.round((val - 1) * 100);
+    const strengthText = strengthPct >= 0 ? `+${strengthPct}% Edge` : `${strengthPct}% Haircut`;
+    
+    return `<tr>
+      <td><strong>${league}</strong> ${prop}</td>
+      <td class="line-value ${strengthClass}">${val.toFixed(2)}x</td>
+      <td class="${strengthClass}">${strengthText}</td>
+    </tr>`;
+  }).join("");
+}
+
+function renderObservatoryFeed(observations) {
+  const tbody = $("obs-feed-tbody");
+  if (!tbody) return;
+  
+  if (observations.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-msg">No observations logged yet. Data arrives every 15m.</td></tr>`;
+    return;
+  }
+  
+  tbody.innerHTML = observations.map(obs => {
+    const resClass = obs.result === "hit" ? "hit" : (obs.result === "miss" ? "miss" : "pending");
+    const loggedDate = new Date(obs.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    return `<tr>
+      <td>${obs.player}</td>
+      <td><span class="league-tag league-${obs.league}">${obs.league}</span> ${obs.prop}</td>
+      <td class="line-value">${obs.line} <span class="side-${obs.side}">${obs.side.toUpperCase()}</span></td>
+      <td class="line-value">${(obs.true_prob * 100).toFixed(1)}%</td>
+      <td><span class="result-tag res-${resClass}">${obs.result.toUpperCase()}</span></td>
+      <td class="line-value">${obs.stat_actual !== null ? obs.stat_actual : "—"}</td>
+      <td style="color:var(--text-muted)">${loggedDate}</td>
+    </tr>`;
+  }).join("");
+}
+
 
 // ── Combined Lines ────────────────────────────────────────────────────────
 const matchedState = {
@@ -719,7 +1055,7 @@ function renderMatchedTable() {
 
 async function fetchMatched() {
   try {
-    const resp = await fetch("/api/matched");
+    const resp = await apiFetch("/api/matched");
     const data = await resp.json();
     matchedState.allLines = data.matches || [];
     if (data.last_refresh) state.lastRefresh = data.last_refresh;
@@ -731,7 +1067,7 @@ async function fetchMatched() {
 
 async function fetchPP() {
   try {
-    const resp = await fetch("/api/prizepicks");
+    const resp = await apiFetch("/api/prizepicks");
     const data = await resp.json();
     ppState.allLines = data.lines || [];
     if (data.last_refresh) state.lastRefresh = data.last_refresh;
@@ -743,7 +1079,7 @@ async function fetchPP() {
 
 async function fetchFD() {
   try {
-    const resp = await fetch("/api/fanduel");
+    const resp = await apiFetch("/api/fanduel");
     const data = await resp.json();
     fdState.allLines = data.lines || [];
     if (data.last_refresh) state.lastRefresh = data.last_refresh;
@@ -755,7 +1091,7 @@ async function fetchFD() {
 
 async function fetchDK() {
   try {
-    const resp = await fetch("/api/draftkings");
+    const resp = await apiFetch("/api/draftkings");
     const data = await resp.json();
     dkState.allLines = data.lines || [];
     if (data.last_refresh) state.lastRefresh = data.last_refresh;
@@ -767,7 +1103,7 @@ async function fetchDK() {
 
 async function fetchPin() {
   try {
-    const resp = await fetch("/api/pinnacle");
+    const resp = await apiFetch("/api/pinnacle");
     const data = await resp.json();
     pinState.allLines = data.lines || [];
     if (data.last_refresh) state.lastRefresh = data.last_refresh;
@@ -782,16 +1118,19 @@ async function fetchPin() {
 // intermediate HTTP cache (service worker, CDN, browser) can serve stale data.
 async function fetchBootstrap() {
   try {
-    const resp = await fetch("/api/bootstrap?t=" + Date.now(), { cache: "no-store" });
+    const resp = await apiFetch("/api/bootstrap?t=" + Date.now(), { cache: "no-store" });
     if (!resp.ok) throw new Error("bootstrap HTTP " + resp.status);
     const data = await resp.json();
 
-    state.allBets           = data.bets      || [];
-    matchedState.allLines   = data.matches   || [];
-    ppState.allLines        = data.pp_lines  || [];
-    fdState.allLines        = data.fd_lines  || [];
-    dkState.allLines        = data.dk_lines  || [];
-    pinState.allLines       = data.pin_lines || [];
+    // Cache for next time
+    saveToCache(data);
+
+    state.allBets          = data.bets      || [];
+    matchedState.allLines  = data.matches   || [];
+    ppState.allLines       = data.pp_lines  || [];
+    fdState.allLines       = data.fd_lines  || [];
+    dkState.allLines       = data.dk_lines  || [];
+    pinState.allLines      = data.pin_lines || [];
     if (data.last_refresh) state.lastRefresh = data.last_refresh;
 
     applyFilters();
@@ -807,7 +1146,28 @@ async function fetchBootstrap() {
   }
 }
 
-// hydrateFromCache removed — no-cache flow now, see Init section below.
+/**
+ * Re-fetch just the bets with auth headers so in_backtest flags are accurate.
+ * Called after auth completes to fix the race where bootstrap loads before JWT.
+ * Also patches the localStorage cache so next load is correct.
+ */
+async function refreshBetsWithAuth() {
+  try {
+    const resp = await apiFetch("/api/bootstrap?t=" + Date.now(), { cache: "no-store" });
+    if (!resp.ok) return;
+    const data = await resp.json();
+
+    // Update bets with fresh in_backtest flags
+    state.allBets = data.bets || [];
+    applyFilters();
+
+    // Patch the cache so subsequent loads have correct flags
+    saveToCache(data);
+  } catch (e) {
+    console.error("Auth-scoped bets refresh failed:", e);
+  }
+}
+
 
 // ── PrizePicks Lines ──────────────────────────────────────────────────────
 const ppState = {
@@ -1269,7 +1629,7 @@ const btState = {
 
 async function fetchBacktest() {
   try {
-    const resp = await fetch("/api/backtest/slips");
+    const resp = await apiFetch("/api/backtest/slips");
     if (!resp.ok) return;
     const data = await resp.json();
     btSlips = data.slips || [];
@@ -1330,19 +1690,23 @@ function renderBacktest() {
 
 
   const totalLegsCount = allLegs.length;
-  const checkedLegs = allLegs.filter(l => l.result === "hit" || l.result === "miss");
-  const hitLegs = checkedLegs.filter(l => l.result === "hit").length;
-  const completedLegsCount = checkedLegs.length;
+  // Volume: all finished outcomes
+  const resolvedLegs = allLegs.filter(l => l.result && l.result !== "pending");
+  // Hit Rate: only actual outcomes (user choice: exclude DNP/Push from accuracy denominator)
+  const accuracyLegs = allLegs.filter(l => l.result === "hit" || l.result === "miss");
+  const hitLegs = accuracyLegs.filter(l => l.result === "hit").length;
+  const completedLegsCount = resolvedLegs.length;
+  const accuracyCount = accuracyLegs.length;
 
   let legHitRateText = "—";
   let legHitRateClass = "bt-card-value";
   let expectedHitRateText = "—";
 
-  if (completedLegsCount > 0) {
-    const avgExp = checkedLegs.reduce((sum, l) => sum + (parseFloat(l.true_prob) || 0), 0) / completedLegsCount;
+  if (accuracyCount > 0) {
+    const avgExp = accuracyLegs.reduce((sum, l) => sum + (parseFloat(l.true_prob) || 0), 0) / accuracyCount;
     expectedHitRateText = (avgExp * 100).toFixed(1) + "%";
-    const pHat = hitLegs / completedLegsCount;
-    const margin = 1.96 * Math.sqrt((pHat * (1 - pHat)) / completedLegsCount);
+    const pHat = hitLegs / accuracyCount;
+    const margin = 1.96 * Math.sqrt((pHat * (1 - pHat)) / accuracyCount);
     const lower = Math.max(0, pHat - margin);
     const upper = Math.min(1, pHat + margin);
     const ciText = `[${(lower * 100).toFixed(1)}%, ${(upper * 100).toFixed(1)}%]`;
@@ -1431,6 +1795,7 @@ function renderBacktest() {
       headerHtml = `<tr class="slip-header-row">
         <td colspan="12">
           <div class="slip-header-content">
+            <button class="btn-delete-slip" data-slip-id="${l.slip_id}" title="Delete this slip">🗑</button>
             <span class="slip-header-stat">
               <span class="slip-header-label">Slip</span>
               <span class="slip-header-id">${l.slip_id}</span>
@@ -1470,6 +1835,36 @@ function renderBacktest() {
       <td data-label="Actual">${(l.stat_actual !== null && l.stat_actual !== undefined && l.stat_actual !== "") ? l.stat_actual : "—"}</td>
     </tr>`;
   }).join("");
+
+  // Wire up delete buttons
+  tbody.querySelectorAll(".btn-delete-slip").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const slipId = btn.dataset.slipId;
+      if (!confirm(`Delete slip ${slipId}? This cannot be undone.`)) return;
+
+      // Optimistic removal: instantly strip from local data and re-render
+      btState.allLegs = btState.allLegs.filter(l => l.slip_id !== slipId);
+      renderBacktest();
+
+      // Fire the server delete in the background
+      try {
+        const resp = await apiFetch(`/api/backtest/slip/${slipId}`, { method: "DELETE" });
+        if (!resp.ok) {
+          const err = await resp.json();
+          alert("Delete failed: " + (err.detail || resp.statusText));
+          // Re-fetch to restore if delete failed
+          await fetchBacktest();
+          return;
+        }
+        // Silently refresh analytics in background to update charts
+        fetchCalibration();
+      } catch (err) {
+        alert("Delete error: " + err.message);
+        await fetchBacktest();
+      }
+    });
+  });
 }
 
 // Filter events
@@ -1553,7 +1948,7 @@ function showSlipNotification(slip) {
 
 async function pollLatestSlip() {
   try {
-    const resp = await fetch("/api/backtest/latest-slip");
+    const resp = await apiFetch("/api/backtest/latest-slip");
     if (!resp.ok) return;
     const data = await resp.json();
     const slip = data.slip;
@@ -1599,7 +1994,7 @@ async function fetchCalibration() {
   // Retained name for backwards-compat with existing callers, but hits the
   // richer /api/analytics endpoint now.
   try {
-    const resp = await fetch("/api/analytics");
+    const resp = await apiFetch("/api/analytics");
     if (!resp.ok) return;
     const data = await resp.json();
     renderCalibration(data);
@@ -1909,42 +2304,100 @@ function hideLoadingOverlay() {
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
-// Always fetch fresh data from the backend on open — no localStorage cache.
-// Show a loading overlay until bootstrap completes so the user sees
-// progress rather than empty tables masquerading as "no data".
-(async () => {
-  showLoadingOverlay("Loading latest lines…");
+// Single orchestrator: hydrate cache → parallel auth + data → auth-gated data.
+window.addEventListener('DOMContentLoaded', async () => {
+    // Step 1: Instant render from localStorage (< 10ms)
+    const cache = hydrateFromCache();
+    if (cache.success) {
+        isDataLoaded = true;
+        hideLoadingOverlay();
+        document.querySelectorAll('.app-content').forEach(e => e.style.display = 'flex');
+    }
 
-  // Prime the backend: hit /api/bootstrap first (single request, all
-  // datasets). Retry once on network failure before falling back to the
-  // per-endpoint path. Cache-busting query param prevents any intermediate
-  // HTTP cache from serving stale data.
-  let ok = await fetchBootstrap();
-  if (!ok) {
-    // Brief retry with a clean cache-buster — gives transient network
-    // hiccups a second chance before the per-endpoint fan-out.
-    await new Promise(r => setTimeout(r, 400));
-    ok = await fetchBootstrap();
-  }
-  if (!ok) {
-    await Promise.all([
-      fetchBets(),
-      fetchMatched(),
-      fetchPP(),
-      fetchFD(),
-      fetchDK(),
-      fetchPin(),
-    ]);
-  }
+    // Step 2: Determine if we need a background data refresh
+    const cacheIsFresh = cache.success && cache.ageSeconds !== null && cache.ageSeconds < CACHE_FRESH_SECONDS;
+    const bootstrapPromise = cacheIsFresh
+        ? Promise.resolve(true)  // Cache is fresh enough, skip network
+        : fetchBootstrap().catch(err => { console.error("Bootstrap failed:", err); return false; });
 
-  // Fetch secondary datasets (backtest, calibration) in parallel so the
-  // Analytics/Backtest tabs are ready the moment the user switches to them.
-  Promise.all([fetchBacktest(), fetchCalibration()]).catch(() => {});
+    // Step 3: Auth + data fetch run IN PARALLEL
+    const authPromise = initAuth().catch(err => console.error("Auth init failed:", err));
+    
+    // Wait for both to settle
+    const [bootstrapOk] = await Promise.all([bootstrapPromise, authPromise]);
 
-  hideLoadingOverlay();
-})();
+    // Step 4: If we had no cache AND bootstrap just completed, mark loaded
+    if (!isDataLoaded) {
+        isDataLoaded = true;
+    }
+    hideLoadingOverlay();
+    document.querySelectorAll('.app-content').forEach(e => e.style.display = 'flex');
+
+    // Step 5: Auth-gated data (only if user is logged in)
+    if (currentSession) {
+        // Re-fetch bets with auth so in_backtest (LOGGED) flags are accurate
+        Promise.all([refreshBetsWithAuth(), fetchBacktest(), fetchCalibration(), fetchUserConfig()]).catch(() => {});
+    }
+});
+
+// Slip panel drawer toggle for mobile (one-time binding)
+window.addEventListener('DOMContentLoaded', () => {
+    const sp = document.getElementById("slip-panel");
+    const h2 = sp && sp.querySelector("h2");
+    if (h2) {
+        h2.addEventListener("click", () => {
+            if (window.innerWidth <= 900) sp.classList.toggle("open");
+        });
+    }
+
+    // Auto-backtest toggle: hydrate immediately from localStorage
+    const abToggle = document.getElementById("auto-backtest-toggle");
+    if (abToggle) {
+        const cached = localStorage.getItem("coreprop_auto_backtest");
+        if (cached !== null) {
+            abToggle.checked = cached === "true";
+        }
+
+        abToggle.addEventListener("change", async (e) => {
+            const isChecked = e.target.checked;
+            // Persist to localStorage immediately for instant reload
+            localStorage.setItem("coreprop_auto_backtest", String(isChecked));
+            abToggle.disabled = true;
+            try {
+                const res = await apiFetch("/api/user/auto-backtest", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ auto_backtest: isChecked })
+                });
+                if (!res.ok) throw new Error("Failed to update config");
+            } catch (err) {
+                console.error("Auto backtest update error:", err);
+                abToggle.checked = !isChecked; // Revert on failure
+                localStorage.setItem("coreprop_auto_backtest", String(!isChecked));
+            } finally {
+                abToggle.disabled = false;
+            }
+        });
+    }
+});
+
+async function fetchUserConfig() {
+    try {
+        const res = await apiFetch("/api/config");
+        if (res.ok) {
+            const data = await res.json();
+            const abToggle = document.getElementById("auto-backtest-toggle");
+            if (abToggle && data.auto_backtest !== undefined) {
+                abToggle.checked = data.auto_backtest;
+                // Sync localStorage with server truth
+                localStorage.setItem("coreprop_auto_backtest", String(data.auto_backtest));
+            }
+        }
+    } catch (e) {
+        console.error("Failed to fetch user config", e);
+    }
+}
 
 fetchStatus();
 setInterval(fetchStatus, 10_000);
-setInterval(pollLatestSlip, 10_000);
-pollLatestSlip();  // check immediately on load
+// Auto-logging was removed globally, handled per-user now

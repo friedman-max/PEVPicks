@@ -31,15 +31,13 @@ body {
   height: 100%;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
   font-size: 14px;
   line-height: 1.5;
-  /* Prevent bouncy scrolling on mobile */
-  position: fixed;
-  width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 .badge {
@@ -148,7 +146,7 @@ body {
 
 /* ── Tab bar ── */
 .tab-bar {
-  display: flex; gap: 12px; background: var(--surface); border-bottom: 1px solid var(--border);
+  display: flex; gap: 6px; background: var(--surface); border-bottom: 1px solid var(--border);
   padding: 10px 0; /* Vertical only, logo handles left, tabs handle right */
   overflow-x: auto;
   scrollbar-width: none; /* Firefox */
@@ -163,21 +161,20 @@ body {
   left: 0;
   z-index: 20;
   background: var(--surface);
-  padding-left: 20px;
+  padding-left: 16px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
 }
 
 .tab-logo {
-  height: 54px;
+  height: 48px;
   width: auto;
   display: block;
   mix-blend-mode: screen;
   padding-right: 16px;
   margin-right: -4px; /* Tighten gap to tabs */
 }
-.tab:last-child { margin-right: 20px; } /* Ensure right breathing room */
 
 .tab-bar::-webkit-scrollbar {
   display: none;
@@ -185,7 +182,10 @@ body {
 
 /* Chrome/Safari */
 .tab {
-  padding: 8px 18px;
+  flex: 1;
+  text-align: center;
+  max-width: 180px;
+  padding: 8px 12px;
   border: 1px solid transparent;
   background: var(--surface2);
   color: var(--text-muted);
@@ -249,13 +249,14 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  overflow: hidden;
+  /* overflow: hidden; Removed to allow internal containers to manage themselves, or set to auto if needed */
 }
 
 /* ── Main layout ── */
 .main-layout {
   display: grid;
   grid-template-columns: 1fr 300px;
+  grid-template-rows: 1fr; /* Constrain row to parent height */
   gap: 0;
   flex: 1;
   min-height: 0;
@@ -273,6 +274,8 @@ body {
 .table-section {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -302,7 +305,7 @@ body {
 
 .table-wrapper {
   flex: 1;
-  overflow-y: auto;
+  overflow: auto;
 }
 
 table {
@@ -527,10 +530,7 @@ tbody tr.selected {
   overflow: hidden;
 }
 
-.pp-view .table-wrapper {
-  flex: 1;
-  overflow-y: auto;
-}
+/* Redundant override removed — handled by .table-wrapper */
 
 .league-tag {
   display: inline-block;
@@ -778,10 +778,7 @@ th.sortable-pp.active.asc::after {
   overflow: hidden;
 }
 
-.backtest-view .table-wrapper {
-  flex: 1;
-  overflow-y: auto;
-}
+/* Redundant override removed — handled by .table-wrapper */
 
 /* Slip group header row */
 tr.slip-header-row {
@@ -809,6 +806,24 @@ tr.slip-header-row:hover {
   align-items: center;
   gap: 15px;
   width: 100%;
+}
+
+.btn-delete-slip {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  opacity: 0.7;
+  transition: opacity 0.15s, background 0.15s;
+  flex-shrink: 0;
+  color: var(--red);
+}
+
+.btn-delete-slip:hover {
+  opacity: 1;
+  background: rgba(239, 68, 68, 0.2);
 }
 
 .slip-header-id {
@@ -1060,7 +1075,7 @@ tr.in-backtest.selected {
   border: 1px solid var(--border);
   border-radius: 8px;
   flex: 1;
-  overflow-y: auto;
+  overflow: auto;
 }
 
 /* ── Calibration Table Compact adjustments ── */
@@ -1131,10 +1146,6 @@ tr.in-backtest.selected {
     gap: 12px;
     padding-bottom: 8px;
     /* Room for scroll if visible */
-
-    /* Visual indicator that content continues off-screen */
-    mask-image: linear-gradient(to right, black 85%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
   }
 
   .tab-bar::-webkit-scrollbar,
@@ -1194,9 +1205,9 @@ tr.in-backtest.selected {
     overflow: hidden !important;
   }
 
-  /* High Specificity Table-to-Cards Transformation */
+  /* Ensure internal scroll is possible on mobile cards if they overflow vertically */
   .table-section .table-wrapper {
-    overflow-x: hidden !important;
+    overflow: auto !important;
   }
 
   #ev-view table,
@@ -1442,8 +1453,7 @@ tr.in-backtest.selected {
    child to own the scroll (as the backtest table does). Analytics has
    multiple rows of panels instead, so we let the view itself scroll. */
 #analytics-view {
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: auto;
   padding-bottom: 16px;
 }
 
@@ -1490,4 +1500,311 @@ tr.in-backtest.selected {
   .analytics-row { flex-direction: column; }
   .analytics-panel { flex-basis: auto; }
   .chart-wrap { height: 220px; }
+}
+
+/* ── Auth overlay ── */
+.auth-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(4px);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  padding: 2rem 2rem 1.5rem;
+  background: var(--surface);
+  border-radius: 12px;
+  text-align: center;
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  position: relative;
+}
+
+.auth-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.6rem;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.auth-close:hover { color: var(--text); }
+
+.auth-logo {
+  height: 44px;
+  margin-bottom: 1.25rem;
+  mix-blend-mode: screen;
+}
+
+.auth-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 1.25rem;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.auth-tab {
+  flex: 1;
+  padding: 9px 0;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--surface2);
+  color: var(--text-muted);
+  border: none;
+  transition: background 0.15s, color 0.15s;
+}
+.auth-tab:hover { color: var(--text); }
+.auth-tab.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.auth-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 14px;
+  font-family: var(--font);
+  transition: border-color 0.15s;
+}
+.auth-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.auth-submit {
+  width: 100%;
+  padding: 11px;
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.auth-error {
+  color: var(--red);
+  font-size: 13px;
+  margin-top: 12px;
+  min-height: 18px;
+}
+
+.username-status {
+  font-size: 12px;
+  min-height: 16px;
+  text-align: left;
+  padding-left: 2px;
+  margin-top: -6px;
+}
+.username-status.available { color: var(--green); }
+.username-status.taken { color: var(--red); }
+.username-status.checking { color: var(--text-muted); }
+
+/* ── Sticky user area (top-right, mirrors logo) ── */
+.sticky-user-wrap {
+  position: sticky;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 20;
+  background: var(--surface);
+  padding: 0 16px 0 24px; /* Space on left for fade */
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+/* Localized fade shadow that doesn't affect the icon opacity */
+.sticky-user-wrap::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  background: linear-gradient(to right, transparent, var(--surface));
+  transform: translateX(-100%);
+  pointer-events: none;
+}
+
+/* Skeleton placeholder — same size as .user-avatar so layout doesn't shift */
+.user-avatar-skeleton {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--surface2);
+  animation: skeletonPulse 1.2s ease-in-out infinite;
+}
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 0.8; }
+}
+
+/* ── User avatar + dropdown ── */
+.user-avatar-wrap {
+  position: relative;
+}
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--blue);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: box-shadow 0.15s, transform 0.1s;
+  font-family: var(--font);
+  text-transform: uppercase;
+}
+.user-avatar:hover {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.35);
+  transform: scale(1.05);
+}
+
+.user-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 220px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  z-index: 100;
+  overflow: hidden;
+  animation: dropdownFadeIn 0.12s ease;
+}
+.user-dropdown.open { display: block; }
+
+@keyframes dropdownFadeIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.user-dropdown-header {
+  padding: 14px 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.user-dropdown-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+}
+.user-dropdown-email {
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.user-dropdown-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0;
+}
+.user-dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 13px;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.user-dropdown-item:hover {
+  background: var(--surface2);
+}
+
+/* ── Observatory Specific ── */
+.ev-high { color: var(--green); }
+.ev-mid { color: var(--yellow); }
+.ev-low { color: var(--red); }
+
+/* Result Tags */
+.result-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.res-pending { background: rgba(122, 128, 160, 0.2); color: var(--text-muted); }
+.res-hit { background: rgba(34, 197, 94, 0.2); color: var(--green); }
+.res-miss { background: rgba(239, 68, 68, 0.2); color: var(--red); }
+.res-push { background: rgba(59, 130, 246, 0.2); color: var(--blue); }
+.res-dnp { 
+  background: rgba(122, 128, 160, 0.3); 
+  color: var(--text-muted); 
+  text-decoration: line-through; 
+}
+
+/* Observatory view needs its own scroll since it's inside backtest-view (overflow:hidden) */
+#observatory-view {
+  overflow-y: auto !important;
+  padding: 16px 20px;
+  gap: 16px;
+}
+
+#observatory-view .analytics-row {
+  flex-shrink: 0;
+}
+
+#observatory-view .analytics-panel {
+  width: 100%;
+}
+
+/* Mobile responsive for Observatory */
+@media (max-width: 900px) {
+  #observatory-view {
+    padding: 10px;
+    gap: 12px;
+  }
+
+  #observatory-view table {
+    font-size: 12px;
+  }
+
+  #observatory-view th,
+  #observatory-view td {
+    padding: 6px 8px;
+  }
+
+  #observatory-view .analytics-panel-header h3 {
+    font-size: 14px;
+  }
 }

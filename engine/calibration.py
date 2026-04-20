@@ -15,7 +15,7 @@ from __future__ import annotations
 import math
 import logging
 from typing import Optional
-from engine.database import get_db
+from engine.database import get_user_db
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +26,11 @@ _EPS = 1e-7
 START_SLIP_ID = "5D3D2A96"
 
 
-def _load_resolved_rows() -> list[dict]:
+def _load_resolved_rows(user_jwt: str) -> list[dict]:
     """
     Read resolved rows from the Supabase database.
     """
-    db = get_db()
+    db = get_user_db(user_jwt)
     if not db:
         return []
 
@@ -60,9 +60,9 @@ def _load_resolved_rows() -> list[dict]:
         return []
 
 
-def _load_clv_rows() -> list[dict]:
+def _load_clv_rows(user_jwt: str) -> list[dict]:
     """Read rows that have a closing_prob/clv_pct tracked, starting from START_SLIP_ID."""
-    db = get_db()
+    db = get_user_db(user_jwt)
     if not db:
         return []
 
@@ -120,7 +120,7 @@ def log_loss(rows: list[dict]) -> Optional[float]:
     return -total / n
 
 
-def evaluate_calibration() -> dict:
+def evaluate_calibration(user_jwt: str) -> dict:
     """
     Compute calibration metrics from resolved backtest data.
 
@@ -134,7 +134,7 @@ def evaluate_calibration() -> dict:
       - avg_predicted_prob: float | None
       - calibration_buckets: list of {bucket, predicted_avg, actual_avg, count}
     """
-    rows = _load_resolved_rows()
+    rows = _load_resolved_rows(user_jwt)
     n = len(rows)
 
     if n == 0:
@@ -180,7 +180,7 @@ def evaluate_calibration() -> dict:
         })
 
     # CLV
-    clv_rows = _load_clv_rows()
+    clv_rows = _load_clv_rows(user_jwt)
     n_clv = len(clv_rows)
     clv_plus_rate = None
     avg_clv_pct = None
@@ -206,7 +206,7 @@ def evaluate_calibration() -> dict:
     }
 
 
-def evaluate_analytics() -> dict:
+def evaluate_analytics(user_jwt: str) -> dict:
     """
     Richer analytics payload for the Analytics tab.
 
@@ -220,8 +220,8 @@ def evaluate_analytics() -> dict:
     """
     from engine.constants import POWER_PAYOUTS, FLEX_PAYOUTS
 
-    base = evaluate_calibration()
-    rows = _load_resolved_rows()
+    base = evaluate_calibration(user_jwt)
+    rows = _load_resolved_rows(user_jwt)
 
     # --- Per-league ----------------------------------------------------------
     def _group(rows, key):
@@ -250,7 +250,7 @@ def evaluate_analytics() -> dict:
     by_prop = _group(rows, "prop")[:10]
 
     # --- Slip mix + cumulative P&L (needs full slip payload) -----------------
-    db = get_db()
+    db = get_user_db(user_jwt)
     slip_mix = {"won": 0, "lost": 0, "pending": 0, "partial": 0}
     pnl_timeline: list[dict] = []
     resolved_slips = won_slips = 0

@@ -14,12 +14,9 @@ Strategy:
     mark truly missed games (already finished, no odds available) so they don't
     remain stuck as empty forever.
 """
-import logging
-from datetime import datetime, timezone, timedelta
-from typing import Any
-
 from engine.consensus import compute_true_probability, books_from_match
 from engine.database import get_db
+from engine.dynamic_calibration import load_calibration_map
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +32,7 @@ MISSED_CUTOFF_HOURS = 1
 
 class CLVTracker:
     def __init__(self):
-        pass
+        self._calibration_map = load_calibration_map()
 
     def update_closing_lines(self, matches: list[Any]) -> int:
         """
@@ -117,15 +114,23 @@ class CLVTracker:
                 # Update if this is a new value or different from the old value.
                 if old_cp_val is None or abs(new_cp_val - old_cp_val) > 1e-4:
                     orig_true_prob = float(row.get("true_prob", 0))
+                    
+                    # Apply dynamic calibration multiplier to the CLOSING prob
+                    # to keep it consistent with the already-calibrated opening prob.
+                    league = row.get("league")
+                    prop   = row.get("prop")
+                    cal_key = f"{league}|{prop}"
+                    multiplier = self._calibration_map.get(cal_key, 1.0)
+                    calibrated_cp = min(new_cp_val * multiplier, 0.999)
 
-                    # CLV edge: (Closing Prob - Original True Prob)
-                    clv_pct = new_cp_val - orig_true_prob
+                    # CLV edge: (Calibrated Closing Prob - Original Calibrated True Prob)
+                    clv_pct = calibrated_cp - orig_true_prob
 
                     try:
                         sid = row.get("slip_id")
                         l_num = int(row.get("leg_num", 0))
                         db.table("legs").update({
-                            "closing_prob": round(new_cp_val, 4),
+                            "closing_prob": round(calibrated_cp, 4),
                             "clv_pct":      round(clv_pct, 4)
                         }).eq("slip_id", sid).eq("leg_num", l_num).execute()
                         updated_count += 1

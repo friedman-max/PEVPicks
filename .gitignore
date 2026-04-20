@@ -60,3 +60,9 @@ data/*.json
 data/*.png
 data/*.html
 data/*.csv
+
+# One-off repair / inject scripts
+inject_auth.py
+repair_auth.py
+test.ps1
+scripts/

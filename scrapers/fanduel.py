@@ -619,10 +619,8 @@ async def _scrape_league(client: httpx.AsyncClient, league: str) -> list[FanDuel
         "player-assists", "player-threes",
     ])
     
-    # Lower concurrency cuts peak memory — each in-flight request holds a
-    # response JSON (tens of KB each) in RAM until parsed. 2 gives us enough
-    # throughput for the free tier without stacking up response buffers.
-    sem = asyncio.Semaphore(2)
+    # Increased concurrency for significantly faster execution.
+    sem = asyncio.Semaphore(15)
 
     async def _safe_fetch(eid: str, tab: str):
         async with sem:

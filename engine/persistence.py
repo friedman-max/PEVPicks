@@ -47,3 +47,25 @@ def load_state_from_supabase(key: str):
         logger.error(f"Failed to load state '{key}' from Supabase: {e}")
     
     return None, None
+
+def load_multiple_states_from_supabase(keys: list[str]):
+    """
+    Fetches the cached state for multiple keys from Supabase via a single request.
+    Returns a dict mapping key -> (value, updated_at).
+    """
+    db = get_db()
+    if not db:
+        return {}
+
+    try:
+        # We need to query where key IN (keys)
+        res = db.table("app_state_cache").select("key, value, updated_at").in_("key", keys).execute()
+        result_map = {}
+        if res.data:
+            for row in res.data:
+                result_map[row["key"]] = (row.get("value"), row.get("updated_at"))
+        return result_map
+    except Exception as e:
+        logger.error(f"Failed to load multiple states from Supabase: {e}")
+    
+    return {}

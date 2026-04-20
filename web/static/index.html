@@ -6,7 +6,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>CoreProp</title>
   <link rel="icon" type="image/png" href="/static/logo.png" />
-  <link rel="stylesheet" href="/static/style.css?v=101" />
+  <!-- Preconnect: start TLS handshakes early -->
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="preconnect" href="https://gxufqwvmkgjaqudqaapw.supabase.co" crossorigin />
+  <link rel="stylesheet" href="/static/style.css?v=106" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body>
@@ -21,6 +25,38 @@
   <!-- ── Slip notification banner ── -->
   <div id="slip-banner" class="slip-banner hidden"></div>
 
+  <!-- ── Auth overlay ── -->
+  <div id="auth-overlay" class="auth-overlay">
+    <div class="auth-card">
+      <button id="btn-close-auth" class="auth-close">&times;</button>
+      <img src="/static/logo_full.png" alt="CoreProp Logo" class="auth-logo" />
+
+      <!-- Tab toggle -->
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="auth-tab-login">Log In</button>
+        <button class="auth-tab" id="auth-tab-signup">Sign Up</button>
+      </div>
+
+      <!-- Login form -->
+      <div id="auth-form-login" class="auth-form">
+        <input type="email" id="login-email" placeholder="Email" class="auth-input" />
+        <input type="password" id="login-password" placeholder="Password" class="auth-input" />
+        <button id="btn-login" class="btn btn-primary auth-submit">Log In</button>
+      </div>
+
+      <!-- Sign Up form -->
+      <div id="auth-form-signup" class="auth-form" style="display:none;">
+        <input type="text" id="signup-username" placeholder="Username" class="auth-input" maxlength="20" autocomplete="off" />
+        <div id="username-status" class="username-status"></div>
+        <input type="email" id="signup-email" placeholder="Email" class="auth-input" />
+        <input type="password" id="signup-password" placeholder="Password (min 6 chars)" class="auth-input" />
+        <button id="btn-signup" class="btn btn-primary auth-submit">Create Account</button>
+      </div>
+
+      <p id="auth-error" class="auth-error"></p>
+    </div>
+  </div>
+
   <!-- ── Tab bar ── -->
   <div class="tab-bar">
     <div class="sticky-logo-wrap">
@@ -34,6 +70,25 @@
     <button class="tab" data-tab="pin">Pinnacle Lines</button>
     <button class="tab" data-tab="backtest">Backtest</button>
     <button class="tab" data-tab="analytics">Analytics</button>
+    <button class="tab" data-tab="observatory">Observatory</button>
+    <div class="sticky-user-wrap">
+      <!-- Skeleton placeholder — reserves space until auth resolves -->
+      <div id="user-skeleton" class="user-avatar-skeleton"></div>
+      <!-- Shown when logged out -->
+      <button id="btn-nav-login" class="btn btn-primary btn-sm" style="display:none;">Log In</button>
+      <!-- Shown when logged in -->
+      <div id="user-avatar-wrap" class="user-avatar-wrap" style="display:none;">
+        <button id="user-avatar" class="user-avatar" title="Account"></button>
+        <div id="user-dropdown" class="user-dropdown">
+          <div class="user-dropdown-header">
+            <span id="user-display-name" class="user-dropdown-name"></span>
+            <span id="user-email" class="user-dropdown-email"></span>
+          </div>
+          <hr class="user-dropdown-divider" />
+          <button id="btn-logout" class="user-dropdown-item">Log out</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <main class="app-content">
@@ -203,7 +258,13 @@
 
       <!-- Slip builder panel -->
       <div class="slip-panel" id="slip-panel">
-        <h2>Slip Builder</h2>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h2 style="margin: 0;">Slip Builder</h2>
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; cursor: pointer;" title="Automatically log the best 6-leg EV slip to Backtest on refresh">
+            <input type="checkbox" id="auto-backtest-toggle" style="width: 16px; height: 16px; cursor: pointer;" />
+            Auto-Backtest
+          </label>
+        </div>
 
         <div class="bankroll-row">
           <label>Bankroll ($)
@@ -641,12 +702,65 @@
       </div>
     </div>
 
+    <!-- ── Observatory view ── -->
+    <div class="backtest-view hidden" id="observatory-view">
+      <div class="analytics-row">
+        <div class="analytics-panel">
+          <div class="analytics-panel-header">
+            <h3>Smart Odds (Calibration Multipliers)</h3>
+            <span class="analytics-subtitle">Prop types sorted by best historical performance</span>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Prop Type</th>
+                  <th>Multiplier</th>
+                  <th>Strength</th>
+                </tr>
+              </thead>
+              <tbody id="obs-multiplier-tbody">
+                <tr><td colspan="3" class="empty-msg">Waiting for next daily calibration...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="analytics-row">
+        <div class="analytics-panel">
+          <div class="analytics-panel-header">
+            <h3>Market Feed (Verified Lines)</h3>
+            <span class="analytics-subtitle">Global observations used to verify model accuracy</span>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Player</th>
+                  <th>Prop</th>
+                  <th>Line</th>
+                  <th>Target Prob</th>
+                  <th>Result</th>
+                  <th>Actual</th>
+                  <th>Logged</th>
+                </tr>
+              </thead>
+              <tbody id="obs-feed-tbody">
+                <tr><td colspan="7" class="empty-msg">No observations logged yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
 
   </main>
 
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="/static/app.js?v=16"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script defer src="/static/app.js?v=22"></script>
 </body>
 
 </html>

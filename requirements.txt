@@ -9,3 +9,4 @@ python-dotenv
 unidecode
 requests
 postgrest
+PyJWT>=2.8.0
