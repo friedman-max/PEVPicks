@@ -10,3 +10,5 @@ unidecode
 requests
 postgrest
 PyJWT>=2.8.0
+pandas
+numpy
