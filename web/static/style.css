@@ -148,9 +148,9 @@ body {
 
 /* ── Tab bar ── */
 .tab-bar {
-  display: flex; gap: 12px; background: var(--surface); border-bottom: 1px solid var(--border);
+  display: flex; gap: 6px; background: var(--surface); border-bottom: 1px solid var(--border);
   padding: 10px 0; /* Vertical only, logo handles left, tabs handle right */
-  overflow-x: auto;
+  overflow-x: hidden;
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE/Edge */
   flex-shrink: 0;
@@ -163,21 +163,20 @@ body {
   left: 0;
   z-index: 20;
   background: var(--surface);
-  padding-left: 20px;
+  padding-left: 16px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
 }
 
 .tab-logo {
-  height: 54px;
+  height: 48px;
   width: auto;
   display: block;
   mix-blend-mode: screen;
   padding-right: 16px;
   margin-right: -4px; /* Tighten gap to tabs */
 }
-.tab:last-child { margin-right: 20px; } /* Ensure right breathing room */
 
 .tab-bar::-webkit-scrollbar {
   display: none;
@@ -185,7 +184,10 @@ body {
 
 /* Chrome/Safari */
 .tab {
-  padding: 8px 18px;
+  flex: 1;
+  text-align: center;
+  max-width: 180px;
+  padding: 8px 12px;
   border: 1px solid transparent;
   background: var(--surface2);
   color: var(--text-muted);
@@ -1131,10 +1133,6 @@ tr.in-backtest.selected {
     gap: 12px;
     padding-bottom: 8px;
     /* Room for scroll if visible */
-
-    /* Visual indicator that content continues off-screen */
-    mask-image: linear-gradient(to right, black 85%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
   }
 
   .tab-bar::-webkit-scrollbar,
@@ -1490,4 +1488,237 @@ tr.in-backtest.selected {
   .analytics-row { flex-direction: column; }
   .analytics-panel { flex-basis: auto; }
   .chart-wrap { height: 220px; }
+}
+
+/* ── Auth overlay ── */
+.auth-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(4px);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  padding: 2rem 2rem 1.5rem;
+  background: var(--surface);
+  border-radius: 12px;
+  text-align: center;
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  position: relative;
+}
+
+.auth-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.6rem;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.auth-close:hover { color: var(--text); }
+
+.auth-logo {
+  height: 44px;
+  margin-bottom: 1.25rem;
+  mix-blend-mode: screen;
+}
+
+.auth-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 1.25rem;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.auth-tab {
+  flex: 1;
+  padding: 9px 0;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--surface2);
+  color: var(--text-muted);
+  border: none;
+  transition: background 0.15s, color 0.15s;
+}
+.auth-tab:hover { color: var(--text); }
+.auth-tab.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.auth-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 14px;
+  font-family: var(--font);
+  transition: border-color 0.15s;
+}
+.auth-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.auth-submit {
+  width: 100%;
+  padding: 11px;
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.auth-error {
+  color: var(--red);
+  font-size: 13px;
+  margin-top: 12px;
+  min-height: 18px;
+}
+
+.username-status {
+  font-size: 12px;
+  min-height: 16px;
+  text-align: left;
+  padding-left: 2px;
+  margin-top: -6px;
+}
+.username-status.available { color: var(--green); }
+.username-status.taken { color: var(--red); }
+.username-status.checking { color: var(--text-muted); }
+
+/* ── Sticky user area (top-right, mirrors logo) ── */
+.sticky-user-wrap {
+  position: sticky;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 20;
+  background: var(--surface);
+  padding: 0 16px 0 24px; /* Space on left for fade */
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+/* Localized fade shadow that doesn't affect the icon opacity */
+.sticky-user-wrap::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  background: linear-gradient(to right, transparent, var(--surface));
+  transform: translateX(-100%);
+  pointer-events: none;
+}
+
+/* ── User avatar + dropdown ── */
+.user-avatar-wrap {
+  position: relative;
+}
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--blue);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: box-shadow 0.15s, transform 0.1s;
+  font-family: var(--font);
+  text-transform: uppercase;
+}
+.user-avatar:hover {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.35);
+  transform: scale(1.05);
+}
+
+.user-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 220px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  z-index: 100;
+  overflow: hidden;
+  animation: dropdownFadeIn 0.12s ease;
+}
+.user-dropdown.open { display: block; }
+
+@keyframes dropdownFadeIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.user-dropdown-header {
+  padding: 14px 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.user-dropdown-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+}
+.user-dropdown-email {
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.user-dropdown-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0;
+}
+.user-dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 13px;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.user-dropdown-item:hover {
+  background: var(--surface2);
 }

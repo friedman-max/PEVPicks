@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>CoreProp</title>
   <link rel="icon" type="image/png" href="/static/logo.png" />
-  <link rel="stylesheet" href="/static/style.css?v=101" />
+  <link rel="stylesheet" href="/static/style.css?v=102" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -23,15 +23,34 @@
   <div id="slip-banner" class="slip-banner hidden"></div>
 
   <!-- ── Auth overlay ── -->
-  <div id="auth-overlay" style="display: none; position: fixed; inset: 0; align-items: center; justify-content: center; z-index: 2000; background: rgba(0,0,0,0.85);">
-    <div style="width: 100%; max-width: 400px; padding: 2rem; background: var(--bg-2); border-radius: 8px; text-align: center; border: 1px solid var(--border); box-shadow: 0 10px 25px rgba(0,0,0,0.5); position: relative;">
-      <button id="btn-close-auth" style="position: absolute; top: 10px; right: 15px; background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer;">&times;</button>
-      <img src="/static/logo_full.png" alt="CoreProp Logo" style="height: 48px; margin-bottom: 1.5rem;" />
-      <h2 style="margin-bottom: 1.5rem;">Login to CoreProp</h2>
-      <input type="email" id="auth-email" placeholder="Email" class="glass-input" style="width: 100%; box-sizing: border-box; margin-bottom: 1rem;" />
-      <input type="password" id="auth-password" placeholder="Password" class="glass-input" style="width: 100%; box-sizing: border-box; margin-bottom: 1.5rem;" />
-      <button id="btn-login" class="btn btn-primary" style="width: 100%; margin-bottom: 0.75rem;">Login / Sign Up</button>
-      <p id="auth-error" style="color: var(--loss-red); margin-top: 1rem;"></p>
+  <div id="auth-overlay" class="auth-overlay">
+    <div class="auth-card">
+      <button id="btn-close-auth" class="auth-close">&times;</button>
+      <img src="/static/logo_full.png" alt="CoreProp Logo" class="auth-logo" />
+
+      <!-- Tab toggle -->
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="auth-tab-login">Log In</button>
+        <button class="auth-tab" id="auth-tab-signup">Sign Up</button>
+      </div>
+
+      <!-- Login form -->
+      <div id="auth-form-login" class="auth-form">
+        <input type="email" id="login-email" placeholder="Email" class="auth-input" />
+        <input type="password" id="login-password" placeholder="Password" class="auth-input" />
+        <button id="btn-login" class="btn btn-primary auth-submit">Log In</button>
+      </div>
+
+      <!-- Sign Up form -->
+      <div id="auth-form-signup" class="auth-form" style="display:none;">
+        <input type="text" id="signup-username" placeholder="Username" class="auth-input" maxlength="20" autocomplete="off" />
+        <div id="username-status" class="username-status"></div>
+        <input type="email" id="signup-email" placeholder="Email" class="auth-input" />
+        <input type="password" id="signup-password" placeholder="Password (min 6 chars)" class="auth-input" />
+        <button id="btn-signup" class="btn btn-primary auth-submit">Create Account</button>
+      </div>
+
+      <p id="auth-error" class="auth-error"></p>
     </div>
   </div>
 
@@ -48,11 +67,21 @@
     <button class="tab" data-tab="pin">Pinnacle Lines</button>
     <button class="tab" data-tab="backtest">Backtest</button>
     <button class="tab" data-tab="analytics">Analytics</button>
-    <div style="flex-grow: 1;"></div>
-    <div id="user-menu" style="display: none; align-items: center; gap: 10px; padding: 0 15px; color: var(--text-muted); font-size: 0.9rem;">
-      <span id="user-email"></span>
-      <button id="btn-logout" class="btn btn-secondary btn-sm">Logout</button>
-      <button id="btn-nav-login" class="btn btn-primary btn-sm" style="display: none;">Login</button>
+    <div class="sticky-user-wrap">
+      <!-- Shown when logged out -->
+      <button id="btn-nav-login" class="btn btn-primary btn-sm" style="display:none;">Log In</button>
+      <!-- Shown when logged in -->
+      <div id="user-avatar-wrap" class="user-avatar-wrap" style="display:none;">
+        <button id="user-avatar" class="user-avatar" title="Account"></button>
+        <div id="user-dropdown" class="user-dropdown">
+          <div class="user-dropdown-header">
+            <span id="user-display-name" class="user-dropdown-name"></span>
+            <span id="user-email" class="user-dropdown-email"></span>
+          </div>
+          <hr class="user-dropdown-divider" />
+          <button id="btn-logout" class="user-dropdown-item">Log out</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -666,7 +695,7 @@
 
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="/static/app.js?v=17"></script>
+  <script src="/static/app.js?v=18"></script>
 </body>
 
 </html>

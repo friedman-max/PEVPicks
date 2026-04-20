@@ -720,6 +720,31 @@ def get_auth_me(user: dict = Depends(get_current_user)):
     return user
 
 
+@app.get("/api/auth/check-username")
+def check_username(username: str):
+    """Check if a username is already taken. Public endpoint."""
+    import requests as _req
+    from engine.database import SUPABASE_URL, SUPABASE_KEY
+    if not username or len(username) < 2 or len(username) > 20:
+        raise HTTPException(status_code=400, detail="Username must be 2-20 characters.")
+    if not username.replace("_", "").isalnum():
+        raise HTTPException(status_code=400, detail="Username may only contain letters, numbers, and underscores.")
+
+    # Query all auth users' metadata for matching username via admin API
+    r = _req.get(
+        f"{SUPABASE_URL}/auth/v1/admin/users",
+        headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"},
+    )
+    if r.status_code != 200:
+        raise HTTPException(status_code=500, detail="Could not verify username.")
+    users = r.json().get("users", [])
+    for u in users:
+        meta = u.get("user_metadata") or {}
+        if meta.get("username", "").lower() == username.lower():
+            return {"available": False}
+    return {"available": True}
+
+
 def _last_refresh_iso():
     """Return last_refresh as ISO string or None (callers already hold no lock)."""
     ts = _state.get("last_refresh")

@@ -7,7 +7,6 @@ let currentSession = null;
 
 async function initAuth() {
     try {
-        // Fetch UI config which itself is an unauthenticated endpoint
         const res = await fetch('/api/ui-config');
         const config = await res.json();
         sbClient = window.supabase.createClient(config.supabase_url, config.supabase_anon_key);
@@ -21,68 +20,159 @@ async function initAuth() {
             handleSessionUpdate(session);
         });
 
-        // Setup UI handlers
+        // ── Auth tab switching ──
+        document.getElementById('auth-tab-login').addEventListener('click', () => {
+            document.getElementById('auth-tab-login').classList.add('active');
+            document.getElementById('auth-tab-signup').classList.remove('active');
+            document.getElementById('auth-form-login').style.display = 'flex';
+            document.getElementById('auth-form-signup').style.display = 'none';
+            document.getElementById('auth-error').textContent = '';
+        });
+        document.getElementById('auth-tab-signup').addEventListener('click', () => {
+            document.getElementById('auth-tab-signup').classList.add('active');
+            document.getElementById('auth-tab-login').classList.remove('active');
+            document.getElementById('auth-form-signup').style.display = 'flex';
+            document.getElementById('auth-form-login').style.display = 'none';
+            document.getElementById('auth-error').textContent = '';
+        });
+
+        // ── Login handler ──
         document.getElementById('btn-login').addEventListener('click', async () => {
-            const email = document.getElementById('auth-email').value;
-            const password = document.getElementById('auth-password').value;
+            const email = document.getElementById('login-email').value.trim();
+            const password = document.getElementById('login-password').value;
             const errorEl = document.getElementById('auth-error');
-            errorEl.textContent = 'Logging in...';
+            if (!email || !password) { errorEl.textContent = 'Please fill in all fields.'; return; }
+            errorEl.textContent = 'Logging in…';
 
-            let { data, error } = await sbClient.auth.signInWithPassword({ email, password });
+            const { error } = await sbClient.auth.signInWithPassword({ email, password });
             if (error) {
-                if (error.message.includes('Invalid login') || error.message.includes('credentials')) {
-                    errorEl.textContent = 'Sign up required. Creating account...';
-                    const { data: signUpData, error: signUpError } = await sbClient.auth.signUp({ email, password });
-                    if (signUpError) {
-                        errorEl.textContent = signUpError.message;
-                        return;
-                    }
-                    data = signUpData;
-                } else {
-                    errorEl.textContent = error.message;
-                    return;
-                }
+                errorEl.textContent = error.message;
+            } else {
+                errorEl.textContent = '';
             }
-            errorEl.textContent = '';
         });
 
-        document.getElementById('btn-logout').addEventListener('click', async () => {
-            await sbClient.auth.signOut();
+        // ── Signup username check (debounced) ──
+        let usernameTimer = null;
+        let usernameAvailable = false;
+        const usernameInput = document.getElementById('signup-username');
+        const usernameStatus = document.getElementById('username-status');
+
+        usernameInput.addEventListener('input', () => {
+            clearTimeout(usernameTimer);
+            usernameAvailable = false;
+            const val = usernameInput.value.trim();
+            if (val.length < 2) {
+                usernameStatus.textContent = val.length > 0 ? 'Min 2 characters' : '';
+                usernameStatus.className = 'username-status taken';
+                return;
+            }
+            usernameStatus.textContent = 'Checking…';
+            usernameStatus.className = 'username-status checking';
+            usernameTimer = setTimeout(async () => {
+                try {
+                    const r = await fetch(`/api/auth/check-username?username=${encodeURIComponent(val)}`);
+                    const d = await r.json();
+                    if (!r.ok) {
+                        usernameStatus.textContent = d.detail || 'Invalid username';
+                        usernameStatus.className = 'username-status taken';
+                    } else if (d.available) {
+                        usernameAvailable = true;
+                        usernameStatus.textContent = '✓ Available';
+                        usernameStatus.className = 'username-status available';
+                    } else {
+                        usernameStatus.textContent = '✗ Already taken';
+                        usernameStatus.className = 'username-status taken';
+                    }
+                } catch {
+                    usernameStatus.textContent = 'Could not check';
+                    usernameStatus.className = 'username-status taken';
+                }
+            }, 400);
         });
 
+        // ── Signup handler ──
+        document.getElementById('btn-signup').addEventListener('click', async () => {
+            const username = usernameInput.value.trim();
+            const email = document.getElementById('signup-email').value.trim();
+            const password = document.getElementById('signup-password').value;
+            const errorEl = document.getElementById('auth-error');
+
+            if (!username || !email || !password) { errorEl.textContent = 'Please fill in all fields.'; return; }
+            if (username.length < 2) { errorEl.textContent = 'Username must be at least 2 characters.'; return; }
+            if (!usernameAvailable) { errorEl.textContent = 'Please choose an available username.'; return; }
+            if (password.length < 6) { errorEl.textContent = 'Password must be at least 6 characters.'; return; }
+
+            errorEl.textContent = 'Creating account…';
+            const { error } = await sbClient.auth.signUp({
+                email,
+                password,
+                options: { data: { username } }
+            });
+            if (error) {
+                errorEl.textContent = error.message;
+            } else {
+                errorEl.textContent = '';
+            }
+        });
+
+        // ── Close modal ──
         document.getElementById('btn-close-auth').addEventListener('click', () => {
             document.getElementById('auth-overlay').style.display = 'none';
         });
 
+        // ── Nav login button ──
         document.getElementById('btn-nav-login').addEventListener('click', () => {
             document.getElementById('auth-overlay').style.display = 'flex';
         });
 
+        // ── Logout ──
+        document.getElementById('btn-logout').addEventListener('click', async () => {
+            await sbClient.auth.signOut();
+            document.getElementById('user-dropdown').classList.remove('open');
+        });
+
+        // ── Avatar dropdown toggle ──
+        document.getElementById('user-avatar').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const dropdown = document.getElementById('user-dropdown');
+            const rect = e.currentTarget.getBoundingClientRect();
+            
+            dropdown.style.position = 'fixed';
+            dropdown.style.top = (rect.bottom + 8) + 'px';
+            dropdown.style.right = (window.innerWidth - rect.right) + 'px';
+            
+            dropdown.classList.toggle('open');
+        });
+        document.addEventListener('click', () => {
+            const dropdown = document.getElementById('user-dropdown');
+            if (dropdown) dropdown.classList.remove('open');
+        });
+
     } catch (e) {
         console.error('Auth init failed', e);
-        document.getElementById('auth-overlay').style.display = 'flex';
-        const errEl = document.getElementById('auth-error');
-        if (errEl) {
-            errEl.style.display = 'block';
-            errEl.textContent = 'Auth Initialization Failed: ' + e.message;
-        }
         hideLoadingOverlay();
     }
 }
 
 let isDataLoaded = false;
 function handleSessionUpdate(session) {
+    const overlay = document.getElementById('auth-overlay');
+    const btnLogin = document.getElementById('btn-nav-login');
+    const avatarWrap = document.getElementById('user-avatar-wrap');
+    const avatar = document.getElementById('user-avatar');
+    const displayName = document.getElementById('user-display-name');
+    const emailEl = document.getElementById('user-email');
+
     if (!session) {
-        document.getElementById('auth-overlay').style.display = 'none';
-        document.getElementById('user-menu').style.display = 'flex';
-        document.getElementById('user-email').style.display = 'none';
-        document.getElementById('btn-logout').style.display = 'none';
-        document.getElementById('btn-nav-login').style.display = 'inline-block';
-        
+        // Not logged in
+        overlay.style.display = 'none';
+        btnLogin.style.display = 'inline-block';
+        avatarWrap.style.display = 'none';
+
         hideLoadingOverlay();
-        // Show tables
         document.querySelectorAll('.app-content').forEach(e => e.style.display = 'block');
-        
+
         if (!isDataLoaded) {
             showLoadingOverlay("Loading latest lines…");
             isDataLoaded = true;
@@ -95,16 +185,21 @@ function handleSessionUpdate(session) {
                 });
         }
     } else {
-        document.getElementById('auth-overlay').style.display = 'none';
-        document.getElementById('user-menu').style.display = 'flex';
-        document.getElementById('user-email').style.display = 'inline';
-        document.getElementById('user-email').textContent = session.user.email;
-        document.getElementById('btn-logout').style.display = 'inline-block';
-        document.getElementById('btn-nav-login').style.display = 'none';
-        
-        // Show tables
+        // Logged in
+        overlay.style.display = 'none';
+        btnLogin.style.display = 'none';
+        avatarWrap.style.display = 'flex';
+
+        const meta = session.user.user_metadata || {};
+        const username = meta.username || session.user.email.split('@')[0];
+        const initial = username.charAt(0).toUpperCase();
+
+        avatar.textContent = initial;
+        displayName.textContent = username;
+        emailEl.textContent = session.user.email;
+
         document.querySelectorAll('.app-content').forEach(e => e.style.display = 'block');
-        
+
         if (!isDataLoaded) {
             showLoadingOverlay("Loading latest lines…");
             isDataLoaded = true;
