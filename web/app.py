@@ -12,7 +12,7 @@ import gc
 import logging
 import sys
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 # Aggressive GC thresholds — scrape cycles create lots of short-lived objects.
@@ -28,6 +28,8 @@ def _intern(s):
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI, HTTPException, Depends
+from engine.dynamic_calibration import update_calibration_map, load_calibration_map
+from engine.ev_calculator import reload_calibration
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -514,7 +516,72 @@ def _run_pipeline_body():
         
         threading.Thread(target=_sync_all, daemon=True).start()
 
-        # Auto-backtest slip creation removed for multi-tenancy.
+        # Auto-backtest logging for opted-in users
+        def _auto_log_bg(bets=serialized_bets):
+            try:
+                from engine.database import get_db
+                db = get_db()
+                if not db:
+                    return
+                # Fetch users who explicitly opted in
+                users_res = db.table("user_config").select("user_id").eq("auto_backtest", True).execute()
+                for row in (users_res.data or []):
+                    uid = row.get("user_id")
+                    if not uid: 
+                        continue
+                        
+                    from engine.backtest import BacktestLogger
+                    bl = BacktestLogger(user_id=uid, db_client=db)
+                    
+                    # Pass the top ~40 bets so it has enough pool to select from
+                    bl.try_log_slip(bets[:40], slip_type="Power", n_legs=6)
+            except Exception as e:
+                logger.error("Auto-backtest background worker error: %s", e)
+
+        threading.Thread(target=_auto_log_bg, daemon=True).start()
+
+        # ── Market Observatory: log ALL high-prob lines for global calibration ──
+        def _log_observatory_bg(bets=serialized_bets):
+            try:
+                from engine.database import get_db as _get_db
+                obs_db = _get_db()
+                if not obs_db:
+                    return
+                rows_to_upsert = []
+                for b in bets:
+                    tp = float(b.get("true_prob") or 0)
+                    if tp < 0.50:
+                        continue
+                    player = b.get("player_name", "")
+                    league = b.get("league", "")
+                    prop   = b.get("prop_type", "")
+                    line   = b.get("pp_line", "")
+                    side   = b.get("side", "")
+                    start  = b.get("start_time", "")
+                    market_key = f"{player}|{league}|{prop}|{line}|{side}|{start}"
+                    rows_to_upsert.append({
+                        "market_key":  market_key,
+                        "player":      player,
+                        "league":      league,
+                        "prop":        prop,
+                        "line":        float(line) if line != "" else 0,
+                        "side":        side,
+                        "true_prob":   round(tp, 4),
+                        "game_start":  start if start else None,
+                        "result":      "pending",
+                    })
+                if rows_to_upsert:
+                    # Batch upsert, skip duplicates via market_key unique constraint
+                    obs_db.table("market_observatory").upsert(
+                        rows_to_upsert,
+                        on_conflict="market_key",
+                        ignore_duplicates=True
+                    ).execute()
+                    logger.info("Observatory: logged %d observations", len(rows_to_upsert))
+            except Exception as e:
+                logger.error("Observatory logging error: %s", e)
+
+        threading.Thread(target=_log_observatory_bg, daemon=True).start()
 
         # ── CLV Tracker: update closing lines for pending bets non-blocking ──
         # Pass the precomputed probs dict only — not the full matches list —
@@ -538,6 +605,13 @@ def _run_pipeline_body():
                     logger.info("ResultsChecker: %d rows updated in background", updated)
             except Exception as rc_exc:
                 logger.warning("ResultsChecker background error: %s", rc_exc)
+            # Also resolve observatory rows (reuses ESPN cache from above)
+            try:
+                obs_updated = _results_checker.check_observatory_results()
+                if obs_updated:
+                    logger.info("Observatory: %d observations resolved in background", obs_updated)
+            except Exception as obs_exc:
+                logger.warning("Observatory resolution error: %s", obs_exc)
 
         threading.Thread(target=_check_results_bg, daemon=True).start()
 
@@ -589,6 +663,29 @@ def startup():
             logger.warning("Startup CLV recovery error: %s", exc)
 
     threading.Thread(target=_startup_clv_recovery, daemon=True).start()
+
+    # ── Daily calibration job ──
+    def _run_daily_calibration():
+        try:
+            from engine.dynamic_calibration import update_calibration_map
+            from engine.ev_calculator import reload_calibration
+            result = update_calibration_map()
+            if result:
+                reload_calibration()
+                logger.info("Daily calibration: updated %d prop multipliers", len(result))
+            else:
+                logger.info("Daily calibration: no mature data yet, skipping")
+        except Exception as exc:
+            logger.error("Daily calibration error: %s", exc)
+
+    scheduler.add_job(
+        _run_daily_calibration,
+        trigger="cron",
+        hour=6,  # Run at 6 AM UTC daily
+        id="daily_calibration",
+    )
+    # Also run calibration once on startup
+    threading.Thread(target=_run_daily_calibration, daemon=True).start()
 
     # Run pipeline immediately on startup so data is ready
     threading.Thread(target=run_pipeline, daemon=True).start()
@@ -770,7 +867,8 @@ def _get_user_config(user: Optional[dict]) -> dict:
     base = {
         "min_ev_pct": -10.0,
         "active_leagues": dict(cfg.ACTIVE_LEAGUES),
-        "refresh_interval_min": 5
+        "refresh_interval_min": 5,
+        "auto_backtest": False
     }
     if not user:
         return base
@@ -786,6 +884,7 @@ def _get_user_config(user: Optional[dict]) -> dict:
                 if row.get("active_leagues"):
                     base["active_leagues"] = row["active_leagues"]
                 base["refresh_interval_min"] = int(row.get("refresh_interval_min", 5))
+                base["auto_backtest"] = bool(row.get("auto_backtest", False))
     except Exception as e:
         logger.warning(f"Failed to fetch user config for {user['id']}: {e}")
         
@@ -999,6 +1098,7 @@ def get_config(user: dict = Depends(get_current_user)):
         "interval_min":   cfg["refresh_interval_min"],
         "min_ev_pct":     cfg["min_ev_pct"],
         "active_leagues": cfg["active_leagues"],
+        "auto_backtest":  cfg.get("auto_backtest", False)
     }
 
 
@@ -1019,6 +1119,28 @@ def update_config(update: ConfigUpdate):
 
     return {"status": "config updated"}
 
+
+class AutoBacktestUpdate(BaseModel):
+    auto_backtest: bool
+
+@app.post("/api/user/auto-backtest")
+def update_auto_backtest(update: AutoBacktestUpdate, user: dict = Depends(get_current_user)):
+    from engine.database import get_user_db
+    db = get_user_db(user["jwt"])
+    if not db:
+        raise HTTPException(status_code=500, detail="Database not reachable.")
+    
+    # Upsert the user_config row. (Requires an ON CONFLICT clause in raw sql, but we'll try a basic upsert via PostgREST)
+    try:
+        db.table("user_config").upsert({
+            "user_id": user["id"],
+            "auto_backtest": update.auto_backtest,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }).execute()
+        return {"status": "success", "auto_backtest": update.auto_backtest}
+    except Exception as e:
+        logger.error(f"Failed to update auto_backtest for user {user['id']}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update configuration.")
 
 # ---------------------------------------------------------------------------
 # PrizePicks-only endpoints
@@ -1663,6 +1785,65 @@ def add_slip_to_backtest(req: BacktestAddSlipRequest, user: dict = Depends(get_c
 
     logger.info("Manual backtest slip logged: %s (%d legs)", new_slip["slip_id"], new_slip["n_legs"])
     return {"slip": new_slip}
+
+
+@app.delete("/api/backtest/slip/{slip_id}")
+def delete_backtest_slip(slip_id: str, user: dict = Depends(get_current_user)):
+    """Delete a slip and its legs from the user's backtest history."""
+    from engine.database import get_user_db
+    db = get_user_db(user["jwt"])
+    if not db:
+        raise HTTPException(status_code=500, detail="No database connection.")
+
+    try:
+        # Verify the slip belongs to this user
+        check = db.table("slips").select("id").eq("id", slip_id).execute()
+        if not check.data:
+            raise HTTPException(status_code=404, detail="Slip not found.")
+
+        # Delete legs first (foreign key), then slip header
+        db.table("legs").delete().eq("slip_id", slip_id).execute()
+        db.table("slips").delete().eq("id", slip_id).execute()
+
+        logger.info("Backtest: deleted slip %s for user %s", slip_id, user["id"])
+        return {"status": "deleted", "slip_id": slip_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Backtest: delete slip failed: %s", e)
+        raise HTTPException(status_code=500, detail=f"Delete failed: {e}")
+
+
+# ── Market Observatory Endpoints ───────────────────────────────────────────
+
+@app.get("/api/observatory")
+def get_observatory_data():
+    """Returns the latest observations from the market_observatory table."""
+    try:
+        from engine.database import get_db
+        db = get_db()
+        if not db:
+            return []
+        # Return last 100 rows, showing latest first
+        res = db.table("market_observatory") \
+            .select("*") \
+            .order("created_at", desc=True) \
+            .limit(100) \
+            .execute()
+        return res.data or []
+    except Exception as e:
+        logger.error("API: observatory fetch error: %s", e)
+        return []
+
+@app.get("/api/observatory/multipliers")
+def get_calibration_map_api():
+    """Returns the current calibration multipliers being applied to the odds."""
+    try:
+        from engine.dynamic_calibration import load_calibration_map
+        return load_calibration_map()
+    except Exception as e:
+        logger.error("API: calibration fetch error: %s", e)
+        return {}
 
 
 

@@ -16,17 +16,27 @@ from engine.constants import (
 )
 from engine.devig import devig_power, devig_single_sided, prob_to_american
 from engine.matcher import MatchedProp
+from engine.dynamic_calibration import load_calibration_map
+
+# Module-level calibration map (refreshed on import or by calling reload_calibration)
+_calibration_map: dict = load_calibration_map()
 
 
 # ---------------------------------------------------------------------------
 # Individual bet result
 # ---------------------------------------------------------------------------
 
+def reload_calibration():
+    """Reload the calibration map from disk (called after daily recalibration)."""
+    global _calibration_map
+    _calibration_map = load_calibration_map()
+
+
 class BetResult:
     __slots__ = (
         "bet_id", "player_name", "league", "prop_type",
         "pp_line", "fd_line", "side",
-        "true_prob", "true_odds", "edge", "individual_ev_pct",
+        "raw_true_prob", "true_prob", "true_odds", "edge", "individual_ev_pct",
         "over_odds", "under_odds", "both_sided",
         "pp_player_id", "start_time",
     )
@@ -54,16 +64,22 @@ class BetResult:
         self.pp_line = pp_line
         self.fd_line = fd_line
         self.side = side
-        self.true_prob = true_prob
+        self.raw_true_prob = true_prob
         self.over_odds = over_odds
         self.under_odds = under_odds
         self.both_sided = both_sided
         self.pp_player_id = pp_player_id
         self.start_time = start_time
-        self.true_odds = prob_to_american(true_prob)
 
-        self.edge = round(true_prob - OPTIMAL_BREAK_EVEN, 6)
-        self.individual_ev_pct = round((true_prob * OPTIMAL_IMPLIED_DECIMAL) - 1.0, 6)
+        # Apply dynamic calibration multiplier
+        cal_key = f"{league}|{prop_type}"
+        multiplier = _calibration_map.get(cal_key, 1.0)
+        calibrated_prob = min(true_prob * multiplier, 0.999)
+        self.true_prob = calibrated_prob
+        self.true_odds = prob_to_american(calibrated_prob)
+
+        self.edge = round(calibrated_prob - OPTIMAL_BREAK_EVEN, 6)
+        self.individual_ev_pct = round((calibrated_prob * OPTIMAL_IMPLIED_DECIMAL) - 1.0, 6)
 
     def to_dict(self) -> dict:
         return {

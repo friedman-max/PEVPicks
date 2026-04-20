@@ -84,16 +84,17 @@ class BacktestLogger:
       - Writes to Supabase using the user's RLS-scoped JWT
     """
 
-    def __init__(self, user_id: str, jwt: str):
+    def __init__(self, user_id: str, jwt: Optional[str] = None, db_client=None):
         self.user_id = user_id
         self.jwt = jwt
+        self.db_client = db_client
 
     def _fetch_recent_slips_with_legs(self) -> list[dict]:
         """
         Return all slips for this user from the last _DEDUP_WINDOW_HOURS with their legs
         attached.
         """
-        db = get_user_db(self.jwt)
+        db = self.db_client or get_user_db(self.jwt)
         if not db:
             return []
 
@@ -105,8 +106,7 @@ class BacktestLogger:
                 db.table("slips")
                 .select("id, timestamp")
                 .gte("timestamp", cutoff_iso)
-                # user_id filter is strictly optional since RLS forces it,
-                # but good for clarity.
+                .eq("user_id", self.user_id)
                 .order("timestamp", desc=True)
                 .limit(500)
                 .execute()
@@ -161,7 +161,7 @@ class BacktestLogger:
                 conflicts.append(bet)
         return conflicts
 
-    def try_log_slip(self, bets: list[dict], slip_type: str = "Power") -> Optional[dict]:
+    def try_log_slip(self, bets: list[dict], slip_type: str = "Power", n_legs: int = 6) -> Optional[dict]:
         """Build and log the best available auto-slip with unique players."""
         used_keys = self._load_used_keys_from_db()
 
@@ -183,20 +183,26 @@ class BacktestLogger:
                 continue
             best_legs.append(bet)
             seen_in_this_slip.add(p_key)
-            if len(best_legs) == 6:
+            if len(best_legs) == n_legs:
                 break
 
-        if len(best_legs) < 6:
+        if len(best_legs) < n_legs:
             return None
 
         true_probs = [float(b.get("true_prob") or 0.0) for b in best_legs]
-        avg_prob = sum(true_probs) / 6
-        power_be = BREAK_EVEN.get(("6", "power"))
+        avg_prob = sum(true_probs) / n_legs
+        be_key = (str(n_legs), slip_type.lower())
+        slip_be = BREAK_EVEN.get(be_key)
 
-        if power_be is None or avg_prob < power_be:
+        if slip_be is None or avg_prob < slip_be:
             return None
 
-        best_ev = power_slip_ev(true_probs)
+        # Use the correct EV function for the slip type
+        if slip_type.lower() == "power":
+            best_ev = power_slip_ev(true_probs)
+        else:
+            best_ev = flex_slip_ev(true_probs)
+
         if best_ev is None or best_ev <= 0:
             return None
 
@@ -212,7 +218,7 @@ class BacktestLogger:
                 "user_id":          self.user_id,
                 "timestamp":        timestamp,
                 "slip_type":        slip_type,
-                "n_legs":           6,
+                "n_legs":           n_legs,
                 "proj_slip_ev_pct": proj_ev,
                 "leg_num":          i,
                 "player":           bet.get("player_name", ""),
@@ -229,8 +235,8 @@ class BacktestLogger:
                 "stat_actual":      "",
             })
 
-        # Write to Supabase using user-scoped DB
-        db = get_user_db(self.jwt)
+        # Write to Supabase using provided client or user-scoped DB
+        db = self.db_client or get_user_db(self.jwt)
         if not db:
             logger.error("Backtest: no database connection, cannot log slip %s", slip_id)
             return None
@@ -242,7 +248,7 @@ class BacktestLogger:
                 "user_id":          self.user_id,
                 "timestamp":        timestamp,
                 "slip_type":        slip_type,
-                "n_legs":           6,
+                "n_legs":           n_legs,
                 "proj_slip_ev_pct": proj_ev
             }).execute()
             # 2. Insert legs

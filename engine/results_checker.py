@@ -196,6 +196,104 @@ class ESPNResultsChecker:
         self._event_cache.clear()
         return updated
 
+    def check_observatory_results(self) -> int:
+        """
+        Resolve pending rows in the market_observatory table using ESPN data.
+        Identical logic to check_pending_results but targets the observatory table.
+        """
+        self._cache.clear()
+        self._gamelog_cache.clear()
+        self._event_cache.clear()
+
+        db = get_db()
+        if not db:
+            return 0
+
+        try:
+            res = db.table("market_observatory").select("*").eq("result", "pending").execute()
+            rows = res.data or []
+        except Exception as exc:
+            logger.error("Observatory: cannot read pending rows: %s", exc)
+            return 0
+
+        if not rows:
+            return 0
+
+        now_utc = datetime.now(timezone.utc)
+        updated = 0
+
+        for row in rows:
+            game_start_str = row.get("game_start", "")
+            league = (row.get("league") or "").upper()
+            if not game_start_str or league not in ESPN_SCOREBOARD:
+                continue
+
+            try:
+                gs = datetime.fromisoformat(game_start_str.replace("Z", "+00:00"))
+                if gs.tzinfo is None:
+                    gs = gs.replace(tzinfo=timezone.utc)
+            except Exception:
+                continue
+
+            duration = GAME_DURATION_MINUTES.get(league, 180)
+            likely_end = gs + timedelta(minutes=duration)
+            if now_utc < likely_end:
+                continue
+
+            player_name = row.get("player", "")
+            prop_type = row.get("prop", "")
+            side = row.get("side", "over")
+            try:
+                line = float(row.get("line") or 0)
+            except ValueError:
+                continue
+
+            player_stats = self._get_player_stats(league, gs, player_name)
+            actual = None
+            if player_stats is not None:
+                actual = self._compute_stat(player_stats, prop_type, league)
+
+            if actual is None:
+                gl_stats = self._fetch_gamelog_stats(league, player_name, gs)
+                if gl_stats is not None:
+                    actual = self._compute_stat(gl_stats, prop_type, league)
+
+            if actual is None:
+                hours_since_end = (now_utc - likely_end).total_seconds() / 3600
+                is_completed = self._is_game_over(league, gs)
+                if is_completed or hours_since_end >= 6:
+                    try:
+                        db.table("market_observatory").update({
+                            "result": "dnp",
+                            "stat_actual": None
+                        }).eq("id", row["id"]).execute()
+                        updated += 1
+                    except Exception as db_exc:
+                        logger.error("Observatory DB update failed: %s", db_exc)
+                continue
+
+            if actual == line:
+                result = "push"
+            else:
+                result = "hit" if (actual > line if side == "over" else actual < line) else "miss"
+
+            try:
+                db.table("market_observatory").update({
+                    "result": result,
+                    "stat_actual": actual
+                }).eq("id", row["id"]).execute()
+                updated += 1
+            except Exception as db_exc:
+                logger.error("Observatory DB update failed: %s", db_exc)
+
+        if updated:
+            logger.info("Observatory: resolved %d pending observations", updated)
+
+        self._cache.clear()
+        self._gamelog_cache.clear()
+        self._event_cache.clear()
+        return updated
+
     # ------------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------------

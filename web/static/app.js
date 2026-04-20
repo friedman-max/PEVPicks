@@ -815,6 +815,7 @@ document.querySelectorAll(".tab").forEach(tab => {
     $("backtest-view").classList.add("hidden");
     $("backtest-filters").classList.add("hidden");
     $("analytics-view").classList.add("hidden");
+    $("observatory-view").classList.add("hidden");
 
     if (target === "ev") {
       $("ev-view").classList.remove("hidden");
@@ -847,9 +848,91 @@ document.querySelectorAll(".tab").forEach(tab => {
     } else if (target === "analytics") {
       $("analytics-view").classList.remove("hidden");
       fetchCalibration();
+    } else if (target === "observatory") {
+      $("observatory-view").classList.remove("hidden");
+      refreshObservatory();
     }
   });
 });
+
+async function refreshObservatory() {
+  // Fetch calibration multipliers (from local file — always works)
+  try {
+    const calResp = await apiFetch("/api/observatory/multipliers");
+    if (calResp.ok) {
+      const multipliers = await calResp.json();
+      renderObservatoryMultipliers(multipliers);
+    }
+  } catch (e) {
+    console.warn("Calibration fetch failed:", e);
+  }
+
+  // Fetch observatory feed (requires market_observatory table)
+  try {
+    const obsResp = await apiFetch("/api/observatory");
+    if (obsResp.ok) {
+      const observations = await obsResp.json();
+      renderObservatoryFeed(observations);
+    }
+  } catch (e) {
+    console.warn("Observatory fetch failed:", e);
+  }
+}
+
+function renderObservatoryMultipliers(multipliers) {
+  const tbody = $("obs-multiplier-tbody");
+  if (!tbody) return;
+  
+  // Convert object to array and sort by best performance (highest multiplier)
+  const sorted = Object.entries(multipliers)
+    .map(([key, value]) => ({ key, value }))
+    .sort((a, b) => b.value - a.value);
+    
+  if (sorted.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="3" class="empty-msg">Waiting for next daily calibration (min 30 observations per prop)...</td></tr>`;
+    return;
+  }
+  
+  tbody.innerHTML = sorted.map(m => {
+    const [league, prop] = m.key.split("|");
+    const val = m.value;
+    const strengthClass = val >= 1 ? "ev-high" : (val > 0.8 ? "ev-mid" : "ev-low");
+    const strengthPct = Math.round((val - 1) * 100);
+    const strengthText = strengthPct >= 0 ? `+${strengthPct}% Edge` : `${strengthPct}% Haircut`;
+    
+    return `<tr>
+      <td><strong>${league}</strong> ${prop}</td>
+      <td class="line-value ${strengthClass}">${val.toFixed(2)}x</td>
+      <td class="${strengthClass}">${strengthText}</td>
+    </tr>`;
+  }).join("");
+}
+
+function renderObservatoryFeed(observations) {
+  const tbody = $("obs-feed-tbody");
+  if (!tbody) return;
+  
+  if (observations.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-msg">No observations logged yet. Data arrives every 15m.</td></tr>`;
+    return;
+  }
+  
+  tbody.innerHTML = observations.map(obs => {
+    const resClass = obs.result === "hit" ? "hit" : (obs.result === "miss" ? "miss" : "pending");
+    const loggedDate = new Date(obs.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    return `<tr>
+      <td>${obs.player}</td>
+      <td><span class="league-tag league-${obs.league}">${obs.league}</span> ${obs.prop}</td>
+      <td class="line-value">${obs.line} <span class="side-${obs.side}">${obs.side.toUpperCase()}</span></td>
+      <td class="line-value">${(obs.true_prob * 100).toFixed(1)}%</td>
+      <td><span class="result-tag res-${resClass}">${obs.result.toUpperCase()}</span></td>
+      <td class="line-value">${obs.stat_actual !== null ? obs.stat_actual : "—"}</td>
+      <td style="color:var(--text-muted)">${loggedDate}</td>
+    </tr>`;
+  }).join("");
+}
+
 
 // ── Combined Lines ────────────────────────────────────────────────────────
 const matchedState = {
@@ -1063,6 +1146,27 @@ async function fetchBootstrap() {
   }
 }
 
+/**
+ * Re-fetch just the bets with auth headers so in_backtest flags are accurate.
+ * Called after auth completes to fix the race where bootstrap loads before JWT.
+ * Also patches the localStorage cache so next load is correct.
+ */
+async function refreshBetsWithAuth() {
+  try {
+    const resp = await apiFetch("/api/bootstrap?t=" + Date.now(), { cache: "no-store" });
+    if (!resp.ok) return;
+    const data = await resp.json();
+
+    // Update bets with fresh in_backtest flags
+    state.allBets = data.bets || [];
+    applyFilters();
+
+    // Patch the cache so subsequent loads have correct flags
+    saveToCache(data);
+  } catch (e) {
+    console.error("Auth-scoped bets refresh failed:", e);
+  }
+}
 
 
 // ── PrizePicks Lines ──────────────────────────────────────────────────────
@@ -1586,19 +1690,23 @@ function renderBacktest() {
 
 
   const totalLegsCount = allLegs.length;
-  const checkedLegs = allLegs.filter(l => l.result === "hit" || l.result === "miss");
-  const hitLegs = checkedLegs.filter(l => l.result === "hit").length;
-  const completedLegsCount = checkedLegs.length;
+  // Volume: all finished outcomes
+  const resolvedLegs = allLegs.filter(l => l.result && l.result !== "pending");
+  // Hit Rate: only actual outcomes (user choice: exclude DNP/Push from accuracy denominator)
+  const accuracyLegs = allLegs.filter(l => l.result === "hit" || l.result === "miss");
+  const hitLegs = accuracyLegs.filter(l => l.result === "hit").length;
+  const completedLegsCount = resolvedLegs.length;
+  const accuracyCount = accuracyLegs.length;
 
   let legHitRateText = "—";
   let legHitRateClass = "bt-card-value";
   let expectedHitRateText = "—";
 
-  if (completedLegsCount > 0) {
-    const avgExp = checkedLegs.reduce((sum, l) => sum + (parseFloat(l.true_prob) || 0), 0) / completedLegsCount;
+  if (accuracyCount > 0) {
+    const avgExp = accuracyLegs.reduce((sum, l) => sum + (parseFloat(l.true_prob) || 0), 0) / accuracyCount;
     expectedHitRateText = (avgExp * 100).toFixed(1) + "%";
-    const pHat = hitLegs / completedLegsCount;
-    const margin = 1.96 * Math.sqrt((pHat * (1 - pHat)) / completedLegsCount);
+    const pHat = hitLegs / accuracyCount;
+    const margin = 1.96 * Math.sqrt((pHat * (1 - pHat)) / accuracyCount);
     const lower = Math.max(0, pHat - margin);
     const upper = Math.min(1, pHat + margin);
     const ciText = `[${(lower * 100).toFixed(1)}%, ${(upper * 100).toFixed(1)}%]`;
@@ -1687,6 +1795,7 @@ function renderBacktest() {
       headerHtml = `<tr class="slip-header-row">
         <td colspan="12">
           <div class="slip-header-content">
+            <button class="btn-delete-slip" data-slip-id="${l.slip_id}" title="Delete this slip">🗑</button>
             <span class="slip-header-stat">
               <span class="slip-header-label">Slip</span>
               <span class="slip-header-id">${l.slip_id}</span>
@@ -1726,6 +1835,36 @@ function renderBacktest() {
       <td data-label="Actual">${(l.stat_actual !== null && l.stat_actual !== undefined && l.stat_actual !== "") ? l.stat_actual : "—"}</td>
     </tr>`;
   }).join("");
+
+  // Wire up delete buttons
+  tbody.querySelectorAll(".btn-delete-slip").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const slipId = btn.dataset.slipId;
+      if (!confirm(`Delete slip ${slipId}? This cannot be undone.`)) return;
+
+      // Optimistic removal: instantly strip from local data and re-render
+      btState.allLegs = btState.allLegs.filter(l => l.slip_id !== slipId);
+      renderBacktest();
+
+      // Fire the server delete in the background
+      try {
+        const resp = await apiFetch(`/api/backtest/slip/${slipId}`, { method: "DELETE" });
+        if (!resp.ok) {
+          const err = await resp.json();
+          alert("Delete failed: " + (err.detail || resp.statusText));
+          // Re-fetch to restore if delete failed
+          await fetchBacktest();
+          return;
+        }
+        // Silently refresh analytics in background to update charts
+        fetchCalibration();
+      } catch (err) {
+        alert("Delete error: " + err.message);
+        await fetchBacktest();
+      }
+    });
+  });
 }
 
 // Filter events
@@ -2196,7 +2335,8 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     // Step 5: Auth-gated data (only if user is logged in)
     if (currentSession) {
-        Promise.all([fetchBacktest(), fetchCalibration()]).catch(() => {});
+        // Re-fetch bets with auth so in_backtest (LOGGED) flags are accurate
+        Promise.all([refreshBetsWithAuth(), fetchBacktest(), fetchCalibration(), fetchUserConfig()]).catch(() => {});
     }
 });
 
@@ -2209,10 +2349,55 @@ window.addEventListener('DOMContentLoaded', () => {
             if (window.innerWidth <= 900) sp.classList.toggle("open");
         });
     }
+
+    // Auto-backtest toggle: hydrate immediately from localStorage
+    const abToggle = document.getElementById("auto-backtest-toggle");
+    if (abToggle) {
+        const cached = localStorage.getItem("coreprop_auto_backtest");
+        if (cached !== null) {
+            abToggle.checked = cached === "true";
+        }
+
+        abToggle.addEventListener("change", async (e) => {
+            const isChecked = e.target.checked;
+            // Persist to localStorage immediately for instant reload
+            localStorage.setItem("coreprop_auto_backtest", String(isChecked));
+            abToggle.disabled = true;
+            try {
+                const res = await apiFetch("/api/user/auto-backtest", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ auto_backtest: isChecked })
+                });
+                if (!res.ok) throw new Error("Failed to update config");
+            } catch (err) {
+                console.error("Auto backtest update error:", err);
+                abToggle.checked = !isChecked; // Revert on failure
+                localStorage.setItem("coreprop_auto_backtest", String(!isChecked));
+            } finally {
+                abToggle.disabled = false;
+            }
+        });
+    }
 });
+
+async function fetchUserConfig() {
+    try {
+        const res = await apiFetch("/api/config");
+        if (res.ok) {
+            const data = await res.json();
+            const abToggle = document.getElementById("auto-backtest-toggle");
+            if (abToggle && data.auto_backtest !== undefined) {
+                abToggle.checked = data.auto_backtest;
+                // Sync localStorage with server truth
+                localStorage.setItem("coreprop_auto_backtest", String(data.auto_backtest));
+            }
+        }
+    } catch (e) {
+        console.error("Failed to fetch user config", e);
+    }
+}
 
 fetchStatus();
 setInterval(fetchStatus, 10_000);
-// Auto-logging was removed, so polling latest slip is no longer needed
-// setInterval(pollLatestSlip, 10_000);
-// pollLatestSlip();
+// Auto-logging was removed globally, handled per-user now

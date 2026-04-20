@@ -8,6 +8,7 @@ create table user_config (
   min_ev_pct      numeric default 0.01,
   active_leagues  jsonb   default '{"NBA":true,"MLB":true,"NHL":true,"NCAAB":true}'::jsonb,
   refresh_interval_min int default 15,
+  auto_backtest   boolean default false,
   created_at      timestamptz default now(),
   updated_at      timestamptz default now()
 );

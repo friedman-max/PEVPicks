@@ -808,6 +808,24 @@ tr.slip-header-row:hover {
   width: 100%;
 }
 
+.btn-delete-slip {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  opacity: 0.7;
+  transition: opacity 0.15s, background 0.15s;
+  flex-shrink: 0;
+  color: var(--red);
+}
+
+.btn-delete-slip:hover {
+  opacity: 1;
+  background: rgba(239, 68, 68, 0.2);
+}
+
 .slip-header-id {
   color: var(--accent);
   font-family: monospace;
@@ -1728,4 +1746,65 @@ tr.in-backtest.selected {
 }
 .user-dropdown-item:hover {
   background: var(--surface2);
+}
+
+/* ── Observatory Specific ── */
+.ev-high { color: var(--green); }
+.ev-mid { color: var(--yellow); }
+.ev-low { color: var(--red); }
+
+/* Result Tags */
+.result-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.res-pending { background: rgba(122, 128, 160, 0.2); color: var(--text-muted); }
+.res-hit { background: rgba(34, 197, 94, 0.2); color: var(--green); }
+.res-miss { background: rgba(239, 68, 68, 0.2); color: var(--red); }
+.res-push { background: rgba(59, 130, 246, 0.2); color: var(--blue); }
+.res-dnp { 
+  background: rgba(122, 128, 160, 0.3); 
+  color: var(--text-muted); 
+  text-decoration: line-through; 
+}
+
+/* Observatory view needs its own scroll since it's inside backtest-view (overflow:hidden) */
+#observatory-view {
+  overflow-y: auto !important;
+  padding: 16px 20px;
+  gap: 16px;
+}
+
+#observatory-view .analytics-row {
+  flex-shrink: 0;
+}
+
+#observatory-view .analytics-panel {
+  width: 100%;
+}
+
+/* Mobile responsive for Observatory */
+@media (max-width: 900px) {
+  #observatory-view {
+    padding: 10px;
+    gap: 12px;
+  }
+
+  #observatory-view table {
+    font-size: 12px;
+  }
+
+  #observatory-view th,
+  #observatory-view td {
+    padding: 6px 8px;
+  }
+
+  #observatory-view .analytics-panel-header h3 {
+    font-size: 14px;
+  }
 }
