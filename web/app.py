@@ -707,7 +707,17 @@ def health():
 
 @app.get("/")
 def root():
-    return FileResponse(str(STATIC_DIR / "index.html"))
+    from engine.database import SUPABASE_URL, SUPABASE_ANON_KEY
+    html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    # Inject runtime config so the frontend doesn't need to fetch /api/ui-config
+    config_script = (
+        f'<script>window.__COREPROP_CONFIG='
+        f'{{"supabase_url":"{SUPABASE_URL}","supabase_anon_key":"{SUPABASE_ANON_KEY}"}}'
+        f'</script>'
+    )
+    html = html.replace("</head>", config_script + "\n</head>", 1)
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content=html)
 
 
 # ---------------------------------------------------------------------------

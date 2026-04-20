@@ -7,9 +7,16 @@ let currentSession = null;
 
 async function initAuth() {
     try {
-        const res = await fetch('/api/ui-config');
-        const config = await res.json();
-        sbClient = window.supabase.createClient(config.supabase_url, config.supabase_anon_key);
+        // Use server-injected config (no network round-trip)
+        const config = window.__COREPROP_CONFIG;
+        if (!config) {
+            // Fallback for direct file access / dev
+            const res = await fetch('/api/ui-config');
+            const fallback = await res.json();
+            sbClient = window.supabase.createClient(fallback.supabase_url, fallback.supabase_anon_key);
+        } else {
+            sbClient = window.supabase.createClient(config.supabase_url, config.supabase_anon_key);
+        }
 
         const { data: { session } } = await sbClient.auth.getSession();
         currentSession = session;
@@ -156,6 +163,11 @@ async function initAuth() {
 }
 
 let isDataLoaded = false;
+
+/**
+ * handleSessionUpdate — UI-ONLY. Updates avatar, skeleton, overlay.
+ * All data loading is handled by the DOMContentLoaded orchestrator.
+ */
 function handleSessionUpdate(session) {
     const overlay = document.getElementById('auth-overlay');
     const btnLogin = document.getElementById('btn-nav-login');
@@ -163,29 +175,16 @@ function handleSessionUpdate(session) {
     const avatar = document.getElementById('user-avatar');
     const displayName = document.getElementById('user-display-name');
     const emailEl = document.getElementById('user-email');
+    
+    // Hide the skeleton placeholder now that auth has resolved
+    const skeleton = document.getElementById('user-skeleton');
+    if (skeleton) skeleton.style.display = 'none';
 
     if (!session) {
-        // Not logged in
         overlay.style.display = 'none';
         btnLogin.style.display = 'inline-block';
         avatarWrap.style.display = 'none';
-
-        hideLoadingOverlay();
-        document.querySelectorAll('.app-content').forEach(e => e.style.display = 'block');
-
-        if (!isDataLoaded) {
-            showLoadingOverlay("Loading latest lines…");
-            isDataLoaded = true;
-            const safetyTimer = setTimeout(hideLoadingOverlay, 20000);
-            fetchBootstrap()
-                .catch(err => console.error("Bootstrap failed:", err))
-                .finally(() => {
-                    clearTimeout(safetyTimer);
-                    hideLoadingOverlay();
-                });
-        }
     } else {
-        // Logged in
         overlay.style.display = 'none';
         btnLogin.style.display = 'none';
         avatarWrap.style.display = 'flex';
@@ -197,25 +196,9 @@ function handleSessionUpdate(session) {
         avatar.textContent = initial;
         displayName.textContent = username;
         emailEl.textContent = session.user.email;
-
-        document.querySelectorAll('.app-content').forEach(e => e.style.display = 'block');
-
-        if (!isDataLoaded) {
-            showLoadingOverlay("Loading latest lines…");
-            isDataLoaded = true;
-            const safetyTimer = setTimeout(hideLoadingOverlay, 20000);
-            fetchBootstrap()
-                .catch(err => console.error("Bootstrap failed:", err))
-                .finally(() => {
-                    clearTimeout(safetyTimer);
-                    hideLoadingOverlay();
-                    Promise.all([fetchBacktest(), fetchCalibration()]).catch(() => {});
-                });
-        } else {
-            // Already loaded public data, but now user logged in. Let's fetch the gated data.
-            Promise.all([fetchBacktest(), fetchCalibration()]).catch(() => {});
-        }
     }
+
+    document.querySelectorAll('.app-content').forEach(e => e.style.display = 'block');
 }
 
 async function apiFetch(url, options = {}) {
@@ -258,24 +241,61 @@ const state = {
   lastRefresh:   null,        // ISO string from server (for staleness display)
 };
 
-// ── NO localStorage cache ──────────────────────────────────────────────────
-// We deliberately do NOT cache datasets in the browser. Every page open
-// fetches the latest data from the backend (which is seeded from Supabase
-// on startup and kept current by the auto-refresh scheduler). This
-// guarantees users see fresh lines on open instead of stale cached blobs
-// from a prior session.
-//
-// Clean up any cache leftovers from previous versions so legacy data
-// can't bleed into the new no-cache flow.
-try {
-  for (let i = localStorage.length - 1; i >= 0; i--) {
-    const k = localStorage.key(i);
-    if (k && k.startsWith("coreprop:cache:")) localStorage.removeItem(k);
-  }
-} catch (e) { /* storage disabled — ignore */ }
+// ── localStorage Cache ─────────────────────────────────────────────────────
+const CACHE_KEY = "coreprop_bootstrap_cache";
+const CACHE_FRESH_SECONDS = 60; // Skip background fetch if cache is younger than this
 
-function cacheLoad() { return {}; }
-function cacheSave(_patch) { /* no-op by design */ }
+/**
+ * Save the entire bootstrap payload to localStorage for instant-load on refresh.
+ */
+function saveToCache(data) {
+  try {
+    const payload = {
+      timestamp: Date.now(),
+      data: data
+    };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+  } catch (e) {
+    console.warn("localStorage save failed:", e);
+  }
+}
+
+/**
+ * Hydrate the application state from localStorage if available.
+ * Returns { success: boolean, ageSeconds: number | null }
+ */
+function hydrateFromCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return { success: false, ageSeconds: null };
+    const { timestamp, data } = JSON.parse(raw);
+    if (!data) return { success: false, ageSeconds: null };
+
+    const ageSeconds = timestamp ? (Date.now() - timestamp) / 1000 : null;
+
+    // Populate all sub-states
+    state.allBets          = data.bets      || [];
+    matchedState.allLines  = data.matches   || [];
+    ppState.allLines       = data.pp_lines  || [];
+    fdState.allLines       = data.fd_lines  || [];
+    dkState.allLines       = data.dk_lines  || [];
+    pinState.allLines      = data.pin_lines || [];
+    if (data.last_refresh) state.lastRefresh = data.last_refresh;
+
+    // Trigger initial renders
+    applyFilters();
+    applyMatchedFilters();
+    applyPPFilters();
+    applyFDFilters();
+    applyDKFilters();
+    applyPinFilters();
+    
+    return { success: true, ageSeconds };
+  } catch (e) {
+    console.warn("localStorage hydration failed:", e);
+    return { success: false, ageSeconds: null };
+  }
+}
 
 // ── DOM refs ───────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -1019,12 +1039,15 @@ async function fetchBootstrap() {
     if (!resp.ok) throw new Error("bootstrap HTTP " + resp.status);
     const data = await resp.json();
 
-    state.allBets           = data.bets      || [];
-    matchedState.allLines   = data.matches   || [];
-    ppState.allLines        = data.pp_lines  || [];
-    fdState.allLines        = data.fd_lines  || [];
-    dkState.allLines        = data.dk_lines  || [];
-    pinState.allLines       = data.pin_lines || [];
+    // Cache for next time
+    saveToCache(data);
+
+    state.allBets          = data.bets      || [];
+    matchedState.allLines  = data.matches   || [];
+    ppState.allLines       = data.pp_lines  || [];
+    fdState.allLines       = data.fd_lines  || [];
+    dkState.allLines       = data.dk_lines  || [];
+    pinState.allLines      = data.pin_lines || [];
     if (data.last_refresh) state.lastRefresh = data.last_refresh;
 
     applyFilters();
@@ -1040,7 +1063,7 @@ async function fetchBootstrap() {
   }
 }
 
-// hydrateFromCache removed — no-cache flow now, see Init section below.
+
 
 // ── PrizePicks Lines ──────────────────────────────────────────────────────
 const ppState = {
@@ -2142,11 +2165,40 @@ function hideLoadingOverlay() {
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
-// Always fetch fresh data from the backend on open — no localStorage cache.
-// Show a loading overlay until bootstrap completes so the user sees
-// progress rather than empty tables masquerading as "no data".
-// Initialize auth
-window.addEventListener('DOMContentLoaded', initAuth);
+// Single orchestrator: hydrate cache → parallel auth + data → auth-gated data.
+window.addEventListener('DOMContentLoaded', async () => {
+    // Step 1: Instant render from localStorage (< 10ms)
+    const cache = hydrateFromCache();
+    if (cache.success) {
+        isDataLoaded = true;
+        hideLoadingOverlay();
+        document.querySelectorAll('.app-content').forEach(e => e.style.display = 'block');
+    }
+
+    // Step 2: Determine if we need a background data refresh
+    const cacheIsFresh = cache.success && cache.ageSeconds !== null && cache.ageSeconds < CACHE_FRESH_SECONDS;
+    const bootstrapPromise = cacheIsFresh
+        ? Promise.resolve(true)  // Cache is fresh enough, skip network
+        : fetchBootstrap().catch(err => { console.error("Bootstrap failed:", err); return false; });
+
+    // Step 3: Auth + data fetch run IN PARALLEL
+    const authPromise = initAuth().catch(err => console.error("Auth init failed:", err));
+    
+    // Wait for both to settle
+    const [bootstrapOk] = await Promise.all([bootstrapPromise, authPromise]);
+
+    // Step 4: If we had no cache AND bootstrap just completed, mark loaded
+    if (!isDataLoaded) {
+        isDataLoaded = true;
+    }
+    hideLoadingOverlay();
+    document.querySelectorAll('.app-content').forEach(e => e.style.display = 'block');
+
+    // Step 5: Auth-gated data (only if user is logged in)
+    if (currentSession) {
+        Promise.all([fetchBacktest(), fetchCalibration()]).catch(() => {});
+    }
+});
 
 // Slip panel drawer toggle for mobile (one-time binding)
 window.addEventListener('DOMContentLoaded', () => {

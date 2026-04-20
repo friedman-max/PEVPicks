@@ -150,7 +150,7 @@ body {
 .tab-bar {
   display: flex; gap: 6px; background: var(--surface); border-bottom: 1px solid var(--border);
   padding: 10px 0; /* Vertical only, logo handles left, tabs handle right */
-  overflow-x: hidden;
+  overflow-x: auto;
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE/Edge */
   flex-shrink: 0;
@@ -304,7 +304,7 @@ body {
 
 .table-wrapper {
   flex: 1;
-  overflow-y: auto;
+  overflow: auto;
 }
 
 table {
@@ -529,10 +529,7 @@ tbody tr.selected {
   overflow: hidden;
 }
 
-.pp-view .table-wrapper {
-  flex: 1;
-  overflow-y: auto;
-}
+/* Redundant override removed — handled by .table-wrapper */
 
 .league-tag {
   display: inline-block;
@@ -780,10 +777,7 @@ th.sortable-pp.active.asc::after {
   overflow: hidden;
 }
 
-.backtest-view .table-wrapper {
-  flex: 1;
-  overflow-y: auto;
-}
+/* Redundant override removed — handled by .table-wrapper */
 
 /* Slip group header row */
 tr.slip-header-row {
@@ -1062,7 +1056,7 @@ tr.in-backtest.selected {
   border: 1px solid var(--border);
   border-radius: 8px;
   flex: 1;
-  overflow-y: auto;
+  overflow: auto;
 }
 
 /* ── Calibration Table Compact adjustments ── */
@@ -1192,9 +1186,9 @@ tr.in-backtest.selected {
     overflow: hidden !important;
   }
 
-  /* High Specificity Table-to-Cards Transformation */
+  /* Ensure internal scroll is possible on mobile cards if they overflow vertically */
   .table-section .table-wrapper {
-    overflow-x: hidden !important;
+    overflow: auto !important;
   }
 
   #ev-view table,
@@ -1440,8 +1434,7 @@ tr.in-backtest.selected {
    child to own the scroll (as the backtest table does). Analytics has
    multiple rows of panels instead, so we let the view itself scroll. */
 #analytics-view {
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: auto;
   padding-bottom: 16px;
 }
 
@@ -1633,6 +1626,19 @@ tr.in-backtest.selected {
   background: linear-gradient(to right, transparent, var(--surface));
   transform: translateX(-100%);
   pointer-events: none;
+}
+
+/* Skeleton placeholder — same size as .user-avatar so layout doesn't shift */
+.user-avatar-skeleton {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--surface2);
+  animation: skeletonPulse 1.2s ease-in-out infinite;
+}
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 0.8; }
 }
 
 /* ── User avatar + dropdown ── */

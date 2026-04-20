@@ -6,7 +6,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>CoreProp</title>
   <link rel="icon" type="image/png" href="/static/logo.png" />
-  <link rel="stylesheet" href="/static/style.css?v=102" />
+  <!-- Preconnect: start TLS handshakes early -->
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="preconnect" href="https://gxufqwvmkgjaqudqaapw.supabase.co" crossorigin />
+  <link rel="stylesheet" href="/static/style.css?v=103" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -68,6 +71,8 @@
     <button class="tab" data-tab="backtest">Backtest</button>
     <button class="tab" data-tab="analytics">Analytics</button>
     <div class="sticky-user-wrap">
+      <!-- Skeleton placeholder — reserves space until auth resolves -->
+      <div id="user-skeleton" class="user-avatar-skeleton"></div>
       <!-- Shown when logged out -->
       <button id="btn-nav-login" class="btn btn-primary btn-sm" style="display:none;">Log In</button>
       <!-- Shown when logged in -->
@@ -694,8 +699,8 @@
   </main>
 
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="/static/app.js?v=18"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script defer src="/static/app.js?v=19"></script>
 </body>
 
 </html>
