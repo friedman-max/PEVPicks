@@ -31,15 +31,13 @@ body {
   height: 100%;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
   font-size: 14px;
   line-height: 1.5;
-  /* Prevent bouncy scrolling on mobile */
-  position: fixed;
-  width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 .badge {
@@ -251,13 +249,14 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  overflow: hidden;
+  /* overflow: hidden; Removed to allow internal containers to manage themselves, or set to auto if needed */
 }
 
 /* ── Main layout ── */
 .main-layout {
   display: grid;
   grid-template-columns: 1fr 300px;
+  grid-template-rows: 1fr; /* Constrain row to parent height */
   gap: 0;
   flex: 1;
   min-height: 0;
@@ -275,6 +274,8 @@ body {
 .table-section {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 

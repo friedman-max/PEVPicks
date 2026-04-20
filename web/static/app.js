@@ -198,7 +198,7 @@ function handleSessionUpdate(session) {
         emailEl.textContent = session.user.email;
     }
 
-    document.querySelectorAll('.app-content').forEach(e => e.style.display = 'block');
+    document.querySelectorAll('.app-content').forEach(e => e.style.display = 'flex');
 }
 
 async function apiFetch(url, options = {}) {
@@ -2172,7 +2172,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (cache.success) {
         isDataLoaded = true;
         hideLoadingOverlay();
-        document.querySelectorAll('.app-content').forEach(e => e.style.display = 'block');
+        document.querySelectorAll('.app-content').forEach(e => e.style.display = 'flex');
     }
 
     // Step 2: Determine if we need a background data refresh
@@ -2192,7 +2192,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         isDataLoaded = true;
     }
     hideLoadingOverlay();
-    document.querySelectorAll('.app-content').forEach(e => e.style.display = 'block');
+    document.querySelectorAll('.app-content').forEach(e => e.style.display = 'flex');
 
     // Step 5: Auth-gated data (only if user is logged in)
     if (currentSession) {
