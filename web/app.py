@@ -9,6 +9,8 @@ Endpoints:
   POST /api/config      - Update config (interval, min_ev, leagues)
 """
 import gc
+import hashlib
+import json
 import logging
 import sys
 import threading
@@ -27,7 +29,9 @@ def _intern(s):
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request, Response
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import JSONResponse
 from engine.dynamic_calibration import update_calibration_map, load_calibration_map
 from engine.ev_calculator import reload_calibration
 from fastapi.staticfiles import StaticFiles
@@ -59,6 +63,11 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="CoreProp")
 
+# Compress JSON responses >= 1KB. Typical line payloads are 100-500KB raw and
+# compress 6-10x with gzip, dramatically reducing network time and response-
+# buffer memory on the 512MB tier.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
+
 # Results checker / CLV singletons (stateless, run in background via service role)
 _results_checker  = ESPNResultsChecker()
 _clv_tracker      = CLVTracker()
@@ -89,6 +98,123 @@ _state = {
     "min_ev_pct":    -10.0,         # fallback default
     "active_leagues": dict(cfg.ACTIVE_LEAGUES), # fallback default
 }
+
+# Pre-serialized JSON response cache. Populated once at the end of each scrape
+# cycle so GET endpoints can return bytes directly without a per-request
+# json.dumps (which on the 512MB tier was the largest transient allocation).
+#
+# Values are bytes keyed by dataset. `etag` is a weak hash of last_refresh so
+# clients can 304-short-circuit unchanged polls.
+_payload_cache = {
+    "bets":      None,   # bytes | None
+    "matches":   None,
+    "pp_lines":  None,
+    "fd_lines":  None,
+    "dk_lines":  None,
+    "pin_lines": None,
+    "core":      None,   # bootstrap/core — bets + meta
+    "etag":      None,   # str | None
+}
+_payload_lock = threading.Lock()
+
+
+def _build_etag(last_refresh) -> str:
+    """Stable ETag derived from the last_refresh timestamp. Weak (W/) because
+    gzip compression can mutate bytes at the transport layer."""
+    seed = last_refresh.isoformat() if isinstance(last_refresh, datetime) else str(last_refresh)
+    h = hashlib.md5(seed.encode("utf-8")).hexdigest()[:16]
+    return f'W/"{h}"'
+
+
+def _json_bytes(obj) -> bytes:
+    """Compact JSON encoding. separators=(',',':') trims ~15% off list payloads."""
+    return json.dumps(obj, separators=(",", ":"), default=str).encode("utf-8")
+
+
+def _refresh_payload_cache(
+    serialized_bets,
+    serialized_matches,
+    serialized_pp,
+    serialized_fd,
+    serialized_dk,
+    serialized_pin,
+    last_refresh,
+    interval_min,
+):
+    """Build all pre-serialized response bytes in one pass. Called from the
+    pipeline with the just-built state so we never dumps() per-request."""
+    last_iso = last_refresh.isoformat() if isinstance(last_refresh, datetime) else last_refresh
+    etag = _build_etag(last_refresh)
+
+    core = {
+        "bets":         serialized_bets,
+        "total":        len(serialized_bets),
+        "is_scraping":  False,
+        "last_refresh": last_iso,
+        "interval_min": interval_min,
+    }
+
+    with _payload_lock:
+        _payload_cache["bets"]     = _json_bytes({"bets": serialized_bets, "total": len(serialized_bets), "is_scraping": False, "last_refresh": last_iso})
+        _payload_cache["matches"]  = _json_bytes({"matches": serialized_matches, "total": len(serialized_matches), "is_scraping": False, "last_refresh": last_iso})
+        _payload_cache["pp_lines"] = _json_bytes({"lines": serialized_pp, "total": len(serialized_pp), "is_scraping": False, "last_refresh": last_iso})
+        _payload_cache["fd_lines"] = _json_bytes({"lines": serialized_fd, "total": len(serialized_fd), "is_scraping": False, "last_refresh": last_iso})
+        _payload_cache["dk_lines"] = _json_bytes({"lines": serialized_dk, "total": len(serialized_dk), "is_scraping": False, "last_refresh": last_iso})
+        _payload_cache["pin_lines"] = _json_bytes({"lines": serialized_pin, "total": len(serialized_pin), "is_scraping": False, "last_refresh": last_iso})
+        _payload_cache["core"]     = _json_bytes(core)
+        _payload_cache["etag"]     = etag
+
+
+def _rebuild_cache_from_state():
+    """Rebuild the payload cache from whatever's currently in _state. Used by
+    the per-book refresh endpoints that only update one dataset at a time."""
+    with _lock:
+        _refresh_payload_cache(
+            _state["bets"],
+            _state["matches"],
+            _state["pp_lines"],
+            _state["fd_lines"],
+            _state["dk_lines"],
+            _state["pin_lines"],
+            _state["last_refresh"],
+            _state["interval_min"],
+        )
+
+
+def _cached_response(key: str, request: Request) -> Response:
+    """Serve a pre-serialized JSON payload with ETag/304 short-circuit. If the
+    cache is empty (pre-first-scrape), returns an empty-shape JSON response."""
+    with _payload_lock:
+        body = _payload_cache.get(key)
+        etag = _payload_cache.get("etag")
+
+    if body is None:
+        # Cold start — minimal empty shape, but still fast and cacheable.
+        shape = {"bets": []} if key in ("bets", "core") else {"lines": [] if key != "matches" else None, "matches": []}
+        empty = {
+            "total": 0,
+            "is_scraping": _state["is_scraping"],
+            "last_refresh": _last_refresh_iso(),
+        }
+        if key == "core":
+            empty["bets"] = []
+            empty["interval_min"] = _state["interval_min"]
+        elif key == "bets":
+            empty["bets"] = []
+        elif key == "matches":
+            empty["matches"] = []
+        else:
+            empty["lines"] = []
+        return JSONResponse(empty)
+
+    if etag and request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers={"ETag": etag})
+
+    headers = {"Cache-Control": "no-cache"}
+    if etag:
+        headers["ETag"] = etag
+    return Response(content=body, media_type="application/json", headers=headers)
+
 
 scheduler = BackgroundScheduler()
 
@@ -470,7 +596,13 @@ def _run_pipeline_body():
             d["fd_odds_book"] = extras.get("fd_odds")
             d["dk_odds_book"] = extras.get("dk_odds")
             d["pin_odds_book"] = extras.get("pin_odds")
-            d["start_time"]   = extras.get("start_time", "")
+            start_time = extras.get("start_time", "")
+            d["start_time"] = start_time
+            # Precompute the backtest-dedup key so the client can join
+            # in_backtest flags locally against /api/backtest/keys, removing
+            # per-request copies and a Supabase round-trip off the hot path.
+            player_key, time_key = make_bet_key(d.get("player_name", ""), start_time)
+            d["bet_key"] = f"{player_key}|{time_key}"
             serialized_bets.append(d)
 
         # Free intermediate mapping before we hand off to Supabase + background
@@ -499,6 +631,22 @@ def _run_pipeline_body():
             _state["last_refresh"] = datetime.now()
             _state["next_refresh"] = datetime.now() + timedelta(minutes=_state["interval_min"])
             _state["scrape_errors"] = errors
+            interval_min_snapshot = _state["interval_min"]
+            last_refresh_snapshot = _state["last_refresh"]
+
+        # Rebuild the pre-serialized payload cache so subsequent GETs avoid
+        # per-request json.dumps. Done outside the state lock because json
+        # encoding is CPU-bound and doesn't touch _state.
+        _refresh_payload_cache(
+            serialized_bets,
+            serialized_matches,
+            serialized_pp,
+            serialized_fd,
+            serialized_dk,
+            serialized_pin,
+            last_refresh_snapshot,
+            interval_min_snapshot,
+        )
         logger.info("Pipeline complete: %d +EV bets found.", len(bets))
 
         # ── Supabase Sync: Persist the new state for instant load on restart ──
@@ -647,6 +795,14 @@ def startup():
     # request that hits /api/bets, /api/bootstrap etc. during warm-up gets
     # the most recent persisted snapshot instead of empty arrays.
     _seed_state_from_db_sync()
+
+    # Seed the payload cache from whatever we just loaded so warm-start GETs
+    # don't fall through to the cold-start empty shape. Safe to call even if
+    # some datasets are empty — empty arrays serialize fine.
+    try:
+        _rebuild_cache_from_state()
+    except Exception as exc:
+        logger.warning("Initial cache seed failed: %s", exc)
 
     scheduler.start()
     _reschedule(_state["interval_min"])
@@ -890,37 +1046,12 @@ def _get_user_config(user: Optional[dict]) -> dict:
     return base
 
 @app.get("/api/bets")
-def get_bets(user: Optional[dict] = Depends(get_current_user_optional)):
-    with _lock:
-        state_bets = _state["bets"]
-        is_scraping = _state["is_scraping"]
-        last_refresh = _last_refresh_iso()
-
-    cfg = _get_user_config(user)
-    
-    # Optional flags for authenticated users to know which bets are already in their backtest
-    in_backtest_keys = set()
-    if user:
-        from engine.backtest import BacktestLogger
-        logger_inst = BacktestLogger(user["id"], user["jwt"])
-        in_backtest_keys = logger_inst._load_used_keys_from_db()
-
-    filtered_bets = []
-    for b in state_bets:
-        if float(b.get("individual_ev_pct", 0)) >= cfg["min_ev_pct"] and cfg["active_leagues"].get(b.get("league"), True):
-            # Flag players already logged for this specific game
-            from engine.backtest import make_bet_key
-            bet_key = make_bet_key(b.get("player_name", ""), b.get("start_time", ""))
-            copied = dict(b)
-            copied["in_backtest"] = bet_key in in_backtest_keys
-            filtered_bets.append(copied)
-
-    return {
-        "bets":         filtered_bets,
-        "total":        len(filtered_bets),
-        "is_scraping":  is_scraping,
-        "last_refresh": last_refresh,
-    }
+def get_bets(request: Request):
+    """Serve the pre-serialized bets payload. Per-user filtering (min_ev_pct,
+    active_leagues, in_backtest) now happens client-side via `/api/backtest/keys`
+    — this removes the per-request dict-copy (~one full payload of allocations)
+    and the Supabase round-trip that used to block the hot path."""
+    return _cached_response("bets", request)
 
 
 @app.get("/api/ui-config")
@@ -933,59 +1064,43 @@ def get_ui_config():
 
 
 @app.get("/api/matched")
-def get_matched():
-    with _lock:
-        return {
-            "matches":      _state.get("matches", []),
-            "total":        len(_state.get("matches", [])),
-            "is_scraping":  _state["is_scraping"],
-            "last_refresh": _last_refresh_iso(),
-        }
+def get_matched(request: Request):
+    return _cached_response("matches", request)
+
+
+@app.get("/api/bootstrap/core")
+def get_bootstrap_core(request: Request):
+    """Critical-path payload for first paint: bets + meta only.
+
+    Intentionally does NOT include matches/pp/fd/dk/pin — those load lazily
+    when their tab is activated. This trims the initial payload by ~80% and
+    removes 5 heavy allocations from the common request path on the 512MB tier.
+    """
+    return _cached_response("core", request)
+
+
+@app.get("/api/backtest/keys")
+def get_backtest_keys(user: dict = Depends(get_current_user)):
+    """Lightweight endpoint: returns the set of `bet_key` strings already
+    logged by this user, so the client can join in_backtest flags locally.
+
+    Replaces the full per-request dict-copy + Supabase round-trip that used
+    to live inside /api/bets and /api/bootstrap."""
+    from engine.backtest import BacktestLogger
+    logger_inst = BacktestLogger(user["id"], user["jwt"])
+    used = logger_inst._load_used_keys_from_db()
+    # used is a set of (normalized_player, yyyy-mm-dd) tuples — flatten to
+    # the same "player|date" string we stamp on each bet during pipeline.
+    keys = [f"{p}|{d}" for (p, d) in used]
+    return {"keys": keys}
 
 
 @app.get("/api/bootstrap")
-def get_bootstrap(user: Optional[dict] = Depends(get_current_user_optional)):
-    """
-    Single-shot payload containing every dataset the UI needs on first load.
-    """
-    with _lock:
-        state_bets = _state["bets"]
-        matches = _state.get("matches", [])
-        pp_lines = _state.get("pp_lines", [])
-        fd_lines = _state.get("fd_lines", [])
-        dk_lines = _state.get("dk_lines", [])
-        pin_lines = _state.get("pin_lines", [])
-        is_scraping = _state["is_scraping"]
-        last_refresh = _last_refresh_iso()
-
-    cfg = _get_user_config(user)
-    
-    in_backtest_keys = set()
-    if user:
-        from engine.backtest import BacktestLogger
-        logger_inst = BacktestLogger(user["id"], user["jwt"])
-        in_backtest_keys = logger_inst._load_used_keys_from_db()
-
-    filtered_bets = []
-    for b in state_bets:
-        if float(b.get("individual_ev_pct", 0)) >= cfg["min_ev_pct"] and cfg["active_leagues"].get(b.get("league"), True):
-            from engine.backtest import make_bet_key
-            bet_key = make_bet_key(b.get("player_name", ""), b.get("start_time", ""))
-            copied = dict(b)
-            copied["in_backtest"] = bet_key in in_backtest_keys
-            filtered_bets.append(copied)
-
-    return {
-        "bets":          filtered_bets,
-        "matches":       matches,
-        "pp_lines":      pp_lines,
-        "fd_lines":      fd_lines,
-        "dk_lines":      dk_lines,
-        "pin_lines":     pin_lines,
-        "is_scraping":   is_scraping,
-        "last_refresh":  last_refresh,
-        "interval_min":  cfg["refresh_interval_min"],
-    }
+def get_bootstrap_legacy(request: Request):
+    """Back-compat shim: old clients (or stale cached HTML) may still call
+    this. Redirect to the lean core endpoint — the extra datasets load lazily
+    on tab activation now."""
+    return _cached_response("core", request)
 
 
 @app.get("/api/status")
@@ -1146,14 +1261,8 @@ def update_auto_backtest(update: AutoBacktestUpdate, user: dict = Depends(get_cu
 # ---------------------------------------------------------------------------
 
 @app.get("/api/prizepicks")
-def get_prizepicks():
-    with _lock:
-        return {
-            "lines": _state["pp_lines"],
-            "total": len(_state["pp_lines"]),
-            "is_scraping": _state["is_scraping_pp"],
-            "last_refresh": _last_refresh_iso(),
-        }
+def get_prizepicks(request: Request):
+    return _cached_response("pp_lines", request)
 
 
 @app.post("/api/prizepicks/refresh")
@@ -1203,6 +1312,7 @@ def _run_pp_scrape():
                 })
         with _lock:
             _state["pp_lines"] = serialized
+        _rebuild_cache_from_state()
         sync_state_to_supabase("pp_lines", serialized)
         logger.info("PrizePicks-only scrape complete: %d lines.", len(serialized))
     except Exception as e:
@@ -1216,14 +1326,8 @@ def _run_pp_scrape():
 # ---------------------------------------------------------------------------
 
 @app.get("/api/fanduel")
-def get_fanduel():
-    with _lock:
-        return {
-            "lines": _state["fd_lines"],
-            "total": len(_state["fd_lines"]),
-            "is_scraping": _state["is_scraping_fd"],
-            "last_refresh": _last_refresh_iso(),
-        }
+def get_fanduel(request: Request):
+    return _cached_response("fd_lines", request)
 
 
 @app.post("/api/fanduel/refresh")
@@ -1286,6 +1390,7 @@ def _run_fd_scrape():
                 })
         with _lock:
             _state["fd_lines"] = serialized
+        _rebuild_cache_from_state()
         sync_state_to_supabase("fd_lines", serialized)
         logger.info("FanDuel scrape complete: %d lines.", len(serialized))
     except Exception as e:
@@ -1300,14 +1405,8 @@ def _run_fd_scrape():
 # ---------------------------------------------------------------------------
 
 @app.get("/api/draftkings")
-def get_draftkings():
-    with _lock:
-        return {
-            "lines": _state["dk_lines"],
-            "total": len(_state["dk_lines"]),
-            "is_scraping": _state["is_scraping_dk"],
-            "last_refresh": _last_refresh_iso(),
-        }
+def get_draftkings(request: Request):
+    return _cached_response("dk_lines", request)
 
 
 @app.post("/api/draftkings/refresh")
@@ -1370,6 +1469,7 @@ def _run_dk_scrape():
                 })
         with _lock:
             _state["dk_lines"] = serialized
+        _rebuild_cache_from_state()
         sync_state_to_supabase("dk_lines", serialized)
         logger.info("DraftKings scrape complete: %d lines.", len(serialized))
     except Exception as e:
@@ -1384,14 +1484,8 @@ def _run_dk_scrape():
 # ---------------------------------------------------------------------------
 
 @app.get("/api/pinnacle")
-def get_pinnacle():
-    with _lock:
-        return {
-            "lines": _state["pin_lines"],
-            "total": len(_state["pin_lines"]),
-            "is_scraping": _state["is_scraping_pin"],
-            "last_refresh": _last_refresh_iso(),
-        }
+def get_pinnacle(request: Request):
+    return _cached_response("pin_lines", request)
 
 
 @app.post("/api/pinnacle/refresh")
@@ -1454,6 +1548,7 @@ def _run_pin_scrape():
                 })
         with _lock:
             _state["pin_lines"] = serialized
+        _rebuild_cache_from_state()
         sync_state_to_supabase("pin_lines", serialized)
         logger.info("Pinnacle scrape complete: %d lines.", len(serialized))
     except Exception as e:

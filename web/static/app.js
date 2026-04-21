@@ -242,18 +242,43 @@ const state = {
 };
 
 // ── localStorage Cache ─────────────────────────────────────────────────────
-const CACHE_KEY = "coreprop_bootstrap_cache";
+// We now cache ONLY the bets payload (the critical-path dataset for the EV
+// tab). Raw line datasets (pp/fd/dk/pin/matches) are loaded lazily when their
+// tab is activated and do not need to persist across reloads — this keeps the
+// localStorage write small (~200KB vs. ~2MB) and cuts parse time on mobile.
+const CACHE_KEY = "coreprop_core_cache_v2";
 const CACHE_FRESH_SECONDS = 60; // Skip background fetch if cache is younger than this
+const OLD_CACHE_KEYS = ["coreprop_bootstrap_cache"]; // purge legacy bloat
+
+// Track which tab-scoped datasets have been loaded this session, so we don't
+// re-fetch on every tab click within a single scrape cycle.
+const loadedDatasets = new Set(); // "matches" | "pp" | "fd" | "dk" | "pin"
+
+// Client-side set of backtest keys for the current user, fetched once via
+// /api/backtest/keys. We join bet.in_backtest locally against this — much
+// cheaper than the server doing a per-request DB round-trip + dict-copy.
+let backtestKeysSet = new Set();
+
+function applyBacktestKeys() {
+  // Stamp in_backtest on every bet in state, then re-render.
+  for (const b of state.allBets) {
+    b.in_backtest = b.bet_key ? backtestKeysSet.has(b.bet_key) : false;
+  }
+  applyFilters();
+}
 
 /**
- * Save the entire bootstrap payload to localStorage for instant-load on refresh.
+ * Save just the bets + meta to localStorage for instant-paint on next load.
+ * Lazy-loaded datasets are intentionally excluded.
  */
 function saveToCache(data) {
   try {
-    const payload = {
-      timestamp: Date.now(),
-      data: data
+    const trimmed = {
+      bets:         data.bets || [],
+      last_refresh: data.last_refresh || null,
+      total:        data.total,
     };
+    const payload = { timestamp: Date.now(), data: trimmed };
     localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
   } catch (e) {
     console.warn("localStorage save failed:", e);
@@ -261,10 +286,13 @@ function saveToCache(data) {
 }
 
 /**
- * Hydrate the application state from localStorage if available.
+ * Hydrate state from localStorage if fresh-enough data is available.
  * Returns { success: boolean, ageSeconds: number | null }
  */
 function hydrateFromCache() {
+  // Purge old oversized cache entries so they don't eat quota forever.
+  for (const k of OLD_CACHE_KEYS) { try { localStorage.removeItem(k); } catch {} }
+
   try {
     const raw = localStorage.getItem(CACHE_KEY);
     if (!raw) return { success: false, ageSeconds: null };
@@ -273,23 +301,12 @@ function hydrateFromCache() {
 
     const ageSeconds = timestamp ? (Date.now() - timestamp) / 1000 : null;
 
-    // Populate all sub-states
-    state.allBets          = data.bets      || [];
-    matchedState.allLines  = data.matches   || [];
-    ppState.allLines       = data.pp_lines  || [];
-    fdState.allLines       = data.fd_lines  || [];
-    dkState.allLines       = data.dk_lines  || [];
-    pinState.allLines      = data.pin_lines || [];
+    state.allBets = data.bets || [];
     if (data.last_refresh) state.lastRefresh = data.last_refresh;
 
-    // Trigger initial renders
+    // Initial render only for the default tab — other tabs load lazily.
     applyFilters();
-    applyMatchedFilters();
-    applyPPFilters();
-    applyFDFilters();
-    applyDKFilters();
-    applyPinFilters();
-    
+
     return { success: true, ageSeconds };
   } catch (e) {
     console.warn("localStorage hydration failed:", e);
@@ -438,6 +455,17 @@ function sortBets(bets) {
     if (va > vb) return state.sortDir === "asc" ? 1 : -1;
     return 0;
   });
+}
+
+// ── Skeleton rows ──────────────────────────────────────────────────────────
+// Shown on first paint before real data arrives. Users perceive the page as
+// "loaded" in <50ms even when the network payload is still in flight.
+function renderSkeletonRows(tbodyEl, colCount, rowCount = 8) {
+  if (!tbodyEl) return;
+  const row = `<tr class="skeleton-row">` +
+    Array.from({ length: colCount }).map(() => `<td><div class="skeleton-bar"></div></td>`).join("") +
+    `</tr>`;
+  tbodyEl.innerHTML = row.repeat(rowCount);
 }
 
 // ── Table rendering ────────────────────────────────────────────────────────
@@ -760,19 +788,37 @@ async function fetchBets() {
   }
 }
 
+// Track the currently-active tab so status-poll refreshes only its data.
+let activeTab = "ev";
+
+async function refreshActiveTab() {
+  // Core bets (always) — tiny, already ETag-gated.
+  await fetchBootstrap();
+
+  // Only revalidate whichever raw-line dataset is currently in view.
+  if (activeTab === "matched") await fetchMatched();
+  else if (activeTab === "pp") await fetchPP();
+  else if (activeTab === "books") await Promise.all([fetchFD(), fetchDK(), fetchPin()]);
+  // ev / backtest / analytics / observatory don't need the raw line datasets.
+
+  if (currentSession) {
+    if (activeTab === "backtest") await fetchBacktest();
+    if (activeTab === "analytics") await fetchCalibration();
+  }
+}
+
 async function fetchStatus() {
   try {
     const resp = await apiFetch("/api/status");
     const data = await resp.json();
 
-    // Detect scraping just finished → refresh every dataset in one shot.
+    // On scrape completion, refresh only the visible tab's data. Previously
+    // this re-fetched all 6 datasets regardless of what was in view — a major
+    // memory spike on the 512MB tier when users idled on any non-EV tab.
     if (state.isScrapingPrev && !data.is_scraping) {
-      const ok = await fetchBootstrap();
-      if (!ok) {
-        await Promise.all([fetchBets(), fetchMatched(), fetchPP(), fetchFD(), fetchDK(), fetchPin()]);
-      }
-      await fetchBacktest();
-      await fetchCalibration();
+      // Invalidate lazy-load tracking so tabs re-fetch on next activation
+      loadedDatasets.clear();
+      await refreshActiveTab();
     }
     state.isScrapingPrev = data.is_scraping;
 
@@ -784,17 +830,44 @@ async function fetchStatus() {
 
 
 // ── Tab switching ─────────────────────────────────────────────────────────
+// Tab-scoped raw-line datasets (matches/pp/fd/dk/pin) are NOT preloaded —
+// they're fetched on first activation of their tab and marked in
+// `loadedDatasets` so we don't re-request on every tab click.
+async function loadTabData(target) {
+  if (target === "matched" && !loadedDatasets.has("matches")) {
+    renderSkeletonRows(matchedTbody, 8, 8);
+    await fetchMatched();
+    loadedDatasets.add("matches");
+  } else if (target === "pp" && !loadedDatasets.has("pp")) {
+    renderSkeletonRows(ppTbody, 6, 8);
+    await fetchPP();
+    loadedDatasets.add("pp");
+  } else if (target === "books") {
+    // Books view unions FD/DK/Pin — fetch any that haven't loaded yet.
+    const needed = [];
+    if (!loadedDatasets.has("fd"))  needed.push(fetchFD().then(() => loadedDatasets.add("fd")));
+    if (!loadedDatasets.has("dk"))  needed.push(fetchDK().then(() => loadedDatasets.add("dk")));
+    if (!loadedDatasets.has("pin")) needed.push(fetchPin().then(() => loadedDatasets.add("pin")));
+    if (needed.length) {
+      renderSkeletonRows(booksTbody, 8, 8);
+      await Promise.all(needed);
+    }
+    applyBooksFilters();
+  }
+}
+
 document.querySelectorAll(".tab").forEach(tab => {
-  tab.addEventListener("click", () => {
+  tab.addEventListener("click", async () => {
     document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
     tab.classList.add("active");
 
     const target = tab.dataset.tab;
-    
+    activeTab = target;
+
     // Auth guard for Backtest and Analytics tabs
     if ((target === "backtest" || target === "analytics") && !currentSession) {
       document.getElementById('auth-overlay').style.display = 'flex';
-      return; 
+      return;
     }
 
     // Hide all
@@ -804,12 +877,8 @@ document.querySelectorAll(".tab").forEach(tab => {
     $("matched-filters").classList.add("hidden");
     $("pp-view").classList.add("hidden");
     $("pp-filters").classList.add("hidden");
-    $("fd-view").classList.add("hidden");
-    $("fd-filters").classList.add("hidden");
-    $("dk-view").classList.add("hidden");
-    $("dk-filters").classList.add("hidden");
-    $("pin-view").classList.add("hidden");
-    $("pin-filters").classList.add("hidden");
+    $("books-view").classList.add("hidden");
+    $("books-filters").classList.add("hidden");
     $("backtest-view").classList.add("hidden");
     $("backtest-filters").classList.add("hidden");
     $("analytics-view").classList.add("hidden");
@@ -821,24 +890,15 @@ document.querySelectorAll(".tab").forEach(tab => {
     } else if (target === "matched") {
       $("matched-view").classList.remove("hidden");
       $("matched-filters").classList.remove("hidden");
+      loadTabData("matched");
     } else if (target === "pp") {
       $("pp-view").classList.remove("hidden");
       $("pp-filters").classList.remove("hidden");
-    } else if (target === "fd") {
-      $("fd-view").classList.remove("hidden");
-      $("fd-filters").classList.remove("hidden");
-    } else if (target === "dk") {
-      $("dk-view").classList.remove("hidden");
-      $("dk-filters").classList.remove("hidden");
-    } else if (target === "pin") {
-      $("pin-view").classList.remove("hidden");
-      $("pin-filters").classList.remove("hidden");
-      // Always re-fetch/render when switching to pin tab
-      if (pinState.allLines.length > 0) {
-        renderPinTable();
-      } else {
-        fetchPin();
-      }
+      loadTabData("pp");
+    } else if (target === "books") {
+      $("books-view").classList.remove("hidden");
+      $("books-filters").classList.remove("hidden");
+      loadTabData("books");
     } else if (target === "backtest") {
       $("backtest-view").classList.remove("hidden");
       $("backtest-filters").classList.remove("hidden");
@@ -1075,13 +1135,15 @@ async function fetchPP() {
   }
 }
 
+// FD/DK/Pin datasets are only rendered through the unified Books view
+// (applyBooksFilters), so the per-book fetches just populate state — the
+// Books tab handler calls applyBooksFilters() after they all resolve.
 async function fetchFD() {
   try {
     const resp = await apiFetch("/api/fanduel");
     const data = await resp.json();
     fdState.allLines = data.lines || [];
     if (data.last_refresh) state.lastRefresh = data.last_refresh;
-    applyFDFilters();
   } catch (e) {
     console.error("Failed to fetch FanDuel lines:", e);
   }
@@ -1093,7 +1155,6 @@ async function fetchDK() {
     const data = await resp.json();
     dkState.allLines = data.lines || [];
     if (data.last_refresh) state.lastRefresh = data.last_refresh;
-    applyDKFilters();
   } catch (e) {
     console.error("Failed to fetch DraftKings lines:", e);
   }
@@ -1105,64 +1166,62 @@ async function fetchPin() {
     const data = await resp.json();
     pinState.allLines = data.lines || [];
     if (data.last_refresh) state.lastRefresh = data.last_refresh;
-    applyPinFilters();
   } catch (e) {
     console.error("Failed to fetch Pinnacle lines:", e);
   }
 }
 
-// ── Bootstrap: single-request path for initial load / refresh ─────────────
-// Always fetches fresh — cache: 'no-store' + cache-buster query param so no
-// intermediate HTTP cache (service worker, CDN, browser) can serve stale data.
+// ── Bootstrap: lightweight first-paint payload ────────────────────────────
+// Only fetches bets + meta. Raw line datasets (pp/fd/dk/pin/matches) are
+// loaded lazily when their tab is activated. Uses ETag so unchanged polls
+// get a 0-byte 304 response — critical on the 512MB server tier.
+let coreEtag = null;
+
 async function fetchBootstrap() {
   try {
-    const resp = await apiFetch("/api/bootstrap?t=" + Date.now(), { cache: "no-store" });
+    const headers = {};
+    if (coreEtag) headers["If-None-Match"] = coreEtag;
+    const resp = await apiFetch("/api/bootstrap/core", { headers });
+
+    if (resp.status === 304) {
+      // Nothing changed — the cached state is still correct.
+      return true;
+    }
     if (!resp.ok) throw new Error("bootstrap HTTP " + resp.status);
+
+    const newEtag = resp.headers.get("ETag");
+    if (newEtag) coreEtag = newEtag;
+
     const data = await resp.json();
-
-    // Cache for next time
-    saveToCache(data);
-
-    state.allBets          = data.bets      || [];
-    matchedState.allLines  = data.matches   || [];
-    ppState.allLines       = data.pp_lines  || [];
-    fdState.allLines       = data.fd_lines  || [];
-    dkState.allLines       = data.dk_lines  || [];
-    pinState.allLines      = data.pin_lines || [];
+    state.allBets = data.bets || [];
     if (data.last_refresh) state.lastRefresh = data.last_refresh;
 
-    applyFilters();
-    applyMatchedFilters();
-    applyPPFilters();
-    applyFDFilters();
-    applyDKFilters();
-    applyPinFilters();
+    // Stamp in_backtest from whatever key-set we have (may be empty pre-auth).
+    applyBacktestKeys();
+
+    // Persist only the bets slice — tab-lazy data is intentionally omitted.
+    saveToCache(data);
     return true;
   } catch (e) {
-    console.error("Bootstrap fetch failed, falling back to per-endpoint:", e);
+    console.error("Bootstrap fetch failed:", e);
     return false;
   }
 }
 
 /**
- * Re-fetch just the bets with auth headers so in_backtest flags are accurate.
- * Called after auth completes to fix the race where bootstrap loads before JWT.
- * Also patches the localStorage cache so next load is correct.
+ * After auth resolves, fetch the user's in_backtest key-set and join locally.
+ * Replaces the old full-bootstrap re-fetch — one tiny request instead of a
+ * full-payload round-trip.
  */
-async function refreshBetsWithAuth() {
+async function refreshBacktestKeys() {
   try {
-    const resp = await apiFetch("/api/bootstrap?t=" + Date.now(), { cache: "no-store" });
+    const resp = await apiFetch("/api/backtest/keys");
     if (!resp.ok) return;
     const data = await resp.json();
-
-    // Update bets with fresh in_backtest flags
-    state.allBets = data.bets || [];
-    applyFilters();
-
-    // Patch the cache so subsequent loads have correct flags
-    saveToCache(data);
+    backtestKeysSet = new Set(data.keys || []);
+    applyBacktestKeys();
   } catch (e) {
-    console.error("Auth-scoped bets refresh failed:", e);
+    console.error("Backtest keys fetch failed:", e);
   }
 }
 
@@ -1278,9 +1337,18 @@ function renderPPTable() {
 }
 
 
-// ── FanDuel Lines ──────────────────────────────────────────────────────
-const fdState = {
-  allLines:      [],
+// ── FanDuel Data ─────────────────────────────────────────────────────────
+const fdState = { allLines: [] };
+
+
+// ── DraftKings Data ──────────────────────────────────────────────────────
+const dkState = { allLines: [] };
+
+
+
+// ── Unified Books ────────────────────────────────────────────────────────
+const booksState = {
+  activeBook:    "fd", // fd, dk, pin
   filteredLines: [],
   sortCol:       "player_name",
   sortDir:       "asc",
@@ -1288,333 +1356,143 @@ const fdState = {
   pageSize:      100,
 };
 
-const fdTbody       = $("fd-tbody");
-const fdTotalBadge  = $("fd-total-badge");
-const fdStatusLabel = $("fd-status-label");
+const booksTbody      = $("books-tbody");
+const booksTotalBadge = $("books-total-badge");
+const bookSelect      = $("books-book-select");
 
-function applyFDFilters() {
-  const league = $("fd-filter-league").value.toUpperCase();
-  const stat   = $("fd-filter-stat").value.toLowerCase().trim();
-  const player = $("fd-filter-player").value.toLowerCase().trim();
+function applyBooksFilters() {
+  const book = document.getElementById("books-book-select") ? $("books-book-select").value : "fd";
+  booksState.activeBook = book;
+  
+  const league = $("books-filter-league").value.toUpperCase();
+  const stat   = $("books-filter-stat").value.toLowerCase().trim();
+  const player = $("books-filter-player").value.toLowerCase().trim();
 
-  fdState.filteredLines = fdState.allLines.filter(l => {
+  // Pick data source
+  let source = [];
+  if (book === "fd") source = fdState.allLines;
+  else if (book === "dk") source = dkState.allLines;
+  else if (book === "pin") {
+    source = pinState.allLines;
+    if (source.length === 0) fetchPin(); 
+  }
+
+  booksState.filteredLines = source.filter(l => {
     if (league && l.league !== league) return false;
     if (stat && !l.stat_type.toLowerCase().includes(stat)) return false;
     if (player && !l.player_name.toLowerCase().includes(player)) return false;
     return true;
   });
 
-  fdState.page = 1;
-  renderFDTable();
+  booksState.page = 1;
+  renderBooksTable();
 }
 
-["fd-filter-league", "fd-filter-stat", "fd-filter-player"].forEach(id => {
-  $(id).addEventListener("input", applyFDFilters);
-  $(id).addEventListener("change", applyFDFilters);
-});
+/**
+ * Initialize event listeners for the Books tab.
+ * Called once on page load (or after elements exist).
+ */
+function initBooksListeners() {
+  const ids = ["books-book-select", "books-filter-league", "books-filter-stat", "books-filter-player"];
+  ids.forEach(id => {
+    const el = $(id);
+    if (el) {
+      el.addEventListener("input", applyBooksFilters);
+      el.addEventListener("change", applyBooksFilters);
+    }
+  });
 
-$("btn-clear-fd-filters").addEventListener("click", () => {
-  $("fd-filter-league").value = "";
-  $("fd-filter-stat").value   = "";
-  $("fd-filter-player").value = "";
-  applyFDFilters();
-});
+  const clearBtn = $("btn-clear-books-filters");
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      $("books-filter-league").value = "";
+      $("books-filter-stat").value   = "";
+      $("books-filter-player").value = "";
+      applyBooksFilters();
+    });
+  }
+}
 
 // Sorting
-document.querySelectorAll("th.sortable-fd").forEach(th => {
-  th.addEventListener("click", () => {
-    const col = th.dataset.col;
-    if (fdState.sortCol === col) {
-      fdState.sortDir = fdState.sortDir === "desc" ? "asc" : "desc";
-    } else {
-      fdState.sortCol = col;
-      fdState.sortDir = col === "line_score" ? "desc" : "asc";
-    }
-    document.querySelectorAll("th.sortable-fd").forEach(t => {
-      t.classList.remove("active", "asc", "desc");
+function initBooksSortListeners() {
+  document.querySelectorAll("th.sortable-books").forEach(th => {
+    th.addEventListener("click", () => {
+      const col = th.dataset.col;
+      if (booksState.sortCol === col) {
+        booksState.sortDir = booksState.sortDir === "desc" ? "asc" : "desc";
+      } else {
+        booksState.sortCol = col;
+        booksState.sortDir = col === "line_score" ? "desc" : "asc";
+      }
+      document.querySelectorAll("th.sortable-books").forEach(t => {
+        t.classList.remove("active", "asc", "desc");
+      });
+      th.classList.add("active", booksState.sortDir);
+      booksState.page = 1;
+      renderBooksTable();
     });
-    th.classList.add("active", fdState.sortDir);
-    fdState.page = 1;
-    renderFDTable();
-  });
-});
-
-function sortFDLines(lines) {
-  return [...lines].sort((a, b) => {
-    let va = a[fdState.sortCol] ?? "";
-    let vb = b[fdState.sortCol] ?? "";
-    if (typeof va === "string") va = va.toLowerCase();
-    if (typeof vb === "string") vb = vb.toLowerCase();
-    if (va < vb) return fdState.sortDir === "asc" ? -1 : 1;
-    if (va > vb) return fdState.sortDir === "asc" ? 1 : -1;
-    return 0;
   });
 }
 
-function renderFDTable() {
-  const sorted = sortFDLines(fdState.filteredLines);
-  
-  const totalItems = sorted.length;
-  const totalPages = Math.ceil(totalItems / fdState.pageSize) || 1;
-  if (fdState.page > totalPages) fdState.page = totalPages;
-  if (fdState.page < 1) fdState.page = 1;
-  const startIdx = (fdState.page - 1) * fdState.pageSize;
-  const paginated = sorted.slice(startIdx, startIdx + fdState.pageSize);
+function renderBooksTable() {
+  const lines = [...booksState.filteredLines].sort((a, b) => {
+    let va = a[booksState.sortCol] ?? "";
+    let vb = b[booksState.sortCol] ?? "";
+    if (typeof va === "string") va = va.toLowerCase();
+    if (typeof vb === "string") vb = vb.toLowerCase();
+    if (va < vb) return booksState.sortDir === "asc" ? -1 : 1;
+    if (va > vb) return booksState.sortDir === "asc" ? 1 : -1;
+    return 0;
+  });
 
-  renderPagination("fd-pagination", fdState, totalItems, renderFDTable);
+  const totalItems = lines.length;
+  const totalPages = Math.ceil(totalItems / booksState.pageSize) || 1;
+  if (booksState.page > totalPages) booksState.page = totalPages;
+  if (booksState.page < 1) booksState.page = 1;
+  const startIdx = (booksState.page - 1) * booksState.pageSize;
+  const paginated = lines.slice(startIdx, startIdx + booksState.pageSize);
 
-  fdTotalBadge.textContent = `${totalItems} lines`;
+  renderPagination("books-pagination", booksState, totalItems, renderBooksTable);
+  if (booksTotalBadge) booksTotalBadge.textContent = `${totalItems} lines (${booksState.activeBook.toUpperCase()})`;
 
   if (totalItems === 0) {
-    fdTbody.innerHTML = `<tr><td colspan="8" class="empty-msg">No lines match current filters.</td></tr>`;
+    if (booksTbody) booksTbody.innerHTML = `<tr><td colspan="8" class="empty-msg">No lines match current filters.</td></tr>`;
     return;
   }
 
-  fdTbody.innerHTML = paginated.map(l => {
-    let gameTime = "—";
-    if (l.start_time) {
-      const d = new Date(l.start_time);
-      gameTime = d.toLocaleDateString([], { month: "numeric", day: "numeric" }) +
-        " " + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-    }
-    return `<tr>
-      <td data-label="Player">${l.player_name}</td>
-      <td data-label="League"><span class="league-tag league-${l.league}">${l.league}</span></td>
-      <td data-label="Prop">${l.stat_type}</td>
-      <td data-label="Line" class="line-value">${l.line_score}</td>
-      <td data-label="Side" class="side-${l.side}">${l.side.toUpperCase()}</td>
-      <td data-label="True Odds" class="line-value">${fmt.trueOdds(l.true_odds)}</td>
-      <td data-label="Book Odds" class="line-value">${fmt.odds(l.line_odds)}</td>
-      <td data-label="Game Time" class="game-time">${gameTime}</td>
-    </tr>`;
-  }).join("");
-}
-
-
-// ── DraftKings Lines ──────────────────────────────────────────────────────
-const dkState = {
-  allLines:      [],
-  filteredLines: [],
-  sortCol:       "player_name",
-  sortDir:       "asc",
-  page:          1,
-  pageSize:      100,
-};
-
-const dkTbody       = $("dk-tbody");
-const dkTotalBadge  = $("dk-total-badge");
-const dkStatusLabel = $("dk-status-label");
-
-function applyDKFilters() {
-  const league = $("dk-filter-league").value.toUpperCase();
-  const stat   = $("dk-filter-stat").value.toLowerCase().trim();
-  const player = $("dk-filter-player").value.toLowerCase().trim();
-
-  dkState.filteredLines = dkState.allLines.filter(l => {
-    if (league && l.league !== league) return false;
-    if (stat && !l.stat_type.toLowerCase().includes(stat)) return false;
-    if (player && !l.player_name.toLowerCase().includes(player)) return false;
-    return true;
-  });
-
-  dkState.page = 1;
-  renderDKTable();
-}
-
-["dk-filter-league", "dk-filter-stat", "dk-filter-player"].forEach(id => {
-  $(id).addEventListener("input", applyDKFilters);
-  $(id).addEventListener("change", applyDKFilters);
-});
-
-$("btn-clear-dk-filters").addEventListener("click", () => {
-  $("dk-filter-league").value = "";
-  $("dk-filter-stat").value   = "";
-  $("dk-filter-player").value = "";
-  applyDKFilters();
-});
-
-// Sorting
-document.querySelectorAll("th.sortable-dk").forEach(th => {
-  th.addEventListener("click", () => {
-    const col = th.dataset.col;
-    if (dkState.sortCol === col) {
-      dkState.sortDir = dkState.sortDir === "desc" ? "asc" : "desc";
-    } else {
-      dkState.sortCol = col;
-      dkState.sortDir = col === "line_score" ? "desc" : "asc";
-    }
-    document.querySelectorAll("th.sortable-dk").forEach(t => {
-      t.classList.remove("active", "asc", "desc");
-    });
-    th.classList.add("active", dkState.sortDir);
-    dkState.page = 1;
-    renderDKTable();
-  });
-});
-
-function sortDKLines(lines) {
-  return [...lines].sort((a, b) => {
-    let va = a[dkState.sortCol] ?? "";
-    let vb = b[dkState.sortCol] ?? "";
-    if (typeof va === "string") va = va.toLowerCase();
-    if (typeof vb === "string") vb = vb.toLowerCase();
-    if (va < vb) return dkState.sortDir === "asc" ? -1 : 1;
-    if (va > vb) return dkState.sortDir === "asc" ? 1 : -1;
-    return 0;
-  });
-}
-
-function renderDKTable() {
-  const sorted = sortDKLines(dkState.filteredLines);
-  
-  const totalItems = sorted.length;
-  const totalPages = Math.ceil(totalItems / dkState.pageSize) || 1;
-  if (dkState.page > totalPages) dkState.page = totalPages;
-  if (dkState.page < 1) dkState.page = 1;
-  const startIdx = (dkState.page - 1) * dkState.pageSize;
-  const paginated = sorted.slice(startIdx, startIdx + dkState.pageSize);
-
-  renderPagination("dk-pagination", dkState, totalItems, renderDKTable);
-
-  dkTotalBadge.textContent = `${totalItems} lines`;
-
-  if (totalItems === 0) {
-    dkTbody.innerHTML = `<tr><td colspan="8" class="empty-msg">No lines match current filters.</td></tr>`;
-    return;
+  if (booksTbody) {
+    booksTbody.innerHTML = paginated.map(l => {
+      let gameTime = "—";
+      if (l.start_time) {
+        const d = new Date(l.start_time);
+        gameTime = d.toLocaleDateString([], { month: "numeric", day: "numeric" }) +
+          " " + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      }
+      return `<tr>
+        <td data-label="Player">${l.player_name}</td>
+        <td data-label="League"><span class="league-tag league-${l.league}">${l.league}</span></td>
+        <td data-label="Prop">${l.stat_type}</td>
+        <td data-label="Line" class="line-value">${l.line_score}</td>
+        <td data-label="Side" class="side-${l.side}">${l.side.toUpperCase()}</td>
+        <td data-label="True Odds" class="line-value">${fmt.trueOdds(l.true_odds)}</td>
+        <td data-label="Book Odds" class="line-value">${fmt.odds(l.line_odds)}</td>
+        <td data-label="Game Time" class="game-time">${gameTime}</td>
+      </tr>`;
+    }).join("");
   }
-
-  dkTbody.innerHTML = paginated.map(l => {
-    let gameTime = "—";
-    if (l.start_time) {
-      const d = new Date(l.start_time);
-      gameTime = d.toLocaleDateString([], { month: "numeric", day: "numeric" }) +
-        " " + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-    }
-    return `<tr>
-      <td data-label="Player">${l.player_name}</td>
-      <td data-label="League"><span class="league-tag league-${l.league}">${l.league}</span></td>
-      <td data-label="Prop">${l.stat_type}</td>
-      <td data-label="Line" class="line-value">${l.line_score}</td>
-      <td data-label="Side" class="side-${l.side}">${l.side.toUpperCase()}</td>
-      <td data-label="True Odds" class="line-value">${fmt.trueOdds(l.true_odds)}</td>
-      <td data-label="Book Odds" class="line-value">${fmt.odds(l.line_odds)}</td>
-      <td data-label="Game Time" class="game-time">${gameTime}</td>
-    </tr>`;
-  }).join("");
 }
 
+// Global initialization call for Books
+setTimeout(() => {
+  initBooksListeners();
+  initBooksSortListeners();
+}, 500);
 
-// ── Pinnacle Lines ──────────────────────────────────────────────────────
-const pinState = {
-  allLines:      [],
-  filteredLines: [],
-  sortCol:       "player_name",
-  sortDir:       "asc",
-  page:          1,
-  pageSize:      100,
-};
 
-const pinTbody       = $("pin-tbody");
-const pinTotalBadge  = $("pin-total-badge");
-const pinStatusLabel = $("pin-status-label");
 
-function applyPinFilters() {
-  const league = $("pin-filter-league").value.toUpperCase();
-  const stat   = $("pin-filter-stat").value.toLowerCase().trim();
-  const player = $("pin-filter-player").value.toLowerCase().trim();
 
-  pinState.filteredLines = pinState.allLines.filter(l => {
-    if (league && l.league !== league) return false;
-    if (stat && !l.stat_type.toLowerCase().includes(stat)) return false;
-    if (player && !l.player_name.toLowerCase().includes(player)) return false;
-    return true;
-  });
-
-  pinState.page = 1;
-  renderPinTable();
-}
-
-["pin-filter-league", "pin-filter-stat", "pin-filter-player"].forEach(id => {
-  $(id).addEventListener("input", applyPinFilters);
-  $(id).addEventListener("change", applyPinFilters);
-});
-
-$("btn-clear-pin-filters").addEventListener("click", () => {
-  $("pin-filter-league").value = "";
-  $("pin-filter-stat").value   = "";
-  $("pin-filter-player").value = "";
-  applyPinFilters();
-});
-
-// Sorting
-document.querySelectorAll("th.sortable-pin").forEach(th => {
-  th.addEventListener("click", () => {
-    const col = th.dataset.col;
-    if (pinState.sortCol === col) {
-      pinState.sortDir = pinState.sortDir === "desc" ? "asc" : "desc";
-    } else {
-      pinState.sortCol = col;
-      pinState.sortDir = col === "line_score" ? "desc" : "asc";
-    }
-    document.querySelectorAll("th.sortable-pin").forEach(t => {
-      t.classList.remove("active", "asc", "desc");
-    });
-    th.classList.add("active", pinState.sortDir);
-    pinState.page = 1;
-    renderPinTable();
-  });
-});
-
-function sortPinLines(lines) {
-  return [...lines].sort((a, b) => {
-    let va = a[pinState.sortCol] ?? "";
-    let vb = b[pinState.sortCol] ?? "";
-    if (typeof va === "string") va = va.toLowerCase();
-    if (typeof vb === "string") vb = vb.toLowerCase();
-    if (va < vb) return pinState.sortDir === "asc" ? -1 : 1;
-    if (va > vb) return pinState.sortDir === "asc" ? 1 : -1;
-    return 0;
-  });
-}
-
-function renderPinTable() {
-  const sorted = sortPinLines(pinState.filteredLines);
-  
-  const totalItems = sorted.length;
-  const totalPages = Math.ceil(totalItems / pinState.pageSize) || 1;
-  if (pinState.page > totalPages) pinState.page = totalPages;
-  if (pinState.page < 1) pinState.page = 1;
-  const startIdx = (pinState.page - 1) * pinState.pageSize;
-  const paginated = sorted.slice(startIdx, startIdx + pinState.pageSize);
-
-  renderPagination("pin-pagination", pinState, totalItems, renderPinTable);
-
-  pinTotalBadge.textContent = `${totalItems} lines`;
-
-  if (totalItems === 0) {
-    pinTbody.innerHTML = `<tr><td colspan="8" class="empty-msg">No lines match current filters.</td></tr>`;
-    return;
-  }
-
-  pinTbody.innerHTML = paginated.map(l => {
-    let gameTime = "—";
-    if (l.start_time) {
-      const d = new Date(l.start_time);
-      gameTime = d.toLocaleDateString([], { month: "numeric", day: "numeric" }) +
-        " " + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-    }
-    return `<tr>
-      <td data-label="Player">${l.player_name}</td>
-      <td data-label="League"><span class="league-tag league-${l.league}">${l.league}</span></td>
-      <td data-label="Prop">${l.stat_type}</td>
-      <td data-label="Line" class="line-value">${l.line_score}</td>
-      <td data-label="Side" class="side-${l.side}">${l.side.toUpperCase()}</td>
-      <td data-label="True Odds" class="line-value">${fmt.trueOdds(l.true_odds)}</td>
-      <td data-label="Book Odds" class="line-value">${fmt.odds(l.line_odds)}</td>
-      <td data-label="Game Time" class="game-time">${gameTime}</td>
-    </tr>`;
-  }).join("");
-}
+// ── Pinnacle Data ────────────────────────────────────────────────────────
+const pinState = { allLines: [] };
 
 
 // ── Backtest Dashboard ────────────────────────────────────────────────────
@@ -2302,9 +2180,15 @@ function hideLoadingOverlay() {
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
-// Single orchestrator: hydrate cache → parallel auth + data → auth-gated data.
+// Orchestrator: skeleton paint → localStorage hydrate → parallel auth+core
+// bootstrap → auth-gated backtest keys join. Tab-scoped datasets load lazily
+// on tab activation, not upfront.
 window.addEventListener('DOMContentLoaded', async () => {
-    // Step 1: Instant render from localStorage (< 10ms)
+    // Step 0: Paint skeleton rows immediately so the user sees structure
+    // within the same frame instead of an empty table.
+    renderSkeletonRows(tbody, 10, 10);
+
+    // Step 1: Try instant render from localStorage (<10ms typical)
     const cache = hydrateFromCache();
     if (cache.success) {
         isDataLoaded = true;
@@ -2312,29 +2196,29 @@ window.addEventListener('DOMContentLoaded', async () => {
         document.querySelectorAll('.app-content').forEach(e => e.style.display = 'flex');
     }
 
-    // Step 2: Determine if we need a background data refresh
+    // Step 2: If cache is very fresh, skip the network round-trip entirely
     const cacheIsFresh = cache.success && cache.ageSeconds !== null && cache.ageSeconds < CACHE_FRESH_SECONDS;
     const bootstrapPromise = cacheIsFresh
-        ? Promise.resolve(true)  // Cache is fresh enough, skip network
+        ? Promise.resolve(true)
         : fetchBootstrap().catch(err => { console.error("Bootstrap failed:", err); return false; });
 
-    // Step 3: Auth + data fetch run IN PARALLEL
+    // Step 3: Auth runs in parallel with the data fetch
     const authPromise = initAuth().catch(err => console.error("Auth init failed:", err));
-    
-    // Wait for both to settle
-    const [bootstrapOk] = await Promise.all([bootstrapPromise, authPromise]);
 
-    // Step 4: If we had no cache AND bootstrap just completed, mark loaded
-    if (!isDataLoaded) {
-        isDataLoaded = true;
-    }
+    await Promise.all([bootstrapPromise, authPromise]);
+
+    isDataLoaded = true;
     hideLoadingOverlay();
     document.querySelectorAll('.app-content').forEach(e => e.style.display = 'flex');
 
-    // Step 5: Auth-gated data (only if user is logged in)
+    // Step 4: Auth-gated side data (all non-blocking, run in parallel)
     if (currentSession) {
-        // Re-fetch bets with auth so in_backtest (LOGGED) flags are accurate
-        Promise.all([refreshBetsWithAuth(), fetchBacktest(), fetchCalibration(), fetchUserConfig()]).catch(() => {});
+        Promise.all([
+            refreshBacktestKeys(),  // tiny request: <1KB of keys
+            fetchBacktest(),
+            fetchCalibration(),
+            fetchUserConfig(),
+        ]).catch(() => {});
     }
 });
 
