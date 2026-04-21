@@ -1788,6 +1788,25 @@ tr.in-backtest.selected {
   width: 100%;
 }
 
+/* Neutral (uncalibrated) multiplier rows: subdued so real edges stand out */
+#obs-multiplier-tbody tr.obs-neutral td {
+  color: var(--text-muted);
+  opacity: 0.75;
+}
+#obs-multiplier-tbody tr.obs-neutral .obs-neutral-text {
+  font-style: italic;
+  font-size: 12px;
+}
+/* The multipliers table now lists every prop type — cap its height so the
+   observations feed below stays reachable without long scrolls. */
+#obs-multiplier-tbody {
+  /* no-op; the wrapper handles scroll */
+}
+#observatory-view .analytics-panel:first-child .table-wrapper {
+  max-height: 360px;
+  overflow: auto;
+}
+
 /* Mobile responsive for Observatory */
 @media (max-width: 900px) {
   #observatory-view {
@@ -1809,11 +1828,16 @@ tr.in-backtest.selected {
   }
 }
 /* ── Skeleton loading rows ──────────────────────────────────────────────── */
+/* Skeleton rows mirror real rows in padding/height so nothing shifts when
+   real data arrives. Per-column widths are set inline to match the actual
+   content proportions (player names are long, league codes short, etc.). */
 .skeleton-row td {
   padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
 }
 .skeleton-bar {
   height: 12px;
+  min-width: 16px;
   border-radius: 4px;
   background: linear-gradient(
     90deg,
@@ -1824,7 +1848,53 @@ tr.in-backtest.selected {
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.4s ease-in-out infinite;
 }
+.skeleton-bar--chk {
+  height: 14px;
+  width: 14px !important;
+  border-radius: 3px;
+}
+/* Subtle stagger so rows don't shimmer in lockstep */
+.skeleton-row:nth-child(2n) .skeleton-bar { animation-delay: 0.15s; }
+.skeleton-row:nth-child(3n) .skeleton-bar { animation-delay: 0.3s; }
+
 @keyframes skeleton-shimmer {
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+
+/* Mobile card layout: real rows collapse with data-label, cells right-align.
+   Skeleton rows mimic that layout so they occupy the right amount of space.
+   Scoped to the views that actually use the card layout — analytics/observatory
+   keep their normal table shape on mobile. */
+@media (max-width: 900px) {
+  #ev-view .skeleton-row,
+  #matched-view .skeleton-row,
+  #pp-view .skeleton-row,
+  #fd-view .skeleton-row,
+  #dk-view .skeleton-row,
+  #pin-view .skeleton-row,
+  #backtest-view .skeleton-row {
+    display: block;
+    border-bottom: 1px solid var(--border);
+    padding: 6px 0;
+  }
+  #ev-view .skeleton-row td,
+  #matched-view .skeleton-row td,
+  #pp-view .skeleton-row td,
+  #fd-view .skeleton-row td,
+  #dk-view .skeleton-row td,
+  #pin-view .skeleton-row td,
+  #backtest-view .skeleton-row td {
+    display: flex;
+    justify-content: flex-end;
+    padding: 6px 12px;
+    border-bottom: none;
+  }
+  #ev-view .skeleton-bar,
+  #matched-view .skeleton-bar,
+  #pp-view .skeleton-bar,
+  #fd-view .skeleton-bar,
+  #dk-view .skeleton-bar,
+  #pin-view .skeleton-bar,
+  #backtest-view .skeleton-bar { max-width: 140px; }
 }

@@ -14,6 +14,7 @@ import json
 import logging
 import sys
 import threading
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -116,6 +117,24 @@ _payload_cache = {
     "etag":      None,   # str | None
 }
 _payload_lock = threading.Lock()
+
+# Per-user analytics cache. /api/analytics is the slowest endpoint — it does
+# 3 legs-table scans + 1 slips scan, all unbounded. But the underlying data
+# only changes when a slip is added/resolved/deleted, which is rare relative
+# to tab clicks. A short TTL makes repeat access essentially free.
+_analytics_cache: dict = {}       # user_id -> (monotonic_ts, data_dict)
+_analytics_cache_lock = threading.Lock()
+_ANALYTICS_TTL_SEC = 30.0
+
+
+def _invalidate_analytics_cache(user_id: Optional[str] = None):
+    """Drop a specific user's cached analytics (after add/delete slip), or
+    everyone's (pass None) if global state changed."""
+    with _analytics_cache_lock:
+        if user_id is None:
+            _analytics_cache.clear()
+        else:
+            _analytics_cache.pop(user_id, None)
 
 
 def _build_etag(last_refresh) -> str:
@@ -1574,9 +1593,23 @@ def get_analytics(user: dict = Depends(get_current_user)):
     """
     Richer analytics payload: calibration + per-league / per-prop performance,
     cumulative P&L timeline, and slip outcome mix.
+
+    Per-user TTL cache (30s) because the frontend re-hits this on every tab
+    activation and status-poll refresh, but the underlying backtest state
+    rarely changes between those calls. Invalidated on add/delete slip.
     """
+    uid = user["id"]
+    now = time.monotonic()
+    with _analytics_cache_lock:
+        cached = _analytics_cache.get(uid)
+        if cached and (now - cached[0]) < _ANALYTICS_TTL_SEC:
+            return cached[1]
+
     from engine.calibration import evaluate_analytics
-    return evaluate_analytics(user_jwt=user["jwt"])
+    data = evaluate_analytics(user_jwt=user["jwt"])
+    with _analytics_cache_lock:
+        _analytics_cache[uid] = (now, data)
+    return data
 
 
 # ---------------------------------------------------------------------------
@@ -1872,6 +1905,7 @@ def add_slip_to_backtest(req: BacktestAddSlipRequest, user: dict = Depends(get_c
     with _lock:
         _state["latest_slip"] = new_slip
 
+    _invalidate_analytics_cache(user["id"])
     logger.info("Manual backtest slip logged: %s (%d legs)", new_slip["slip_id"], new_slip["n_legs"])
     return {"slip": new_slip}
 
@@ -1894,6 +1928,7 @@ def delete_backtest_slip(slip_id: str, user: dict = Depends(get_current_user)):
         db.table("legs").delete().eq("slip_id", slip_id).execute()
         db.table("slips").delete().eq("id", slip_id).execute()
 
+        _invalidate_analytics_cache(user["id"])
         logger.info("Backtest: deleted slip %s for user %s", slip_id, user["id"])
         return {"status": "deleted", "slip_id": slip_id}
     except HTTPException:
@@ -1926,10 +1961,29 @@ def get_observatory_data():
 
 @app.get("/api/observatory/multipliers")
 def get_calibration_map_api():
-    """Returns the current calibration multipliers being applied to the odds."""
+    """Returns every (league, prop) combination the system tracks, with its
+    current calibration multiplier if one has matured (>=30 observations),
+    or a neutral 1.0 default with calibrated=False if not."""
     try:
         from engine.dynamic_calibration import load_calibration_map
-        return load_calibration_map()
+        from engine.constants import PROP_TYPE_MAP
+        calibrated = load_calibration_map() or {}
+
+        # Build the universe of (league, prop) pairs from the canonical map.
+        # Dedupe by taking the set of PrizePicks labels per league.
+        out = {}
+        for league, mapping in PROP_TYPE_MAP.items():
+            for prop in sorted(set(mapping.values())):
+                key = f"{league}|{prop}"
+                if key in calibrated:
+                    out[key] = {"value": float(calibrated[key]), "calibrated": True}
+                else:
+                    out[key] = {"value": 1.0, "calibrated": False}
+        # Also surface any calibrated keys that aren't in PROP_TYPE_MAP (defensive).
+        for key, val in calibrated.items():
+            if key not in out:
+                out[key] = {"value": float(val), "calibrated": True}
+        return out
     except Exception as e:
         logger.error("API: calibration fetch error: %s", e)
         return {}

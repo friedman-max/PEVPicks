@@ -458,13 +458,37 @@ function sortBets(bets) {
 }
 
 // ── Skeleton rows ──────────────────────────────────────────────────────────
-// Shown on first paint before real data arrives. Users perceive the page as
-// "loaded" in <50ms even when the network payload is still in flight.
-function renderSkeletonRows(tbodyEl, colCount, rowCount = 8) {
+// Shown on first paint before real data arrives. Per-column width schemas
+// mirror the real row structure so the skeleton doesn't shift layout when
+// data arrives — users perceive a "loaded" page in <50ms.
+//
+// Each schema entry is either:
+//   - a number (bar width in %), or
+//   - { w: percent, type: "chk" }  for checkbox-style tiny square
+//   - { w: percent, align: "right" } for numeric right-aligned cells
+const SKELETON_SCHEMAS = {
+  // EV table: chk, Player, League, Prop, Line, Side, True Odds, Edge, EV%, Book Odds
+  ev:      [ {w:14,type:"chk"}, 75, 40, 65, 35, 35, 50, 50, 55, 80 ],
+  // Matched: Player, League, Prop, Line, Side, True, Best, FD, DK, PIN, Time
+  matched: [ 75, 40, 65, 35, 35, 50, 50, 50, 50, 50, 55 ],
+  // PP: Player, League, Prop, Line, Side, Time
+  pp:      [ 75, 40, 65, 35, 35, 55 ],
+  // Books: Player, League, Prop, Line, Side, True, Book, Time
+  books:   [ 75, 40, 65, 35, 35, 50, 55, 55 ],
+};
+
+function renderSkeletonRows(tbodyEl, schemaKey, rowCount = 10) {
   if (!tbodyEl) return;
-  const row = `<tr class="skeleton-row">` +
-    Array.from({ length: colCount }).map(() => `<td><div class="skeleton-bar"></div></td>`).join("") +
-    `</tr>`;
+  const schema = SKELETON_SCHEMAS[schemaKey] || [];
+  if (!schema.length) return;
+
+  const cells = schema.map(c => {
+    const width = typeof c === "number" ? c : c.w;
+    const extra = (typeof c === "object" && c.type === "chk") ? " skeleton-bar--chk" : "";
+    return `<td><div class="skeleton-bar${extra}" style="width:${width}%"></div></td>`;
+  }).join("");
+
+  const row = `<tr class="skeleton-row">${cells}</tr>`;
   tbodyEl.innerHTML = row.repeat(rowCount);
 }
 
@@ -835,11 +859,11 @@ async function fetchStatus() {
 // `loadedDatasets` so we don't re-request on every tab click.
 async function loadTabData(target) {
   if (target === "matched" && !loadedDatasets.has("matches")) {
-    renderSkeletonRows(matchedTbody, 8, 8);
+    renderSkeletonRows(matchedTbody, "matched", 10);
     await fetchMatched();
     loadedDatasets.add("matches");
   } else if (target === "pp" && !loadedDatasets.has("pp")) {
-    renderSkeletonRows(ppTbody, 6, 8);
+    renderSkeletonRows(ppTbody, "pp", 10);
     await fetchPP();
     loadedDatasets.add("pp");
   } else if (target === "books") {
@@ -849,7 +873,7 @@ async function loadTabData(target) {
     if (!loadedDatasets.has("dk"))  needed.push(fetchDK().then(() => loadedDatasets.add("dk")));
     if (!loadedDatasets.has("pin")) needed.push(fetchPin().then(() => loadedDatasets.add("pin")));
     if (needed.length) {
-      renderSkeletonRows(booksTbody, 8, 8);
+      renderSkeletonRows(booksTbody, "books", 10);
       await Promise.all(needed);
     }
     applyBooksFilters();
@@ -940,24 +964,46 @@ async function refreshObservatory() {
 function renderObservatoryMultipliers(multipliers) {
   const tbody = $("obs-multiplier-tbody");
   if (!tbody) return;
-  
-  // Convert object to array and sort by best performance (highest multiplier)
-  const sorted = Object.entries(multipliers)
-    .map(([key, value]) => ({ key, value }))
-    .sort((a, b) => b.value - a.value);
-    
-  if (sorted.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="3" class="empty-msg">Waiting for next daily calibration (min 30 observations per prop)...</td></tr>`;
+
+  // Normalize: accept both the legacy flat {key: value} shape and the
+  // new {key: {value, calibrated}} shape.
+  const rows = Object.entries(multipliers).map(([key, entry]) => {
+    let value, calibrated;
+    if (entry && typeof entry === "object") {
+      value = Number(entry.value);
+      calibrated = !!entry.calibrated;
+    } else {
+      value = Number(entry);
+      calibrated = true;
+    }
+    return { key, value, calibrated };
+  });
+
+  if (rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="3" class="empty-msg">No prop types registered.</td></tr>`;
     return;
   }
-  
-  tbody.innerHTML = sorted.map(m => {
+
+  // Sort: calibrated rows first (by strongest edge), then neutrals grouped by league.
+  rows.sort((a, b) => {
+    if (a.calibrated !== b.calibrated) return a.calibrated ? -1 : 1;
+    if (a.calibrated) return b.value - a.value;
+    return a.key.localeCompare(b.key);
+  });
+
+  tbody.innerHTML = rows.map(m => {
     const [league, prop] = m.key.split("|");
     const val = m.value;
+    if (!m.calibrated) {
+      return `<tr class="obs-neutral">
+        <td><strong>${league}</strong> ${prop}</td>
+        <td class="line-value">1.00x</td>
+        <td class="obs-neutral-text">Awaiting data (≥30 obs)</td>
+      </tr>`;
+    }
     const strengthClass = val >= 1 ? "ev-high" : (val > 0.8 ? "ev-mid" : "ev-low");
     const strengthPct = Math.round((val - 1) * 100);
     const strengthText = strengthPct >= 0 ? `+${strengthPct}% Edge` : `${strengthPct}% Haircut`;
-    
     return `<tr>
       <td><strong>${league}</strong> ${prop}</td>
       <td class="line-value ${strengthClass}">${val.toFixed(2)}x</td>
@@ -1866,15 +1912,82 @@ async function pollLatestSlip() {
 // Chart.js instances — kept so we can destroy before redraw.
 const _charts = { pnl: null, cal: null, slipMix: null };
 
+// Client-side cache of the last analytics payload so a page refresh (or tab
+// re-click) can paint instantly from memory while the server response arrives.
+const ANALYTICS_CACHE_KEY = "coreprop_analytics_cache_v1";
+const ANALYTICS_CACHE_FRESH_SEC = 25;
+
+function saveAnalyticsCache(data) {
+  try {
+    localStorage.setItem(ANALYTICS_CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
+  } catch {}
+}
+function loadAnalyticsCache() {
+  try {
+    const raw = localStorage.getItem(ANALYTICS_CACHE_KEY);
+    if (!raw) return null;
+    const { ts, data } = JSON.parse(raw);
+    const ageSec = (Date.now() - ts) / 1000;
+    return { data, ageSec };
+  } catch { return null; }
+}
+
+// Paint skeleton placeholders on the analytics cards + tables so the tab
+// doesn't sit visibly empty for seconds on a cold load.
+function renderAnalyticsSkeleton() {
+  const cardIds = ["cal-brier", "cal-logloss", "cal-resolved", "cal-hitrate", "cal-avgpred", "cal-delta"];
+  for (const id of cardIds) {
+    const el = $(id);
+    if (el && el.textContent.trim() === "—") {
+      el.innerHTML = `<div class="skeleton-bar" style="width:70%; height:20px; display:inline-block;"></div>`;
+    }
+  }
+  const tbodyIds = ["cal-tbody", "league-perf-tbody", "prop-perf-tbody"];
+  for (const id of tbodyIds) {
+    const el = $(id);
+    if (!el) continue;
+    // Don't overwrite already-rendered data; only skeleton when empty.
+    const hasEmpty = el.querySelector(".empty-msg");
+    if (hasEmpty) {
+      el.innerHTML = Array.from({ length: 5 }).map(() =>
+        `<tr class="skeleton-row">${
+          Array.from({ length: id === "cal-tbody" ? 5 : 6 }).map((_, i) =>
+            `<td><div class="skeleton-bar" style="width:${i === 0 ? 60 : 40}%"></div></td>`
+          ).join("")
+        }</tr>`
+      ).join("");
+    }
+  }
+}
+
+// Render the non-chart pieces first (cards + tables); chart rendering is
+// expensive (Chart.js destroy+redraw) so we defer it to the next idle slot
+// so the summary becomes readable within the same frame.
+function renderAnalyticsIncremental(data) {
+  renderCalibration(data);
+  const deferCharts = () => renderAnalyticsExtras(data);
+  if (window.requestIdleCallback) {
+    requestIdleCallback(deferCharts, { timeout: 400 });
+  } else {
+    setTimeout(deferCharts, 0);
+  }
+}
+
 async function fetchCalibration() {
-  // Retained name for backwards-compat with existing callers, but hits the
-  // richer /api/analytics endpoint now.
+  // First, paint from localStorage cache if we have anything recent.
+  const cached = loadAnalyticsCache();
+  if (cached && cached.ageSec < ANALYTICS_CACHE_FRESH_SEC) {
+    renderAnalyticsIncremental(cached.data);
+  } else {
+    renderAnalyticsSkeleton();
+  }
+
   try {
     const resp = await apiFetch("/api/analytics");
     if (!resp.ok) return;
     const data = await resp.json();
-    renderCalibration(data);
-    renderAnalyticsExtras(data);
+    renderAnalyticsIncremental(data);
+    saveAnalyticsCache(data);
   } catch (e) {
     console.error("Analytics fetch error:", e);
   }
@@ -2186,7 +2299,7 @@ function hideLoadingOverlay() {
 window.addEventListener('DOMContentLoaded', async () => {
     // Step 0: Paint skeleton rows immediately so the user sees structure
     // within the same frame instead of an empty table.
-    renderSkeletonRows(tbody, 10, 10);
+    renderSkeletonRows(tbody, "ev", 10);
 
     // Step 1: Try instant render from localStorage (<10ms typical)
     const cache = hydrateFromCache();
