@@ -5,8 +5,11 @@ EV calculation engine.
 - Slip EV% for Power (exact) and Flex (full enumeration over all leg combinations)
 - Line discrepancy directional logic
 """
+import statistics
 from itertools import product as itertools_product
 from typing import Optional
+
+import numpy as np
 
 from engine.constants import (
     OPTIMAL_BREAK_EVEN,
@@ -17,6 +20,7 @@ from engine.constants import (
 from engine.devig import devig_power, devig_single_sided, prob_to_american
 from engine.matcher import MatchedProp
 from engine.dynamic_calibration import load_calibration_map
+from engine.correlation import build_correlation_matrix, legs_metadata_from_bets
 
 # Module-level calibration map (refreshed on import or by calling reload_calibration)
 _calibration_map: dict = load_calibration_map()
@@ -325,19 +329,133 @@ def flex_slip_ev(true_probs: list[float]) -> Optional[float]:
     return ev
 
 
+_MC_N_SIMS_DEFAULT: int = 20_000
+
+
+def _sample_correlated_bernoullis(
+    probs: np.ndarray,
+    corr_matrix: np.ndarray,
+    n_sims: int,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    """Draw `n_sims` correlated Bernoulli vectors with the given marginal
+    probabilities and latent-scale correlation matrix via a Gaussian copula.
+
+    Returns an (n_sims, n_legs) int8 array of 0/1 outcomes."""
+    n = probs.shape[0]
+    # Invert the standard-normal CDF once per leg. P(X_i < τ_i) = p_i where
+    # X_i ~ N(0, 1). Using stdlib inv_cdf avoids a scipy dependency.
+    thresholds = np.array(
+        [statistics.NormalDist().inv_cdf(float(p)) for p in probs],
+        dtype=float,
+    )
+
+    # Cholesky with mild jitter for numerical stability on near-singular
+    # matrices (e.g. when two legs have ρ ≈ 1).
+    jitter = 1e-10
+    for _ in range(4):
+        try:
+            L = np.linalg.cholesky(corr_matrix + jitter * np.eye(n))
+            break
+        except np.linalg.LinAlgError:
+            jitter *= 100
+    else:
+        # Absolute fallback: treat as independent. Better to lose the
+        # correlation signal than to crash the slip evaluation.
+        L = np.eye(n)
+
+    Z = rng.standard_normal((n_sims, n))
+    X = Z @ L.T
+    hits = (X < thresholds[np.newaxis, :]).astype(np.int8)
+    return hits
+
+
+def power_slip_ev_corr(
+    probs: list[float],
+    corr_matrix: np.ndarray,
+    n_sims: int = _MC_N_SIMS_DEFAULT,
+    seed: Optional[int] = None,
+) -> Optional[float]:
+    """Correlation-aware Power EV via Gaussian copula Monte Carlo.
+
+    Independence-assuming Π(p_i) systematically overstates Power EV on
+    same-game stacks. This function samples correlated outcomes and computes
+    P(all hit) directly, which at default n_sims has a standard error of
+    ~0.7% on a 5% probability.
+    """
+    n = len(probs)
+    payout = POWER_PAYOUTS.get(n)
+    if payout is None:
+        return None
+    if n == 0:
+        return None
+    if n == 1:
+        return probs[0] * payout - 1.0
+
+    rng = np.random.default_rng(seed)
+    p_arr = np.asarray(probs, dtype=float)
+    hits = _sample_correlated_bernoullis(p_arr, corr_matrix, n_sims, rng)
+    all_hit_rate = float((hits.sum(axis=1) == n).mean())
+    return all_hit_rate * payout - 1.0
+
+
+def flex_slip_ev_corr(
+    probs: list[float],
+    corr_matrix: np.ndarray,
+    n_sims: int = _MC_N_SIMS_DEFAULT,
+    seed: Optional[int] = None,
+) -> Optional[float]:
+    """Correlation-aware Flex EV via Gaussian copula Monte Carlo.
+
+    Flex payouts depend on the number of hits, so we compute the full
+    distribution of hit counts under the correlation structure rather than
+    enumerating 2^n independent outcomes.
+    """
+    n = len(probs)
+    payout_tiers = FLEX_PAYOUTS.get(n)
+    if payout_tiers is None:
+        return None
+
+    rng = np.random.default_rng(seed)
+    p_arr = np.asarray(probs, dtype=float)
+    hits = _sample_correlated_bernoullis(p_arr, corr_matrix, n_sims, rng)
+    hit_counts = hits.sum(axis=1)
+
+    ev = -1.0  # cost of the bet
+    for k, pay in payout_tiers.items():
+        if pay == 0.0:
+            continue
+        ev += float((hit_counts == k).mean()) * pay
+    return ev
+
+
 def calculate_slip(
     bet_results: list[BetResult],
     bankroll: float,
+    n_sims: int = _MC_N_SIMS_DEFAULT,
+    seed: Optional[int] = None,
 ) -> dict:
     """
     Given a list of selected BetResults and a bankroll, compute Power and Flex EV.
     Returns a dict with slip stats ready for the frontend.
+
+    Uses correlation-aware Monte Carlo when two or more legs share a game
+    (latent-scale ρ > 0). If the correlation matrix is the identity (all
+    legs from different games), we short-circuit to the exact independence
+    formulas — no MC noise on unrelated slips.
     """
     n = len(bet_results)
     true_probs = [b.true_prob for b in bet_results]
 
-    power_ev = power_slip_ev(true_probs)
-    flex_ev  = flex_slip_ev(true_probs)
+    corr_matrix = build_correlation_matrix(legs_metadata_from_bets(bet_results))
+    has_correlation = n >= 2 and not np.allclose(corr_matrix, np.eye(n), atol=1e-8)
+
+    if has_correlation:
+        power_ev = power_slip_ev_corr(true_probs, corr_matrix, n_sims=n_sims, seed=seed)
+        flex_ev  = flex_slip_ev_corr(true_probs,  corr_matrix, n_sims=n_sims, seed=seed)
+    else:
+        power_ev = power_slip_ev(true_probs)
+        flex_ev  = flex_slip_ev(true_probs)
 
     # Determine the better play
     best_type = None

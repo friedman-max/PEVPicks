@@ -1875,9 +1875,19 @@ def add_slip_to_backtest(req: BacktestAddSlipRequest, user: dict = Depends(get_c
         true_probs = [float(b.get("true_prob") or 0) for b in backtest_bets]
         k = len(backtest_bets)
         try:
-            from engine.ev_calculator import power_slip_ev, flex_slip_ev
-            power_ev = power_slip_ev(true_probs)
-            flex_ev  = flex_slip_ev(true_probs)
+            import numpy as _np
+            from engine.ev_calculator import (
+                power_slip_ev, flex_slip_ev,
+                power_slip_ev_corr, flex_slip_ev_corr,
+            )
+            from engine.correlation import build_correlation_matrix, legs_metadata_from_bets
+            corr = build_correlation_matrix(legs_metadata_from_bets(backtest_bets))
+            if k >= 2 and not _np.allclose(corr, _np.eye(k), atol=1e-8):
+                power_ev = power_slip_ev_corr(true_probs, corr)
+                flex_ev  = flex_slip_ev_corr(true_probs,  corr)
+            else:
+                power_ev = power_slip_ev(true_probs)
+                flex_ev  = flex_slip_ev(true_probs)
             best_ev   = max(power_ev, flex_ev) if flex_ev is not None else power_ev
             best_type = "Power" if power_ev >= (flex_ev or -999) else "Flex"
         except Exception:
