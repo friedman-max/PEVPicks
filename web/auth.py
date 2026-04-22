@@ -23,6 +23,18 @@ if _JWKS_URL:
     except Exception as exc:  # pragma: no cover
         logger.warning("Failed to initialize PyJWKClient for %s: %s", _JWKS_URL, exc)
         _jwk_client = None
+else:
+    logger.warning(
+        "SUPABASE_URL missing at auth import — JWKS verification disabled. "
+        "Only HS256 tokens with SUPABASE_JWT_SECRET will verify."
+    )
+
+logger.info(
+    "Auth init: jwks=%s hs256_secret=%s issuer=%s",
+    "ok" if _jwk_client is not None else "none",
+    "set" if SUPABASE_JWT_SECRET else "unset",
+    f"{SUPABASE_URL}/auth/v1" if SUPABASE_URL else "none",
+)
 
 # Using FastAPI's standard Bearer token schema
 token_auth_scheme = HTTPBearer(auto_error=False)
@@ -48,7 +60,11 @@ def _decode(token: str) -> dict:
         decode_kwargs["issuer"] = expected_issuer
 
     # Asymmetric: verify against Supabase JWKS.
-    if alg in ("ES256", "RS256", "ES384", "RS384") and _jwk_client is not None:
+    if alg in ("ES256", "RS256", "ES384", "RS384"):
+        if _jwk_client is None:
+            raise jwt.InvalidTokenError(
+                f"Token alg={alg} requires JWKS but SUPABASE_URL is not configured on this server."
+            )
         try:
             signing_key = _jwk_client.get_signing_key_from_jwt(token).key
             return jwt.decode(
@@ -61,10 +77,17 @@ def _decode(token: str) -> dict:
             # Re-raise explicit token errors so the handler catches them
             if isinstance(exc, (jwt.ExpiredSignatureError, jwt.InvalidTokenError, jwt.InvalidIssuerError, jwt.InvalidAudienceError)):
                 raise exc
-            logger.debug("JWKS verify failed initially: %s", exc)
+            # Non-JWT failure (likely PyJWKClient network/DNS error). Log loud
+            # so prod operators can see why auth broke.
+            logger.error("JWKS verify failed (alg=%s): %s", alg, exc)
+            raise jwt.InvalidTokenError(f"JWKS verification failed: {exc}")
 
     # Symmetric legacy path or fallback.
-    if alg == "HS256" and SUPABASE_JWT_SECRET:
+    if alg == "HS256":
+        if not SUPABASE_JWT_SECRET:
+            raise jwt.InvalidTokenError(
+                "Token alg=HS256 but SUPABASE_JWT_SECRET is not set on this server."
+            )
         return jwt.decode(
             token,
             SUPABASE_JWT_SECRET,
@@ -72,7 +95,7 @@ def _decode(token: str) -> dict:
             **decode_kwargs
         )
 
-    raise jwt.InvalidTokenError("No matching algorithm and signing key found to verify token.")
+    raise jwt.InvalidTokenError(f"Unsupported token algorithm: {alg or '(missing)'}")
 
 
 async def get_current_user_optional(
