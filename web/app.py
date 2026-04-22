@@ -706,14 +706,16 @@ def _run_pipeline_body():
         logger.info("Pipeline complete: %d +EV bets found.", len(bets))
 
         # ── Supabase Sync: Persist the new state for instant load on restart ──
+        # sync_state_to_supabase auto-gzips payloads over 256KB, so the books
+        # (fd/dk/pin_lines, 2-5MB raw) compress to ~300-500KB — well under any
+        # PostgREST request cap.
         def _sync_all():
             sync_state_to_supabase("bets", serialized_bets)
             sync_state_to_supabase("matches", serialized_matches)
             sync_state_to_supabase("pp_lines", serialized_pp)
-            # We explicitly do NOT sync fd_lines, dk_lines, pin_lines 
-            # because they each contain 10K+ objects (2-5MB JSON) which 
-            # triggers PostgREST Payload Too Large timeouts/errors and crashes 
-            # the sync thread. The raw tabs will just wait for the next scrape to complete.
+            sync_state_to_supabase("fd_lines", serialized_fd)
+            sync_state_to_supabase("dk_lines", serialized_dk)
+            sync_state_to_supabase("pin_lines", serialized_pin)
             if _state["last_refresh"]:
                 sync_state_to_supabase("last_refresh", _state["last_refresh"].isoformat())
         
@@ -864,6 +866,12 @@ def startup():
     # some datasets are empty — empty arrays serialize fine.
     try:
         _rebuild_cache_from_state()
+        # Books are authoritative as pre-serialized bytes now. Drop the
+        # duplicate Python lists to cut ~10MB of RSS before the pipeline runs.
+        with _lock:
+            _state["fd_lines"]  = []
+            _state["dk_lines"]  = []
+            _state["pin_lines"] = []
     except Exception as exc:
         logger.warning("Initial cache seed failed: %s", exc)
 
@@ -939,7 +947,7 @@ def _seed_state_from_db_sync():
     from engine.persistence import load_multiple_states_from_supabase
     
     logger.info("Startup: Seeding state from Supabase cache...")
-    keys = ["bets", "matches", "pp_lines", "last_refresh"]
+    keys = ["bets", "matches", "pp_lines", "fd_lines", "dk_lines", "pin_lines", "last_refresh"]
     now = datetime.now(timezone.utc)
     db = get_db()
 
@@ -1461,6 +1469,9 @@ def _run_fd_scrape():
         # pp_lines, dk_lines, pin_lines, core) are untouched, so re-encoding
         # them would just churn memory.
         _update_one_payload("fd_lines", serialized, last_ref)
+        # Persist so a cold start can serve data before the next scrape.
+        # sync_state_to_supabase auto-gzips payloads over 256KB.
+        threading.Thread(target=sync_state_to_supabase, args=("fd_lines", serialized), daemon=True).start()
         # Drop the Python list: the bytes cache is now authoritative for GETs,
         # and _state[fd_lines] isn't read anywhere else.
         with _lock:
@@ -1544,6 +1555,7 @@ def _run_dk_scrape():
             _state["last_refresh"] = datetime.now()
             last_ref = _state["last_refresh"]
         _update_one_payload("dk_lines", serialized, last_ref)
+        threading.Thread(target=sync_state_to_supabase, args=("dk_lines", serialized), daemon=True).start()
         with _lock:
             _state["dk_lines"] = []
         logger.info("DraftKings scrape complete: %d lines.", len(serialized))
@@ -1625,6 +1637,7 @@ def _run_pin_scrape():
             _state["last_refresh"] = datetime.now()
             last_ref = _state["last_refresh"]
         _update_one_payload("pin_lines", serialized, last_ref)
+        threading.Thread(target=sync_state_to_supabase, args=("pin_lines", serialized), daemon=True).start()
         with _lock:
             _state["pin_lines"] = []
         logger.info("Pinnacle scrape complete: %d lines.", len(serialized))
