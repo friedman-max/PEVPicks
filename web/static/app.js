@@ -1622,7 +1622,11 @@ async function fetchBacktest() {
 
   try {
     const resp = await apiFetch("/api/backtest/slips");
-    if (!resp.ok) return;
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => "");
+      console.error(`Backtest slips fetch failed: ${resp.status} ${resp.statusText}`, body);
+      return;
+    }
     const data = await resp.json();
     btSlips = data.slips || [];
     renderBacktest();
@@ -2062,7 +2066,11 @@ async function fetchCalibration() {
   renderAnalyticsSkeleton();
   try {
     const resp = await apiFetch("/api/analytics");
-    if (!resp.ok) return;
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => "");
+      console.error(`Analytics fetch failed: ${resp.status} ${resp.statusText}`, body);
+      return;
+    }
     const data = await resp.json();
     renderAnalyticsIncremental(data);
     saveAnalyticsCache(data);
