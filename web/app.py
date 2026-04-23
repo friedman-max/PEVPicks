@@ -1287,12 +1287,13 @@ def auto_build_slip(req: SlipRequest, user: Optional[dict] = Depends(get_current
         raise HTTPException(status_code=400, detail="Could not calculate any valid slip.")
         
 class SandboxRequest(BaseModel):
-    leagues:    list[str] = []
-    min_prob:   float     = 0.5408
-    slip_size:  int       = 6
-    slip_type:  str       = "flex"
-    bet_size:   float     = 1.0
-    use_kelly:  bool      = False
+    leagues:        list[str] = []
+    min_prob:       float     = 0.5408
+    slip_size:      int       = 6
+    slip_type:      str       = "flex"
+    bet_size:       float     = 1.0
+    use_kelly:      bool      = False
+    included_props: list[str] = []
 
 @app.post("/api/sandbox/run")
 def run_sandbox_simulation(req: SandboxRequest, user: dict = Depends(get_current_user)):
@@ -1304,7 +1305,8 @@ def run_sandbox_simulation(req: SandboxRequest, user: dict = Depends(get_current
         slip_size=req.slip_size,
         slip_type=req.slip_type,
         bet_size=req.bet_size,
-        use_kelly=req.use_kelly
+        use_kelly=req.use_kelly,
+        included_props=req.included_props
     )
     result = tester.run_simulation(config)
     if "error" in result:

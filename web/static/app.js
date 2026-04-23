@@ -2514,6 +2514,13 @@ function initSandbox() {
         });
     });
 
+    // 1b. Stat-type chip toggles
+    document.querySelectorAll("#sb-prop-chips .chip").forEach(chip => {
+        chip.addEventListener("click", () => {
+            chip.classList.toggle("active");
+        });
+    });
+
     // 2. Prob range slider
     const probRange = $("sb-range-prob");
     const probLabel = $("sb-val-prob");
@@ -2551,6 +2558,7 @@ function initSandbox() {
 async function runSandbox() {
     const btnRun = $("btn-run-sandbox");
     const leagues = [...document.querySelectorAll("#sb-league-chips .chip.active")].map(c => c.dataset.val);
+    const includedProps = [...document.querySelectorAll("#sb-prop-chips .chip.active")].map(c => c.dataset.val);
     const minProb = parseFloat($("sb-range-prob").value);
     const slipSize = parseInt($("sb-select-size").value);
     const slipType = $("sb-select-type").value;
@@ -2569,7 +2577,8 @@ async function runSandbox() {
                 slip_size: slipSize,
                 slip_type: slipType,
                 bet_size: 1.0,
-                use_kelly: useKelly
+                use_kelly: useKelly,
+                included_props: includedProps
             })
         });
 

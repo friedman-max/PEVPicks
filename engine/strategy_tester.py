@@ -19,6 +19,7 @@ class StrategyConfig:
     bankroll: float = 100.0
     bet_size: float = 1.0     # Fixed bet size per slip
     excluded_props: List[str] = field(default_factory=list)
+    included_props: List[str] = field(default_factory=list)  # Empty = all props
     use_calibration: bool = True
     use_kelly: bool = False
 
@@ -88,6 +89,10 @@ class StrategyTester:
             # Apply exclusion filters
             if config.excluded_props:
                 df = df[~df['prop'].isin(config.excluded_props)]
+
+            # Apply inclusion filters (stat-type specialization)
+            if config.included_props:
+                df = df[df['prop'].isin(config.included_props)]
 
             # Apply probability filter
             # Note: In a real simulation, we might want to apply calibration multipliers here
