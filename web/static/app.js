@@ -2607,6 +2607,7 @@ function renderSandboxResults(data) {
     $("sb-metric-roi").textContent = s.roi_pct + "%";
     $("sb-metric-roi").className = "bt-card-value " + (s.roi_pct >= 0 ? "positive" : "negative");
     $("sb-metric-winrate").textContent = s.win_rate_pct + "%";
+    $("sb-metric-drawdown").textContent = s.max_drawdown_pct + "%";
 
     // Update Chart
     const ctx = $("chart-sandbox-equity").getContext("2d");

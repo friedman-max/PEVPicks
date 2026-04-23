@@ -112,6 +112,8 @@ class StrategyTester:
             cumulative_profit = 0.0
             total_bet = 0.0
             bankroll = config.bankroll
+            peak_bankroll = bankroll
+            max_drawdown = 0.0
             equity_curve = []
             
             # Sort slates by time to simulate chronological betting
@@ -146,6 +148,15 @@ class StrategyTester:
 
                     profit = (bet_size * payout_mult) - bet_size
                     bankroll += profit
+
+                    # Track drawdown
+                    if bankroll > peak_bankroll:
+                        peak_bankroll = bankroll
+                    else:
+                        dd = (peak_bankroll - bankroll) / peak_bankroll if peak_bankroll > 0 else 0
+                        if dd > max_drawdown:
+                            max_drawdown = dd
+
                     cumulative_profit += profit
                     total_bet += bet_size
                     
@@ -178,6 +189,7 @@ class StrategyTester:
                     "total_profit": round(cumulative_profit, 2),
                     "roi_pct": round(roi * 100, 2),
                     "win_rate_pct": round(win_rate * 100, 2),
+                    "max_drawdown_pct": round(max_drawdown * 100, 2),
                 },
                 "equity_curve": equity_curve,
                 "slips": sim_slips[-50:] # Return last 50 for the UI log
