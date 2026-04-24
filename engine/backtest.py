@@ -28,12 +28,49 @@ MIN_LEG_EV_PCT = -0.01   # -1%
 _DEDUP_WINDOW_HOURS = 48
 
 
+# Punctuation that is intra-word (initials, apostrophes) is stripped; those
+# that mark word boundaries (hyphens, underscores, commas) become spaces.
+_PUNCT_STRIP = str.maketrans({c: "" for c in ".'`"})
+_PUNCT_SPACE = str.maketrans({c: " " for c in "-_,"})
+
 def _normalize(s: str) -> str:
-    """Standardize strings: unidecode, lowercase, and strip whitespace."""
+    """Standardize strings for identity comparison.
+
+    Applies: unidecode → lowercase → strip intra-word punctuation
+    (`.`, `'`, `` ` ``) → replace boundary punctuation (`-`, `_`, `,`) with
+    spaces → merge consecutive single-letter tokens (so "R J Barrett"
+    collapses to "rj barrett") → collapse whitespace → strip.
+
+    This folds scraper-level spelling drift like "R.J. Barrett" vs
+    "RJ Barrett" vs "R J Barrett", "D'Angelo" vs "DAngelo", "Jean-Luc"
+    vs "Jean Luc" to the same key so cross-slip dedup on
+    (player, game_start) actually holds.
+    """
     if not s:
         return ""
-    s = unidecode.unidecode(s).lower().strip()
-    return s
+    s = unidecode.unidecode(s).lower()
+    s = s.translate(_PUNCT_STRIP)
+    s = s.translate(_PUNCT_SPACE)
+    tokens = s.split()
+
+    # Merge runs of single-character tokens into one: [r, j, barrett]
+    # → [rj, barrett]. Only runs of length ≥ 2 are merged, so a stray
+    # single-letter first name like "A Davis" still becomes "a davis".
+    merged: list[str] = []
+    i = 0
+    while i < len(tokens):
+        if len(tokens[i]) == 1 and i + 1 < len(tokens) and len(tokens[i + 1]) == 1:
+            run = [tokens[i]]
+            j = i + 1
+            while j < len(tokens) and len(tokens[j]) == 1:
+                run.append(tokens[j])
+                j += 1
+            merged.append("".join(run))
+            i = j
+        else:
+            merged.append(tokens[i])
+            i += 1
+    return " ".join(merged)
 
 def make_bet_key(player: str, start_time: str) -> tuple[str, str]:
     """Build a unique signature for a player in a specific game (UTC-normalized)."""

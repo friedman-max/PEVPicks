@@ -20,12 +20,15 @@ from typing import Any
 
 from engine.database import get_db
 from engine.consensus import books_from_match, compute_true_probability
+from engine.dynamic_calibration import load_calibration_map
 
 logger = logging.getLogger(__name__)
 
-# How long after game start (in minutes) we still attempt to update closing_prob.
-# Lines are typically pulled within ~30 min of game start.
-POST_START_GRACE_MINUTES = 30
+# Once the game starts, lines are no longer "closing" — any match we'd find
+# after tip-off is live in-play pricing, not the closing line we want to
+# compare against. Closing_prob is therefore frozen at the last value
+# captured before start.
+POST_START_GRACE_MINUTES = 0
 
 # How long after game start (in hours) before we consider CLV as "missed" and
 # finalize with a fallback. This prevents rows from being stuck empty forever
@@ -35,12 +38,13 @@ MISSED_CUTOFF_HOURS = 1
 
 class CLVTracker:
     def __init__(self):
-        # CLV compares closing_prob to the true_prob recorded at bet-log time.
-        # That stored value is the raw, uncalibrated `worst_case_prob` from the
-        # consensus engine (see web/app.py:_run_pipeline_body). We therefore do
-        # NOT apply a calibration multiplier here — doing so would make every
-        # bet look CLV-negative immediately whenever multiplier < 1.
-        pass
+        # CLV compares closing_prob against the true_prob stored at bet-log
+        # time. That stored value is ALREADY calibrated by
+        # BetResult.__init__ (raw worst_case_prob × calibration_multiplier),
+        # so the closing side must apply the identical multiplier — otherwise
+        # CLV shows a phantom jump the size of the multiplier gap the moment
+        # the bet is logged.
+        self._calibration_map = load_calibration_map()
 
     def update_closing_lines(self, matches: list[Any]) -> int:
         """
@@ -94,9 +98,10 @@ class CLVTracker:
 
             mins_to_start = (gs - now_utc).total_seconds() / 60.0
 
-            # Skip if the game started more than POST_START_GRACE_MINUTES ago —
-            # lines are gone by then, so any match found would be for a different game.
-            if mins_to_start < -POST_START_GRACE_MINUTES:
+            # Hard cutoff at game start: any price we'd see now is live
+            # in-play, not closing. Freeze closing_prob at whatever was
+            # last captured before tip-off.
+            if mins_to_start <= 0:
                 continue
 
             player = (row.get("player") or "").lower().strip()
@@ -119,14 +124,20 @@ class CLVTracker:
                     except (ValueError, TypeError):
                         old_cp_val = None
 
-                # Update if this is a new value or different from the old value.
-                if old_cp_val is None or abs(new_cp_val - old_cp_val) > 1e-4:
-                    orig_true_prob = float(row.get("true_prob", 0))
+                # Apply the same calibration multiplier BetResult used at
+                # bet-log time, so closing_prob lives in the same space as the
+                # stored true_prob and CLV reflects only line movement.
+                league = row.get("league")
+                prop_for_cal = row.get("prop")
+                cal_key = f"{league}|{prop_for_cal}"
+                multiplier = self._calibration_map.get(cal_key, 1.0)
+                calibrated_cp = min(new_cp_val * multiplier, 0.999)
 
-                    # closing_prob is the raw consensus worst_case_prob — the
-                    # same quantity stored as true_prob at bet-log time. CLV
-                    # therefore measures pure line movement.
-                    closing_prob = min(new_cp_val, 0.999)
+                # Update only when the calibrated value has moved materially
+                # from whatever was last written.
+                if old_cp_val is None or abs(calibrated_cp - old_cp_val) > 1e-4:
+                    orig_true_prob = float(row.get("true_prob", 0))
+                    closing_prob = calibrated_cp
                     clv_pct = closing_prob - orig_true_prob
 
                     try:

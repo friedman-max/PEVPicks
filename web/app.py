@@ -1751,7 +1751,7 @@ def get_analytics(user: dict = Depends(get_current_user)):
 
 @app.get("/api/backtest/slips")
 def get_backtest_slips(user: dict = Depends(get_current_user)):
-    """Return the last 50 logged slips from Supabase."""
+    """Return the last 100 logged slips from Supabase."""
     from engine.database import get_user_db
 
     db = get_user_db(user["jwt"])
@@ -1761,8 +1761,8 @@ def get_backtest_slips(user: dict = Depends(get_current_user)):
         return {"slips": [], "total": 0}
 
     try:
-        # 1. Fetch the latest 50 slips
-        slips_res = db.table("slips").select("*").order("timestamp", desc=True).limit(50).execute()
+        # 1. Fetch the latest 100 slips
+        slips_res = db.table("slips").select("*").order("timestamp", desc=True).limit(100).execute()
         slip_data = slips_res.data
         if not slip_data:
             return {"slips": [], "total": 0}

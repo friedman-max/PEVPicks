@@ -1621,13 +1621,33 @@ setTimeout(() => {
 let btSlips = [];   // raw slip objects from API
 const btState = {
   page: 1,
-  pageSize: 100
+  // pageSize counts SLIPS, not legs — pagination boundaries must never
+  // split a slip's legs across pages. 20 slips × ~6 legs ≈ 120 leg-rows
+  // per page.
+  pageSize: 20
 };
+
+// Pure helper: given an ordered list of slips (each with .legs already
+// filter-applied, possibly empty-legs dropped) and a page state with
+// {page, pageSize}, return {pageSlips, paginatedLegs, totalSlips,
+// totalPages}. Exported for tests.
+function paginateSlipsForBacktest(slipsFiltered, state) {
+  const totalSlips = slipsFiltered.length;
+  const totalPages = Math.max(1, Math.ceil(totalSlips / state.pageSize));
+  const page = Math.min(Math.max(1, state.page), totalPages);
+  const start = (page - 1) * state.pageSize;
+  const pageSlips = slipsFiltered.slice(start, start + state.pageSize);
+  const paginatedLegs = pageSlips.flatMap(s => s.legs);
+  return { pageSlips, paginatedLegs, totalSlips, totalPages, page };
+}
+if (typeof window !== "undefined") window.paginateSlipsForBacktest = paginateSlipsForBacktest;
 
 // Per-user localStorage cache for backtest slips. Like analytics, the data
 // barely changes between tab activations — paint from cache first so the
 // user sees the full table immediately, and skip the fetch if still fresh.
-const BT_CACHE_KEY = "coreprop_backtest_cache_v1";
+// Bumped v1 → v2 when the API limit went 50 → 100 so any stale
+// cached 50-slip response from a prior session is discarded on load.
+const BT_CACHE_KEY = "coreprop_backtest_cache_v2";
 const BT_CACHE_FRESH_SEC = 300;
 
 function saveBacktestCache(slips) {
@@ -1696,18 +1716,25 @@ function renderBacktest() {
     };
   }
 
-  // Flatten all legs for the table, applying filters
+  // Build {slip_id, legs:[...]} entries preserving slip order. Filters
+  // apply per-leg; a slip with zero matching legs is dropped entirely
+  // so pagination doesn't show empty slip headers.
+  const slipsFiltered = [];
   let allLegs = [];
   for (const slip of btSlips) {
+    const matchingLegs = [];
     for (const leg of (slip.legs || [])) {
-      const row = { ...leg, slip_id: slip.slip_id, timestamp: slip.timestamp,
-                     slip_type: slip.slip_type, n_legs: slip.n_legs,
-                     proj_slip_ev_pct: slip.proj_slip_ev_pct,
-                     slip_payout: slip.payout, slip_hits: slip.hits,
-                     slip_completed: slip.completed };
       if (filterResult && (leg.result || "pending") !== filterResult) continue;
       if (filterLeague && (leg.league || "").toUpperCase() !== filterLeague) continue;
-      allLegs.push(row);
+      matchingLegs.push({ ...leg, slip_id: slip.slip_id, timestamp: slip.timestamp,
+                          slip_type: slip.slip_type, n_legs: slip.n_legs,
+                          proj_slip_ev_pct: slip.proj_slip_ev_pct,
+                          slip_payout: slip.payout, slip_hits: slip.hits,
+                          slip_completed: slip.completed });
+    }
+    if (matchingLegs.length > 0) {
+      slipsFiltered.push({ slip_id: slip.slip_id, legs: matchingLegs });
+      allLegs.push(...matchingLegs);
     }
   }
 
@@ -1791,13 +1818,15 @@ function renderBacktest() {
   // ── Table ──────────────────────────────────────────────────────────────
   const tbody = $("bt-tbody");
 
-  const totalItems = allLegs.length;
-  const totalPages = Math.ceil(totalItems / btState.pageSize) || 1;
-  if (btState.page > totalPages) btState.page = totalPages;
-  if (btState.page < 1) btState.page = 1;
-  const startIdx = (btState.page - 1) * btState.pageSize;
-  const paginated = allLegs.slice(startIdx, startIdx + btState.pageSize);
+  // Paginate by SLIP (not leg) so a slip's legs never straddle a page.
+  // NOTE: `totalSlips` is already declared in the summary block above, so
+  // rename the destructured field to `pagedSlipTotal`.
+  const { paginatedLegs: paginated, totalSlips: pagedSlipTotal, page: clampedPage } =
+    paginateSlipsForBacktest(slipsFiltered, btState);
+  btState.page = clampedPage;
+  const totalItems = pagedSlipTotal;
 
+  // renderPagination expects totalItems & pageSize that divide to totalPages.
   renderPagination("bt-pagination", btState, totalItems, renderBacktest);
 
   if (totalItems === 0) {
