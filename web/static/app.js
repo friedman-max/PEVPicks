@@ -1667,8 +1667,10 @@ function loadBacktestCache() {
 function renderBacktestSkeleton() {
   const tbody = $("bt-tbody");
   if (!tbody) return;
-  // 11 columns in the backtest table; render 8 skeleton rows.
-  const cells = Array.from({ length: 11 })
+  // 12 columns in the backtest table (Player, League, Prop Type, Line,
+  // Side, True Prob, Closing, CLV%, Ind EV%, Game Start, Result, Actual);
+  // render 8 skeleton rows.
+  const cells = Array.from({ length: 12 })
     .map((_, i) => `<td><div class="skeleton-bar" style="width:${i === 0 ? 60 : 45}%"></div></td>`)
     .join("");
   tbody.innerHTML = Array.from({ length: 8 }).map(() => `<tr class="skeleton-row">${cells}</tr>`).join("");
