@@ -4,11 +4,23 @@ Backtest and slip logger for CoreProp.
 Automatically documents the best +EV slip combinations as they appear
 throughout the day. Logs to Supabase with one row per leg.
 
-Dedup is enforced per (player, game_start) across a rolling 48h window
-sourced from Supabase — a player in a given game can appear in at most
-one slip during that window. Same player in a different game is fine.
+Dedup is layered:
+  • (player, game_date) — a player in a given game appears in at most one
+    slip across the rolling 48 h window.
+  • (player, prop, line, side, game_date) — an exact leg never appears in
+    two slips. Catches edge cases where the player-key dedup might miss
+    (e.g. a defensive belt-and-suspenders).
+  • Per-user threading.Lock — serializes concurrent log attempts so two
+    refreshes can't both read the same "used keys" snapshot before either
+    commits its slip.
+
+Within-slip caps:
+  • At most 3 legs share a single (league, game_date) bucket — prevents
+    runaway same-game stacks where correlation makes the joint EV worse
+    than the marginal EVs imply.
 """
 import logging
+import threading
 import uuid
 from datetime import date, datetime, timezone, timedelta
 from typing import Optional
@@ -26,6 +38,26 @@ MIN_LEG_EV_PCT = -0.01   # -1%
 # How far back we scan for duplicate slips and used-player keys.
 # 48 h covers every intra-day restart plus the midnight rollover.
 _DEDUP_WINDOW_HOURS = 48
+
+# Max legs from the same (league, game_date) inside a single slip. Prevents
+# auto-build from filling all 6 slots with one game where positive
+# correlation between legs is high (e.g., a hitting team's batters all
+# share game-script tailwinds).
+_MAX_LEGS_PER_GAME = 3
+
+# Per-user lock registry. Each user gets one lock; concurrent calls to
+# try_log_slip for the same user serialize so the dedup snapshot a thread
+# reads is never invalidated by a peer commit mid-flight.
+_user_locks: dict[str, threading.Lock] = {}
+_user_locks_registry_lock = threading.Lock()
+
+def _get_user_lock(user_id: str) -> threading.Lock:
+    with _user_locks_registry_lock:
+        lk = _user_locks.get(user_id)
+        if lk is None:
+            lk = threading.Lock()
+            _user_locks[user_id] = lk
+        return lk
 
 
 # Punctuation that is intra-word (initials, apostrophes) is stripped; those
@@ -71,6 +103,33 @@ def _normalize(s: str) -> str:
             merged.append(tokens[i])
             i += 1
     return " ".join(merged)
+
+def _normalize_line(line) -> str:
+    """Normalize a line value for fingerprinting. Handles strings and floats
+    consistently — '0.5' and 0.5 collapse to the same key."""
+    try:
+        return f"{float(line):.4f}"
+    except (TypeError, ValueError):
+        return str(line or "").strip()
+
+
+def make_leg_key(player: str, prop: str, line, side: str, start_time: str) -> tuple:
+    """Exact-leg fingerprint: same player + prop + line + side in the same
+    game produces the same key. Used to enforce that no identical leg
+    appears in two different slips."""
+    p_key, t_key = make_bet_key(player, start_time)
+    prop_key = (prop or "").strip().lower()
+    side_key = (side or "").strip().lower()
+    return (p_key, prop_key, _normalize_line(line), side_key, t_key)
+
+
+def make_game_key(league: str, start_time: str) -> tuple[str, str]:
+    """Best-effort 'same game' bucket. Two legs sharing this key are
+    presumed to be from the same game (or at least same league + same UTC
+    date), so the within-slip cap can prevent over-stacking."""
+    _, t_key = make_bet_key("", start_time)
+    return ((league or "").strip().upper() or "UNKNOWN", t_key)
+
 
 def make_bet_key(player: str, start_time: str) -> tuple[str, str]:
     """Build a unique signature for a player in a specific game (UTC-normalized)."""
@@ -176,14 +235,33 @@ class BacktestLogger:
             return []
 
     def _load_used_keys_from_db(self) -> set[tuple[str, str]]:
-        used: set[tuple[str, str]] = set()
+        """Backwards-compatible: return the set of (player, game_date)
+        pair keys used in the dedup window. Callers that need the
+        exact-leg set should use _load_dedup_sets() instead."""
+        pair_keys, _ = self._load_dedup_sets()
+        return pair_keys
+
+    def _load_dedup_sets(self) -> tuple[set[tuple], set[tuple]]:
+        """Return (pair_keys, leg_keys) used within the dedup window.
+          pair_keys: {(player, game_date)} — ensures a player isn't bet
+                     twice in the same game across slips.
+          leg_keys:  {(player, prop, line, side, game_date)} — ensures the
+                     exact same leg never repeats."""
+        pair_keys: set[tuple] = set()
+        leg_keys: set[tuple] = set()
         for slip in self._fetch_recent_slips_with_legs():
             for leg in slip["legs"]:
-                used.add(make_bet_key(
-                    leg.get("player", "") or "",
-                    leg.get("game_start", "") or "",
+                player = leg.get("player", "") or ""
+                start  = leg.get("game_start", "") or ""
+                pair_keys.add(make_bet_key(player, start))
+                leg_keys.add(make_leg_key(
+                    player,
+                    leg.get("prop", "") or "",
+                    leg.get("line", "") or "",
+                    leg.get("side", "") or "",
+                    start,
                 ))
-        return used
+        return pair_keys, leg_keys
 
     def find_conflicting_legs(self, bets: list[dict], used_keys: set) -> list[dict]:
         if not bets:
@@ -199,8 +277,18 @@ class BacktestLogger:
         return conflicts
 
     def try_log_slip(self, bets: list[dict], slip_type: str = "Power", n_legs: int = 6) -> Optional[dict]:
-        """Build and log the best available auto-slip with unique players."""
-        used_keys = self._load_used_keys_from_db()
+        """Build and log the best available auto-slip with unique players.
+
+        Serialized per-user: the body runs under a per-user lock so
+        concurrent refreshes can't both pass the dedup gate with the
+        same candidates. Without the lock, two threads could each read
+        an empty used-keys set, both pick Jake McCarthy, and both write
+        slips containing him."""
+        with _get_user_lock(self.user_id):
+            return self._try_log_slip_locked(bets, slip_type, n_legs)
+
+    def _try_log_slip_locked(self, bets: list[dict], slip_type: str, n_legs: int) -> Optional[dict]:
+        used_pair_keys, used_leg_keys = self._load_dedup_sets()
 
         def _ev(b: dict) -> float:
             return float(b.get("individual_ev_pct") or 0.0)
@@ -209,17 +297,37 @@ class BacktestLogger:
         pool = sorted(valid, key=_ev, reverse=True)
 
         best_legs = []
-        seen_in_this_slip = set()
-        
+        seen_pair: set[tuple] = set()
+        seen_leg:  set[tuple] = set()
+        per_game_count: dict[tuple, int] = {}
+
         for bet in pool:
-            p_key = make_bet_key(
-                bet.get("player_name", ""),
-                bet.get("start_time", "")
+            player = bet.get("player_name", "") or ""
+            start  = bet.get("start_time", "") or ""
+            p_key = make_bet_key(player, start)
+            l_key = make_leg_key(
+                player,
+                bet.get("prop_type", "") or "",
+                bet.get("pp_line", "") or "",
+                bet.get("side", "") or "",
+                start,
             )
-            if p_key in used_keys or p_key in seen_in_this_slip:
+            g_key = make_game_key(bet.get("league", "") or "", start)
+
+            # Cross-slip dedup (DB-sourced)
+            if p_key in used_pair_keys: continue
+            if l_key in used_leg_keys:  continue
+            # Within-slip dedup
+            if p_key in seen_pair: continue
+            if l_key in seen_leg:  continue
+            # Within-slip same-game cap
+            if per_game_count.get(g_key, 0) >= _MAX_LEGS_PER_GAME:
                 continue
+
             best_legs.append(bet)
-            seen_in_this_slip.add(p_key)
+            seen_pair.add(p_key)
+            seen_leg.add(l_key)
+            per_game_count[g_key] = per_game_count.get(g_key, 0) + 1
             if len(best_legs) == n_legs:
                 break
 
