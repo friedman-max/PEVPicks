@@ -1253,7 +1253,7 @@ function renderCalibrationCurves(isotonic) {
   const datasets = [{
     type: "line",
     label: "Perfect calibration",
-    data: [{ x: 0.5, y: 0.5 }, { x: 0.85, y: 0.85 }],
+    data: [{ x: 0.3, y: 0.3 }, { x: 0.85, y: 0.85 }],
     borderColor: "rgba(255,255,255,0.30)",
     borderDash: [5, 4],
     borderWidth: 1,
@@ -1346,14 +1346,14 @@ function renderCalibrationCurves(isotonic) {
       scales: {
         x: {
           type: "linear",
-          min: 0.5, max: 0.85,
+          min: 0.3, max: 0.85,
           title: { display: true, text: "Model probability", color: _chartTextColor() },
           ticks: { color: _chartTextColor(), callback: (v) => (v * 100).toFixed(0) + "%" },
           grid: { color: "rgba(255,255,255,0.06)" },
         },
         y: {
           type: "linear",
-          min: 0.3, max: 1.0,
+          min: 0.0, max: 1.0,
           title: { display: true, text: "Observed hit rate", color: _chartTextColor() },
           ticks: { color: _chartTextColor(), callback: (v) => (v * 100).toFixed(0) + "%" },
           grid: { color: "rgba(255,255,255,0.06)" },

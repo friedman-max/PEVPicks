@@ -775,7 +775,12 @@ def _run_pipeline_body():
 
         threading.Thread(target=_auto_log_bg, daemon=True).start()
 
-        # ── Market Observatory: log ALL high-prob lines for global calibration ──
+        # ── Market Observatory: log lines for global calibration ──
+        # Threshold at 0.30 (not 0.50) so the calibration sees both winners and
+        # losers. Restricting to >0.50 made every observation an "expected hit",
+        # which can only push calibration down. Including the 0.30–0.50 band
+        # gives bidirectional signal — leagues whose underdogs over-perform
+        # adjust up, those whose favorites under-perform adjust down.
         def _log_observatory_bg(bets=serialized_bets, books_probs_map=bet_books_probs):
             try:
                 from engine.database import get_db as _get_db
@@ -788,7 +793,7 @@ def _run_pipeline_body():
                 _books_supported = True
                 for b in bets:
                     tp = float(b.get("true_prob") or 0)
-                    if tp < 0.50:
+                    if tp < 0.30:
                         continue
                     player = b.get("player_name", "")
                     league = b.get("league", "")
@@ -2253,21 +2258,29 @@ def delete_backtest_slip(slip_id: str, user: dict = Depends(get_current_user)):
 
 @app.get("/api/observatory")
 def get_observatory_data():
-    """Returns the latest *resolved* observations from the market_observatory
-    table — pending rows are excluded so the feed only ever shows settled
-    outcomes (hit / miss / push / dnp)."""
+    """Returns the latest observations from the market_observatory table.
+    Resolved and pending rows are fetched separately so a flood of recent
+    pending rows can't push all the hit/miss rows past the row cap."""
     try:
         from engine.database import get_db
         db = get_db()
         if not db:
             return []
-        res = db.table("market_observatory") \
+        resolved = db.table("market_observatory") \
             .select("*") \
             .neq("result", "pending") \
             .order("created_at", desc=True) \
             .limit(100) \
-            .execute()
-        return res.data or []
+            .execute().data or []
+        pending = db.table("market_observatory") \
+            .select("*") \
+            .eq("result", "pending") \
+            .order("created_at", desc=True) \
+            .limit(100) \
+            .execute().data or []
+        combined = resolved + pending
+        combined.sort(key=lambda r: r.get("created_at") or "", reverse=True)
+        return combined
     except Exception as e:
         logger.error("API: observatory fetch error: %s", e)
         return []
